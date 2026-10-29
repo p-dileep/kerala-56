@@ -31,18 +31,28 @@ const DEFAULT_PARAMS = {
   // play
   cutMinPts: 3, fightMinPts: 2,
   // card tracking (1 = use inferred voids / remaining trumps, 0 = plain heuristics)
-  useTracking: 1
+  useTracking: 1,
+  // Monte Carlo check before a level bid (40/48/56) or a contested bid at 36+: deals laid out
+  // from what the auction revealed (0 = heuristics only), confidence required, slack below the target
+  simDeals: 24, simConf: 0.75, simMargin: 1, simContest: 1,
+  // probe: holding one suit, name a second one cheaply so partner can choose (back to the first / NT)
+  probeMaxValue: 31, probeMinLen: 3, probeSlack: 2
 };
 
 // Behaviour presets: overrides on DEFAULT_PARAMS. 'medium' is the tuned default.
 const STYLES = {
   defensive: { estBase: 22, bidContestMargin: 4, raiseMargin: 7, plus2Margin: 5, levelMargin: 99, jumpEst: 99,
-    showJackMargin: 2, altMargin: 2, doubleMinPts: 17, raiseMaxValue: 32, plusMaxValue: 36, backMaxValue: 36 },
+    showJackMargin: 2, altMargin: 2, doubleMinPts: 17, raiseMaxValue: 32, plusMaxValue: 36, backMaxValue: 36,
+    simConf: 0.85, simMargin: 2, probeMaxValue: 29 },
   medium: {},
   aggressive: { estBase: 26, bidContestMargin: 0, raiseMargin: 3, plus2Margin: 1, levelMargin: 2, jumpEst: 38, jumpGap: 6,
-    showJackMargin: -1, altMargin: -1, doubleMinPts: 13, raiseMaxValue: 44, plusMaxValue: 48, backMaxValue: 48 }
+    showJackMargin: -1, altMargin: -1, doubleMinPts: 13, raiseMaxValue: 44, plusMaxValue: 48, backMaxValue: 48,
+    simConf: 0.6, simMargin: 0, probeMaxValue: 33 }
 };
-const paramsFor = (style) => ({ ...DEFAULT_PARAMS, ...(STYLES[style] || {}) });
+// Each named bot has its own temperament; the host's table setting 'mixed' uses these.
+const BOT_PERSONALITY = { Kuttan: 'aggressive', Ammini: 'defensive', Pappan: 'medium', Chinnu: 'aggressive', Unni: 'medium',
+  Kunjamma: 'defensive', Appu: 'aggressive', Sarojini: 'medium', Mathai: 'defensive', Leela: 'medium' };
+const paramsFor = (style, name) => ({ ...DEFAULT_PARAMS, ...(STYLES[style === 'mixed' ? BOT_PERSONALITY[name] : style] || {}) });
 
 // ---------------------------------------------------------------- bidding
 
@@ -126,7 +136,13 @@ function chooseBid(view, P = DEFAULT_PARAMS) {
       // Levels pay more tables: 40+ = 2, 48+ = 3. Partner's bid is their estimate assuming an average
       // partner; add how much our hand exceeds average and go straight to the highest level reached.
       const teamEst = b.high.value + (support - P.estBase);
-      const level = [56, 48, 40].find((L) => L > b.high.value && teamEst >= L + P.levelMargin);
+      let level = [56, 48, 40].find((L) => L > b.high.value && teamEst >= L + P.levelMargin);
+      // With the auction's facts (shown Jacks, Plus cards, voids) laid out, see how many points the
+      // team really collects and go to the highest level that holds up; this also overrules the guess.
+      if (P.simDeals && b.high.value < 56 && teamEst >= 40 - P.levelMargin - 4) {
+        const q = simPoints(view, partnerSuit, P);
+        if (q !== null) level = [56, 48, 40].find((L) => L > b.high.value && q >= L + P.simMargin);
+      }
       if (level && level >= legal.minBid) return { type: 'bid', value: level, suit: partnerSuit };
       // Holding the Jack of partner's suit: tell the team by raising one step (the "30 Hearts" form
       // shows the Jack), unless we already showed it or the level is getting high.
@@ -173,10 +189,28 @@ function chooseBid(view, P = DEFAULT_PARAMS) {
     return { type: 'bid', value: legal.minBid, suit: s.suit };
   }
 
+  // Probe: we named a suit, opponents hold a cheap bid, and we have a second suit worth naming.
+  // Calling it asks partner to choose: back to our first suit, no-trump, or pass to keep the second.
+  const mySuits = [...new Set(b.actions.filter((a) => a.seat === seat && (a.type === 'bid' || a.type === 'plus') && a.suit !== 'NT').map((a) => a.suit))];
+  if (legal.minBid && b.high && mySuits.length === 1 && b.high.value < P.probeMaxValue) {
+    const second = options.find((o) => o.suit !== 'NT' && o.suit !== mySuits[0] && legal.suits.includes(o.suit) &&
+      hand.filter((c) => c.suit === o.suit).length >= P.probeMinLen &&
+      hand.some((c) => c.suit === o.suit && (c.rank === 'J' || c.rank === '9')) && o.est >= legal.minBid - P.probeSlack);
+    if (second) return { type: 'bid', value: legal.minBid, suit: second.suit };
+  }
+
   if (legal.minBid && best.est >= legal.minBid + (b.high ? P.bidContestMargin : 0)) {
     // Bid economically: just the minimum, but jump to a level when strong and contested.
     let value = legal.minBid;
     if (b.high && best.est >= P.jumpEst && value < 40 && best.est - value > P.jumpGap) value = 40;
+    // A contested bid at 36 or more is checked by laying the hand out: bid only what holds up.
+    if (P.simDeals && P.simContest && b.high && value >= 36) {
+      const q = simPoints(view, best.suit, P);
+      if (q !== null) {
+        if (q < value + P.simMargin) return legal.pass ? { type: 'pass' } : { type: 'bid', value, suit: best.suit };
+        value = [56, 48, 40].find((L) => L >= value && q >= L + P.simMargin) || value;
+      }
+    }
     return { type: 'bid', value, suit: best.suit };
   }
 
@@ -186,6 +220,107 @@ function chooseBid(view, P = DEFAULT_PARAMS) {
     if (b.high.value >= P.doubleMinValue && myPts >= P.doubleMinPts) return { type: 'double' };
   }
   return { type: 'pass' };
+}
+
+// ---------------------------------------------------------------- team knowledge
+/**
+ * What the auction has told everyone about each seat's cards. Only public information:
+ * a suit call made with the Jack signal shows one Jack; each Plus shows the cards it claimed
+ * (a Plus 1 on the Jack means the Jack is that seat's only card in the suit); NS shows a void.
+ * Returns { must: [[rank+suit...]], lone: [Set(suit)], voids: [Set(suit)] } per seat.
+ */
+function inferFacts(view) {
+  const N = view.players || 6;
+  const must = Array.from({ length: N }, () => []);
+  const lone = Array.from({ length: N }, () => new Set());
+  const voids = Array.from({ length: N }, () => new Set());
+  const jackShown = new Set();
+  const acts = view.bidding.actions;
+  acts.forEach((a, i) => {
+    if (a.type === 'ns') voids[a.seat].add(a.ns);
+    if (a.suit === 'NT' || !a.suit) return;
+    if (a.type === 'bid' && a.hasJack && !jackShown.has(`${a.seat}${a.suit}`)) {
+      jackShown.add(`${a.seat}${a.suit}`); must[a.seat].push(`J${a.suit}`);
+    }
+    if (a.type === 'plus') {
+      const m = E.plusMeaning(acts.slice(0, i), a.suit)[a.n] || [];
+      for (const r of m) must[a.seat].push(`${r}${a.suit}`);
+      if (a.n === 1 && m[0] === 'J') lone[a.seat].add(a.suit);
+    }
+  });
+  return { must, lone, voids };
+}
+
+/**
+ * Deal the cards I cannot see to the other seats at random, honouring the facts where possible.
+ * Returns hands[] (mine included) or null when a required card is no longer available.
+ */
+function dealUnseen(view, facts, rng) {
+  const N = view.players || 6, me = view.mySeat;
+  const seen = new Set([...view.hand.map((c) => c.id), ...(view.playedIds || [])]);
+  const pool = E.shuffle(E.makeDeck().filter((c) => !seen.has(c.id)), rng);
+  const hands = Array.from({ length: N }, () => []);
+  hands[me] = view.hand.slice();
+  const room = view.handCounts.slice();
+  room[me] = 0;
+  for (let s = 0; s < N; s++) {
+    if (s === me) continue;
+    for (const rs of facts.must[s]) {
+      const i = pool.findIndex((c) => c.rank + c.suit === rs);
+      if (i < 0 || room[s] <= 0) return null;
+      hands[s].push(pool.splice(i, 1)[0]); room[s]--;
+    }
+  }
+  for (const c of pool) {
+    const ok = [], any = [];
+    for (let s = 0; s < N; s++) {
+      if (s === me || room[s] <= 0) continue;
+      any.push(s);
+      if (!facts.voids[s].has(c.suit) && !facts.lone[s].has(c.suit)) ok.push(s);
+    }
+    const pick = (ok.length ? ok : any)[Math.floor(rng() * (ok.length ? ok : any).length)];
+    if (pick === undefined) return null;
+    hands[pick].push(c); room[pick]--;
+  }
+  return hands;
+}
+
+/**
+ * Monte Carlo: play the hand out in `suit` on `deals` random layouts consistent with the auction,
+ * both teams using the bot's own play. Returns my team's points at confidence `conf`
+ * (the value reached in at least that share of deals), or null when no deal could be laid out.
+ */
+function simPoints(view, suit, P, rng = Math.random) {
+  const deals = P.simDeals | 0;
+  if (!deals) return null;
+  const N = view.players || 6, me = E.team(view.mySeat), hs = view.handSize || 48 / N;
+  const facts = inferFacts(view);
+  const results = [];
+  const playP = { ...DEFAULT_PARAMS, useTracking: 0 };
+  for (let d = 0; d < deals; d++) {
+    const hands = dealUnseen(view, facts, rng);
+    if (!hands) continue;
+    const st = {
+      settings: view.settings, phase: 'playing', handNo: view.handNo, dealer: view.dealer, tables: [99, 99],
+      hands: hands.map((h) => E.sortHand(h)), bidding: view.bidding, history: [], winner: null, log: [], result: null,
+      contract: { seat: view.mySeat, team: me, value: 56, suit, hasJack: false, mult: 1 },
+      trick: { leader: view.bidding.opener, cards: [], complete: false, winner: null }, turn: view.bidding.opener,
+      tricksTaken: [0, 0], points: [0, 0], played: [], trickNo: 0, lastTrick: null
+    };
+    while (st.trickNo < hs) {
+      if (st.trick.complete) {
+        const w = st.trick.winner;
+        st.points[E.team(w)] += st.trick.points; st.trickNo++;
+        st.trick = { leader: w, cards: [], complete: false, winner: null }; st.turn = w;
+        continue;
+      }
+      E.playCard(st, st.turn, choosePlay(botView(st, st.turn), playP));
+    }
+    results.push(st.points[me]);
+  }
+  if (!results.length) return null;
+  results.sort((a, b) => a - b);
+  return results[Math.min(results.length - 1, Math.floor((1 - P.simConf) * results.length))];
 }
 
 // ---------------------------------------------------------------- play helpers
@@ -362,4 +497,4 @@ function botView(state, seat) {
 }
 
 const estimate = estimateFor;
-module.exports = { decide, botView, estimate, chooseBid, choosePlay, track, DEFAULT_PARAMS, STYLES, paramsFor };
+module.exports = { decide, botView, estimate, chooseBid, choosePlay, track, inferFacts, dealUnseen, simPoints, DEFAULT_PARAMS, STYLES, BOT_PERSONALITY, paramsFor };

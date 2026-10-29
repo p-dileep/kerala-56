@@ -175,7 +175,15 @@ function legalBidActions(state, seat) {
   if (plusSuit) {
     const suit = plusSuit;
     const inSuit = hand.filter((c) => c.suit === suit);
-    const count = (r) => inSuit.filter((c) => c.rank === r).length;
+    // Cards this seat already showed in the suit (its Jack signal, earlier Plus calls) cannot be claimed again.
+    const shown = [];
+    let jackCounted = false;
+    b.actions.forEach((a, i) => {
+      if (a.seat !== seat || a.suit !== suit) return;
+      if (a.type === 'bid' && a.hasJack && !jackCounted) { jackCounted = true; shown.push('J'); }
+      if (a.type === 'plus') shown.push(...(plusMeaning(b.actions.slice(0, i), suit)[a.n] || []));
+    });
+    const count = (r) => inSuit.filter((c) => c.rank === r).length - shown.filter((x) => x === r).length;
     const holds = (ranks) => RANKS.every((r) => count(r) >= ranks.filter((x) => x === r).length);
     const room = MAX_BID - b.high.value;
     const m = plusMeaning(b.actions, suit);

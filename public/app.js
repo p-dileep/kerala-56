@@ -242,10 +242,10 @@
     $('seats').querySelectorAll('[data-kick]').forEach((b) => (b.onclick = () => socket.emit('kick', { seat: b.dataset.kick })));
   }
 
-  const STYLE_TEXT = { defensive: 'Defensive: bid low, rarely raise or go for levels', medium: 'Medium: balanced (default)', aggressive: 'Aggressive: bid up, support partner, go for 40 / 48 / 56' };
+  const STYLE_TEXT = { mixed: 'Mixed: each bot keeps its own temperament (hover a bot for it)', defensive: 'Defensive: bid low, rarely raise or go for levels', medium: 'Medium: balanced (default)', aggressive: 'Aggressive: bid up, support partner, go for 40 / 48 / 56' };
   function botStyleHtml() {
-    if (!room.isHost) return `<div class="sub">Bots: ${esc(room.botStyle || 'medium')}</div>`;
-    return `<label class="sub">Bots: <select id="botStyle" title="${esc(STYLE_TEXT[room.botStyle] || '')}">${['defensive', 'medium', 'aggressive']
+    if (!room.isHost) return `<div class="sub">Bots: ${esc(room.botStyle || 'mixed')}</div>`;
+    return `<label class="sub">Bots: <select id="botStyle" title="${esc(STYLE_TEXT[room.botStyle] || '')}">${['mixed', 'defensive', 'medium', 'aggressive']
       .map((s) => `<option value="${s}" ${s === room.botStyle ? 'selected' : ''}>${s}</option>`).join('')}</select></label>`;
   }
   function wireBotStyle() { const el = $('botStyle'); if (el) el.onchange = () => socket.emit('botStyle', { style: el.value }); }

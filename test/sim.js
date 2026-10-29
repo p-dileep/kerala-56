@@ -144,6 +144,50 @@ assert.throws(()=>E.applyBid(s, s.turn, {type:'pass'}), /Opener/);
   assert.deepEqual(B.paramsFor('medium'), B.DEFAULT_PARAMS);
   assert.ok(B.paramsFor('aggressive').estBase > B.paramsFor('defensive').estBase);
   assert.deepEqual(B.paramsFor('nonsense'), B.DEFAULT_PARAMS);
+  assert.deepEqual(B.paramsFor('mixed', 'Kuttan'), B.paramsFor('aggressive'));
+  assert.deepEqual(B.paramsFor('mixed', 'Ammini'), B.paramsFor('defensive'));
+  assert.deepEqual(B.paramsFor('mixed', 'Bot 3'), B.DEFAULT_PARAMS);
+  // team knowledge: the auction's Jack signal, Plus cards and NS void are read into facts and
+  // every simulated layout honours them
+  { const s = E.newMatch({}, ()=>0.3); const op = s.turn;
+    s.hands[op] = s.hands[op].filter((c)=>!(c.suit==='H'&&c.rank==='J')); s.hands[op].push({ id: 'JH0', suit: 'H', rank: 'J' });
+    E.applyBid(s, op, { type: 'bid', value: 28, suit: 'H' });            // shows a Jack
+    const o1 = s.turn; E.applyBid(s, o1, { type: 'pass' });
+    const p1 = s.turn;                                                    // opener's partner
+    s.hands[p1] = s.hands[p1].filter((c)=>c.suit!=='H'); s.hands[p1].push({ id: 'JH1', suit: 'H', rank: 'J' }, { id: '9H0', suit: 'H', rank: '9' });
+    s.hands[p1] = s.hands[p1].slice(0, 8); s.hands[op] = s.hands[op].slice(0, 8);
+    E.applyBid(s, p1, { type: 'plus', n: 2 });                           // J + 9 of hearts
+    const o2 = s.turn; const vs = E.legalBidActions(s, o2).ns.find((o)=>o.suit==='H');
+    if (vs) { s.hands[o2] = s.hands[o2].filter((c)=>c.suit!=='H'); E.applyBid(s, o2, { type: 'ns', value: vs.value }); }
+    const me = s.turn; const v = B.botView(s, me); const f = B.inferFacts(v);
+    assert.deepEqual(f.must[op], ['JH']); assert.deepEqual(f.must[p1], ['JH', '9H']);
+    if (vs) assert.ok(f.voids[o2].has('H'));
+    for (let k = 0; k < 20; k++) { const h = B.dealUnseen(v, f, Math.random); if (!h) continue;
+      assert.ok(h[op].some((c)=>c.rank==='J'&&c.suit==='H')); assert.ok(h[p1].some((c)=>c.rank==='9'&&c.suit==='H'));
+      if (vs) assert.ok(!h[o2].some((c)=>c.suit==='H'));
+      assert.equal(h.flat().length, 48); assert.equal(new Set(h.flat().map((c)=>c.id)).size, 48); }
+    const q = B.simPoints(v, 'H', B.DEFAULT_PARAMS); assert.ok(q === null || (q >= 0 && q <= 56));
+    assert.equal(B.simPoints(v, 'H', { ...B.DEFAULT_PARAMS, simDeals: 0 }), null); }
+  // a Jack shown by the bid form cannot be claimed again by the same player's Plus
+  { const s = E.newMatch({}, ()=>0.3); const op = s.turn;
+    s.hands[op] = [{id:'JH0',suit:'H',rank:'J'},{id:'9H0',suit:'H',rank:'9'},{id:'AS0',suit:'S',rank:'A'},{id:'KS0',suit:'S',rank:'K'},{id:'QS0',suit:'S',rank:'Q'},{id:'KC0',suit:'C',rank:'K'},{id:'QC0',suit:'C',rank:'Q'},{id:'KD0',suit:'D',rank:'K'}];
+    E.applyBid(s, op, { type: 'bid', value: 28, suit: 'H' });            // shows the Jack
+    E.applyBid(s, s.turn, { type: 'pass' });
+    const p1 = s.turn; s.hands[p1] = s.hands[p1].filter((c)=>c.suit!=='H').slice(0, 7).concat([{id:'JH1',suit:'H',rank:'J'}]);
+    E.applyBid(s, p1, { type: 'plus', n: 1 });                           // partner: the other Jack, lone
+    while (s.turn !== op) E.applyBid(s, s.turn, { type: 'pass' });
+    const L = E.legalBidActions(s, op);                                   // ladder now 9 9 A A...: Plus 1 = a 9
+    assert.deepEqual(L.plus, [1]); assert.deepEqual(L.plusMeaning[1], ['9']);
+    s.hands[op] = s.hands[op].filter((c)=>c.id!=='9H0').concat([{id:'AH0',suit:'H',rank:'A'}]);
+    assert.deepEqual(E.legalBidActions(s, op).plus, []); }               // only the shown Jack left: nothing new to claim
+  // probe: holding one suit against a cheap opponent bid, a two-suited hand names its second suit
+  { const s = E.newMatch({}, ()=>0.3); const op = s.turn;
+    s.hands[op] = [{id:'JS0',suit:'S',rank:'J'},{id:'9S0',suit:'S',rank:'9'},{id:'AS0',suit:'S',rank:'A'},{id:'JH0',suit:'H',rank:'J'},{id:'9H0',suit:'H',rank:'9'},{id:'KH0',suit:'H',rank:'K'},{id:'QC0',suit:'C',rank:'Q'},{id:'KD0',suit:'D',rank:'K'}];
+    E.applyBid(s, op, { type: 'bid', value: 28, suit: 'S' });
+    s.hands[s.turn] = [{id:'JD0',suit:'D',rank:'J'},{id:'9D0',suit:'D',rank:'9'},{id:'AD0',suit:'D',rank:'A'},{id:'10D0',suit:'D',rank:'10'},{id:'JC0',suit:'C',rank:'J'},{id:'AC0',suit:'C',rank:'A'},{id:'KC0',suit:'C',rank:'K'},{id:'QD0',suit:'D',rank:'Q'}];
+    E.applyBid(s, s.turn, { type: 'bid', value: 29, suit: 'D' });        // opponent overcalls
+    while (s.turn !== op) E.applyBid(s, s.turn, { type: 'pass' });
+    const a = B.chooseBid(B.botView(s, op)); assert.deepEqual(a, { type: 'bid', value: 30, suit: 'H' }); }
   // partner probed with a second suit: bot goes back to partner's first suit when it can support it
   const z = E.newMatch({}, ()=>0.3); const zo = z.turn;
   const seatsFrom = (k)=>(zo + k) % 6;

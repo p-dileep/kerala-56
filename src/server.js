@@ -45,7 +45,7 @@ function createRoom(hostToken, players = 6, code = null) {
     fixed: !!code,          // permanent lobby table: never deleted, reset when empty
     seats: Array.from({ length: players }, emptySeat),
     game: null,
-    botStyle: 'medium',
+    botStyle: 'mixed',
     chat: [],
     timer: null,
     awaySince: {},
@@ -71,7 +71,7 @@ function ensureHost(room) {
 function resetFixed(room) {
   clearTimeout(room.timer);
   room.seats = Array.from({ length: room.players }, emptySeat);
-  room.game = null; room.chat = []; room.hostToken = null; room.botStyle = 'medium'; room.touched = Date.now();
+  room.game = null; room.chat = []; room.hostToken = null; room.botStyle = 'mixed'; room.touched = Date.now();
 }
 
 function lobbyInfo() {
@@ -106,6 +106,7 @@ function broadcast(room) {
       fixed: room.fixed,
       isHost: sock.data.token === room.hostToken,
       botStyle: room.botStyle,
+      botPersonality: Bot.BOT_PERSONALITY,
       mySeat: seat >= 0 ? seat : null,
       seats: publicSeats(room),
       chat: room.chat.slice(-40),
@@ -152,7 +153,7 @@ function schedule(room) {
 function autoAct(room, seat) {
   const g = room.game;
   try {
-    const d = Bot.decide(Bot.botView(g, seat), Bot.paramsFor(room.botStyle));
+    const d = Bot.decide(Bot.botView(g, seat), Bot.paramsFor(room.botStyle, room.seats[seat].name));
     if (!d) return;
     if (d.kind === 'bid') E.applyBid(g, seat, d.action);
     else E.playCard(g, seat, d.cardId);
@@ -268,7 +269,7 @@ io.on('connection', (socket) => {
   socket.on('botStyle', ({ style } = {}) => {
     const room = getRoom();
     if (!room || socket.data.token !== room.hostToken) return fail('Only the host can change the bots');
-    if (!Bot.STYLES[style]) return fail('Unknown bot style');
+    if (!Bot.STYLES[style] && style !== 'mixed') return fail('Unknown bot style');
     room.botStyle = style;
     sysChat(room, `Bots set to ${style}.`);
     broadcast(room);

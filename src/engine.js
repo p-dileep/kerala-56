@@ -378,8 +378,8 @@ function scoreHand(state) {
   state.result = { contract: c, made, points: state.points.slice(), amount, payer, receiver };
   state.history.push({ hand: state.handNo, ...state.result });
   state.log.push(made
-    ? `Team ${'AB'[bidTeam]} made ${c.value} with ${state.points[bidTeam]} — receives ${amount} table(s).`
-    : `Team ${'AB'[bidTeam]} fell short of ${c.value} with ${state.points[bidTeam]} — pays ${amount} table(s).`);
+    ? `Team ${'AB'[bidTeam]} made ${c.value} with ${state.points[bidTeam]} — receives ${amount} chip(s).`
+    : `Team ${'AB'[bidTeam]} fell short of ${c.value} with ${state.points[bidTeam]} — pays ${amount} chip(s).`);
 
   if (paid < amount || state.tables[payer] <= 0) {
     state.phase = 'matchover';
@@ -398,6 +398,13 @@ function nextHand(state, rng = Math.random) {
 }
 
 // ---------------------------------------------------------------- views
+
+// Host resets both teams' chips to the starting count (any time; a finished match reopens as a new one).
+function resetChips(state) {
+  state.tables = [state.settings.startingTables, state.settings.startingTables];
+  state.log.push(`Chips reset to ${state.settings.startingTables} each.`);
+  if (state.phase === 'matchover') { state.winner = null; state.phase = 'handover'; }
+}
 
 function getView(state, seat) {
   const mine = seat !== null && seat !== undefined && seat >= 0;
@@ -434,7 +441,7 @@ function getView(state, seat) {
 
 module.exports = {
   SUITS, RANKS, RANK_POWER, POINTS, LEVELS, NUM_SEATS, HAND_SIZE, MIN_BID, MAX_BID, DEFAULT_SETTINGS,
-  team, nextSeat, plusMeaning, makeDeck, shuffle, sortHand, bidBaseTables, nextLevelAbove,
+  team, nextSeat, resetChips, plusMeaning, makeDeck, shuffle, sortHand, bidBaseTables, nextLevelAbove,
   newMatch, startHand, legalBidActions, applyBid, legalCards, winningIndex, playCard,
   collectTrick, scoreHand, nextHand, getView, trumpSuit
 };

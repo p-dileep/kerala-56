@@ -18,7 +18,7 @@ Or on Windows just double-click `start_game.bat`: it installs Node.js (via winge
 To play with friends over the internet without any hosting, double-click `start_online.bat` instead. It does everything `start_game.bat` does, downloads the portable `cloudflared.exe` into `tools/` on first use (no Cloudflare account needed), opens a quick tunnel, prints and copies the public `https://....trycloudflare.com` address, and opens the browser there. Create the table at that address and click the table code to copy the invite link. The address changes every time the tunnel is restarted.
 
 ## Variants
-`players` in the table settings is 6 or 8. Both use the same 48-card pack, so 8 players get 6 cards and play 6 tricks; bids, levels and tables are unchanged. Bots scale their hand estimates to the hand size.
+`players` in the table settings is 6 or 8. Both use the same 48-card pack, so 8 players get 6 cards and play 6 tricks; bids, levels and chips are unchanged. Bots scale their hand estimates to the hand size.
 
 ## Deploy on Render (how the public link is set up)
 New Web Service from the GitHub repo, language Docker (the `Dockerfile` is used, no build or start command needed), branch `main`, Free instance. Render sets `PORT` itself.
@@ -52,19 +52,21 @@ Run a **single** process. Rooms are held in memory. A restart ends the tables in
 - Bids are 28–56 with a suit or NT. The opener must bid at least 28. You cannot name a suit you are void in.
   Raising **your own** standing bid must jump to the next level (40/48/56).
 - Jack signal: a bid is shown as "30 ♥" when the caller holds the Jack of that suit and "♥ 30" when they do not. The engine derives this from the hand.
+- Seats can change at any time, even mid-hand: anyone can take a bot's seat ("Take seat" / "Move here"), the host can replace any player with a bot, and any seated player can replace someone who has dropped off (shown as "away"). A player who leaves is replaced by a bot.
 - After a hand, "Show the initial hands" (in the result window, the table centre, or the top bar) reveals every player's cards as dealt. Hands stay private until then.
+- The host can reset both teams to 12 chips at any time ("Reset chips" in the top bar).
 - After a hand the table waits: the host clicks "Next hand" (in the result window or the centre of the table) when everyone has reviewed the result.
 - A hand stops as soon as the result is decided: the bidding team reaches the target, or the points still unplayed cannot get them there. The remaining cards are not played.
 - Plus convention: the opener may open with "Plus N" in a suit (= 28+N in that suit, fresh-ladder meaning); otherwise only a partner of the high bidder may say "Plus N", raising by N in the same suit. Meanings are relative to the power ladder J J 9 9 A A 10 10 K K Q Q minus cards already shown by earlier calls in that suit (a Jack-signal call shows one Jack; each Plus shows what it claimed). Plus 1 = the top remaining card of the ladder; while that is a Jack it must be the only card held in the suit. Plus may also be said over an opponent's bid, in the last suit a partner called (Plus N = current bid + N in that suit). Plus 2 = the top two remaining cards (fresh: both Jacks; after a Plus 1: the other Jack and a Nine; after all Jacks and Nines: both Aces). Plus 3 = the top three remaining cards (fresh: both Jacks and a Nine). The engine offers each only when the hand qualifies; `legalBidActions().plusMeaning` gives the current meaning.
 - Bot styles: the host picks Defensive / Medium / Aggressive before dealing (and between matches). Presets live in `STYLES` in `src/bot.js`; Medium is the tuned default, Aggressive bids up, supports partner more readily and goes for 40 / 48 / 56, Defensive bids low and never jumps levels.
-- Bot bidding: a bot holding the Jack of its partner's suit shows it by raising one step (the "30 Hearts" form). When partner's bid plus the bot's extra strength reaches 40, 48 or 56 (`levelMargin`), it bids that level directly, since levels pay more tables.
+- Bot bidding: a bot holding the Jack of its partner's suit shows it by raising one step (the "30 Hearts" form). When partner's bid plus the bot's extra strength reaches 40, 48 or 56 (`levelMargin`), it bids that level directly, since levels pay more chips.
 - Bot bidding: when its partner, holding the bid, has switched from an earlier suit to a second one (a probe for information), the bot answers once: it goes back to the first suit when it can support it, or calls no-trump when strong all round, so a weak probe suit is not left as the contract.
 - NS convention: "value NS" is a no-trump bid that says you hold no cards of a called suit. One step above the current bid points at the most recently called suit, two steps at the suit called before that, and so on. Offered only when you are actually void in that suit; it plays as NT if it wins the auction.
 - Opponents may double, then the bidders may redouble. A redouble ends the auction, and so do 5 passes after the last bid or double.
 - Trump is the suit named in the winning bid and is open to everyone. Follow suit if able; trumping is optional.
   Identical cards: the first one played wins.
-- Tables: each team starts with 12. Bids of 28–39 win 1 or lose 2, 40–47 win 2 or lose 3, 48–55 win 3 or lose 4, 56 wins 4 or loses 5.
-  Doubling ×2, redoubling ×4. A team that runs out of tables loses.
+- Chips (tables / kuttu): each team starts with 12. Bids of 28–39 win 1 or lose 2, 40–47 win 2 or lose 3, 48–55 win 3 or lose 4, 56 wins 4 or loses 5.
+  Doubling ×2, redoubling ×4. A team that runs out of chips loses.
 
 House-rule knobs are in `DEFAULT_SETTINGS` (`startingTables`, `redoubleMultiplier`, `selfRaiseNextLevel`).
 

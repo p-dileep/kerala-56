@@ -150,6 +150,7 @@
     $('modalBody').querySelectorAll('[data-start]').forEach((b) => (b.onclick = () => { closeModal(); socket.emit('start'); }));
     $('modalBody').querySelectorAll('[data-next]').forEach((b) => (b.onclick = () => { closeModal(); socket.emit('nextHand'); }));
     $('modalBody').querySelectorAll('[data-hands]').forEach((b) => (b.onclick = showDealtHands));
+    $('modalBody').querySelectorAll('[data-reset]').forEach((b) => (b.onclick = () => { closeModal(); socket.emit('resetChips'); }));
   }
   function closeModal() { $('modal').classList.add('hidden'); $('modalBody').innerHTML = ''; }
   $('modal').onclick = (e) => { if (e.target === $('modal') && $('modal').dataset.closable) closeModal(); };
@@ -159,6 +160,7 @@
   function render() {
     const g = room.game;
     $('handsBtn').classList.toggle('hidden', !(g && g.dealt));
+    $('resetChipsBtn').classList.toggle('hidden', !(g && room.isHost));
     $('roomCode').textContent = room.code;
     renderScores(g);
     renderSeats(g);
@@ -174,7 +176,7 @@
 
   function renderScores(g) {
     for (const t of [0, 1]) {
-      $(`tables${t}`).textContent = g ? `${g.tables[t]} tables` : '12 tables';
+      $(`tables${t}`).textContent = g ? `${g.tables[t]} chips` : '12 chips';
       $(`hpts${t}`).textContent = g && g.contract ? `${g.points[t]} pts` : '';
     }
     const c = g && g.contract;
@@ -219,10 +221,13 @@
         if (g) meta.push(`${g.handCounts[s.seat]} cards`);
         if (s.kind === 'human' && !s.connected) meta.push('<span class="away">away</span>');
         let actions = '';
-        if (s.kind === 'bot' && !isMe && (room.mySeat === null || !g))
-          actions += `<button class="btn small" data-sit="${s.seat}">Take seat</button>`;
+        const seated = room.mySeat !== null;
+        if (s.kind === 'bot' && !isMe)
+          actions += `<button class="btn small" data-sit="${s.seat}" title="${seated && g ? 'Move here; a bot takes your current seat' : 'Play this seat'}">${seated && g ? 'Move here' : 'Take seat'}</button>`;
         if (host && !g && s.kind === 'bot') actions += `<button class="btn small ghost" data-unbot="${s.seat}">Remove</button>`;
-        if (host && s.kind === 'human' && !isMe) actions += `<button class="btn small ghost" data-kick="${s.seat}">${g ? 'Replace with bot' : 'Remove'}</button>`;
+        // host may replace anyone; any seated player may replace someone who has dropped off
+        if (s.kind === 'human' && !isMe && (host || (seated && !s.connected)))
+          actions += `<button class="btn small ghost" data-kick="${s.seat}">${g ? 'Replace with bot' : 'Remove'}</button>`;
         body = `<div class="nm">${esc(s.name)}</div><div class="meta">${meta.join(' ')}</div>
           ${actions ? `<div class="seat-actions">${actions}</div>` : ''}`;
       }
@@ -256,6 +261,8 @@
       <div class="row"><button class="btn primary" data-close>Close</button></div>`, true);
   }
   $('handsBtn').onclick = showDealtHands;
+  $('resetChipsBtn').onclick = () => openModal(`<h2>Reset chips?</h2><p>Both teams go back to 12 chips. The current hand continues.</p>
+    <div class="row"><button class="btn primary" data-reset>Reset</button><button class="btn" data-close>Cancel</button></div>`, true);
 
   function renderCenter(g) {
     const c = $('center');
@@ -416,8 +423,8 @@
     const bt = TEAM[c.team];
     const verdict = r.made ? `${bt} made it` : `${bt} went down`;
     const flow = r.made
-      ? `${TEAM[r.payer]} pays ${r.amount} table${r.amount > 1 ? 's' : ''} to ${bt}.`
-      : `${bt} pays ${r.amount} table${r.amount > 1 ? 's' : ''} to ${TEAM[r.receiver]}.`;
+      ? `${TEAM[r.payer]} pays ${r.amount} chip${r.amount > 1 ? 's' : ''} to ${bt}.`
+      : `${bt} pays ${r.amount} chip${r.amount > 1 ? 's' : ''} to ${TEAM[r.receiver]}.`;
     const over = g.phase === 'matchover';
     openModal(`
       <h2>${verdict}</h2>
@@ -426,8 +433,8 @@
       <div class="tally">
         <span>${TEAM[0]} points</span><span class="v">${r.points[0]}</span>
         <span>${TEAM[1]} points</span><span class="v">${r.points[1]}</span>
-        <span>${TEAM[0]} tables</span><span class="v">${g.tables[0]}</span>
-        <span>${TEAM[1]} tables</span><span class="v">${g.tables[1]}</span>
+        <span>${TEAM[0]} chips</span><span class="v">${g.tables[0]}</span>
+        <span>${TEAM[1]} chips</span><span class="v">${g.tables[1]}</span>
       </div>
       ${over ? `<p><b>${TEAM[g.winner]} wins the match.</b></p>` : room.isHost ? '' : '<p class="sub">The host deals the next hand.</p>'}
       <div class="row">

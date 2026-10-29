@@ -227,9 +227,9 @@ io.on('connection', (socket) => {
     const cur = seatOfToken(room, socket.data.token);
     let myName = clean(name);
     if (cur >= 0) {
-      if (room.game) return fail('You are already playing in this match.');
       myName = myName || room.seats[cur].name;
-      room.seats[cur] = emptySeat();
+      room.seats[cur] = room.game ? { ...emptySeat(), kind: 'bot', name: BOT_NAMES[cur] } : emptySeat();
+      if (room.game) sysChat(room, `${BOT_NAMES[cur]} took over ${myName}'s old seat.`);
     }
     room.seats[seat] = { kind: 'human', name: myName || `Player ${seat + 1}`, token: socket.data.token, socketId: socket.id, connected: true };
     if (target.kind === 'bot') sysChat(room, `${room.seats[seat].name} took over from ${target.name}.`);
@@ -249,9 +249,12 @@ io.on('connection', (socket) => {
 
   socket.on('kick', ({ seat } = {}) => {
     const room = getRoom();
-    if (!room || socket.data.token !== room.hostToken) return;
+    if (!room) return;
     const s = room.seats[Number(seat)];
-    if (!s || s.kind !== 'human' || s.token === room.hostToken) return;
+    if (!s || s.kind !== 'human' || s.token === socket.data.token) return;
+    const isHost = socket.data.token === room.hostToken;
+    const seated = seatOfToken(room, socket.data.token) >= 0;
+    if (!isHost && !(seated && !s.connected)) return fail('Only the host can replace a player who is still connected.');
     sysChat(room, `${s.name} was replaced by a bot.`);
     room.seats[Number(seat)] = room.game ? { ...emptySeat(), kind: 'bot', name: BOT_NAMES[Number(seat)] } : emptySeat();
     broadcast(room);
@@ -263,6 +266,15 @@ io.on('connection', (socket) => {
     if (!Bot.STYLES[style]) return fail('Unknown bot style');
     room.botStyle = style;
     sysChat(room, `Bots set to ${style}.`);
+    broadcast(room);
+  });
+
+  socket.on('resetChips', () => {
+    const room = getRoom();
+    if (!room || socket.data.token !== room.hostToken) return fail('Only the host can reset the chips');
+    if (!room.game) return;
+    E.resetChips(room.game);
+    sysChat(room, 'Chips reset to 12 each.');
     broadcast(room);
   });
 

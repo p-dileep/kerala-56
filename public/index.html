@@ -42,16 +42,17 @@
     <details class="rules">
       <summary>How 56 is played here</summary>
       <ul>
-        <li>Cards rank J, 9, A, 10, K, Q. Points: J 3, 9 2, A 1, 10 1. The 48 cards hold 56 points. Six players get 8 cards each (3 vs 3); eight players get 6 cards each (4 vs 4). Bids, levels and tables are the same at both sizes.</li>
+        <li>Cards rank J, 9, A, 10, K, Q. Points: J 3, 9 2, A 1, 10 1. The 48 cards hold 56 points. Six players get 8 cards each (3 vs 3); eight players get 6 cards each (4 vs 4). Bids, levels and chips are the same at both sizes.</li>
         <li>Bidding goes round from the dealer's right. Bids run 28–56 with a trump suit or no-trump. The first bidder must open with at least 28.</li>
         <li>You cannot name a suit you hold none of. To raise your own standing bid you must jump to the next level (40, 48 or 56).</li>
         <li>Jack signal: a call shows as <b>30 ♥</b> when the caller holds the Jack of that suit and <b>♥ 30</b> when they do not.</li>
         <li>A hand stops early once the bidders have reached the target or can no longer reach it.</li>
         <li>Plus: the opener may open with <b>Plus N</b> in a suit (28+N in that suit); otherwise only a partner of the high bidder may say <b>Plus N</b>, raising by N in the same suit. Meanings follow the power ladder J J 9 9 A A 10 10 K K Q Q minus the cards already shown by earlier calls in that suit. Plus 1 = the top remaining card of the ladder; while that is a Jack it must be your only card in the suit. Plus can also be said over an opponent's bid, in the suit your partner last called. Plus 2 = the top two remaining cards (fresh suit: both Jacks; after a Plus 1: the other Jack and a Nine; once all Jacks and Nines are shown: both Aces). Plus 3 = the top three remaining cards (fresh suit: both Jacks and a Nine). The buttons show what each Plus means right now.</li>
         <li>NS: a no-trump call that says you hold none of a suit already called. One step above the current bid points at the most recent suit, two steps at the suit before that, and so on. Example: after 30 ♣ and 31 ♥, <b>32 NS</b> means no hearts and <b>33 NS</b> means no clubs.</li>
+        <li>Seats can change any time: take over a bot, move to a bot's seat, or replace a player who has dropped off with a bot. The hand continues.</li>
         <li>Opponents may double, and the bidding team may then redouble, which ends the auction.</li>
         <li>Follow suit if you can. The highest trump wins, otherwise the highest card of the suit led. When two identical cards fall, the first one played wins.</li>
-        <li>Each team starts with 12 tables. Bids of 28–39 win 1 or lose 2, 40–47 win 2 or lose 3, 48–55 win 3 or lose 4, and 56 wins 4 or loses 5. Doubling multiplies by 2, redoubling by 4. A team out of tables loses the match.</li>
+        <li>Each team starts with 12 chips. Bids of 28–39 win 1 or lose 2, 40–47 win 2 or lose 3, 48–55 win 3 or lose 4, and 56 wins 4 or loses 5. Doubling multiplies by 2, redoubling by 4. A team out of chips loses the match. The host can reset the chips at any time.</li>
       </ul>
     </details>
   </div>
@@ -102,6 +103,7 @@
   <aside id="rail" class="rail">
     <div class="rail-head">
       <button id="lastTrickBtn" class="btn small">Last trick</button>
+      <button id="resetChipsBtn" class="btn small ghost hidden" title="Host only: both teams back to 12 chips">Reset chips</button>
       <button id="handsBtn" class="btn small hidden" title="Everyone's cards as dealt (after the hand)">Show the hands</button>
       <button id="leaveBtn" class="btn small ghost">Leave table</button>
     </div>

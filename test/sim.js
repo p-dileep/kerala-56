@@ -117,6 +117,9 @@ assert.throws(()=>E.applyBid(s, s.turn, {type:'pass'}), /Opener/);
     E.applyBid(y, at(2), {type:'plus', n:1});
     assert.deepEqual([y.bidding.high.value, y.bidding.high.suit, y.bidding.high.seat], [32, 'S', at(2)]);
   }
+  // chips reset: host puts both teams back to the start; a finished match reopens
+  { const r = E.newMatch({}, ()=>0.3); r.tables = [3, 21]; E.resetChips(r); assert.deepEqual(r.tables, [12, 12]);
+    r.phase = 'matchover'; r.winner = 1; E.resetChips(r); assert.equal(r.phase, 'handover'); assert.equal(r.winner, null); }
   // the deal is hidden while playing and revealed to everyone once the hand is over
   { const d = E.newMatch({}, ()=>0.3);
     assert.equal(E.getView(d, 0).dealt, null); assert.equal(E.getView(d, null).dealt, null);

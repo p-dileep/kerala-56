@@ -1,0 +1,33 @@
+KERALA 56 - HOW TO START THE GAME
+=================================
+
+A. Play on your own computer (you + bots, or friends on the same Wi-Fi)
+----------------------------------------------------------------------
+1. Double-click  start_game.bat
+2. The first time it installs what it needs (Node.js, game files). This can
+   take a few minutes. If it asks you to close the window and run again, do so.
+3. A browser opens at http://localhost:3056
+4. Type your name and click "Start a new table". Empty seats are played by bots.
+
+B. Play with friends over the internet
+--------------------------------------
+1. Double-click  start_online.bat
+2. Wait until the window shows "Your game is online at: https://....trycloudflare.com"
+   The first time it also downloads a small tunnel program (about 55 MB).
+3. A browser opens at that address. Type your name, click "Start a new table".
+4. On the table screen, click the TABLE CODE at the top-left. The invite link
+   is copied. Send it to your friends (WhatsApp etc.).
+5. Friends open the link, type their name and pick a seat.
+
+Keep the minimised windows (server / tunnel) open while you play.
+Close them to stop the game. The online address changes every time you
+restart, so send a fresh link each session.
+
+Problems?
+---------
+- "Unable to connect" in the browser: the server window closed with an error.
+  Run the .bat from a Command Prompt to read the message.
+- Nothing happens / "node is not recognized": install Node.js from https://nodejs.org
+  and run the .bat again.
+- Port busy: another program is already using port 3056 (maybe an earlier copy
+  of this game). Close it and run the .bat again.

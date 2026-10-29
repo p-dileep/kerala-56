@@ -1,0 +1,19 @@
+{
+  "name": "kerala-56",
+  "version": "1.0.0",
+  "description": "Kerala-style 56 (Ambathiyaaru) card game: real-time multiplayer with bots",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node test/sim.js && node test/socket.js"
+  },
+  "engines": { "node": ">=18" },
+  "license": "UNLICENSED",
+  "dependencies": {
+    "express": "^5.1.0",
+    "socket.io": "^4.8.0"
+  },
+  "devDependencies": {
+    "socket.io-client": "^4.8.0"
+  }
+}

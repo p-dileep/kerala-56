@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>56 · Kerala card table</title>
+<meta name="theme-color" content="#0E3B43">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manjari:wght@100;400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<!-- Lobby -->
+<main id="lobby" class="screen">
+  <div class="lobby-card">
+    <h1 class="wordmark"><span class="num">56</span><span class="ml">അമ്പത്തിയാറ്</span></h1>
+    <p class="lede">Six players, two teams of three, two packs. Start a table and send the code to your friends. Bots fill any empty seats.</p>
+    <ol class="howto">
+      <li>Type your name and click <b>Start a new table</b>.</li>
+      <li>On the table screen, click the <b>table code</b> at the top-left to copy the shareable link.</li>
+      <li>Send that link to your friends. They open it, type their name, and pick a seat.</li>
+      <li>Empty seats are played by bots. Keep the server window open while you play.</li>
+    </ol>
+    <label class="field">
+      <span>Your name</span>
+      <input id="nameInput" maxlength="18" autocomplete="nickname" placeholder="e.g. Dileep">
+    </label>
+    <button id="createBtn" class="btn primary">Start a new table</button>
+    <div class="join-row">
+      <label class="field grow">
+        <span>Have a code?</span>
+        <input id="codeInput" maxlength="5" placeholder="ABCDE" autocapitalize="characters">
+      </label>
+      <button id="joinBtn" class="btn">Join table</button>
+    </div>
+    <details class="rules">
+      <summary>How 56 is played here</summary>
+      <ul>
+        <li>Cards rank J, 9, A, 10, K, Q. Points: J 3, 9 2, A 1, 10 1. The 48 cards hold 56 points.</li>
+        <li>Bidding goes round from the dealer's right. Bids run 28–56 with a trump suit or no-trump. The first bidder must open with at least 28.</li>
+        <li>You cannot name a suit you hold none of. To raise your own standing bid you must jump to the next level (40, 48 or 56).</li>
+        <li>Jack signal: a call shows as <b>30 ♥</b> when the caller holds the Jack of that suit and <b>♥ 30</b> when they do not.</li>
+        <li>A hand stops early once the bidders have reached the target or can no longer reach it.</li>
+        <li>Plus: the opener may open with <b>Plus N</b> in a suit (28+N in that suit); otherwise only a partner of the high bidder may say <b>Plus N</b>, raising by N in the same suit. Meanings follow the power ladder J J 9 9 A A 10 10 K K Q Q minus the cards already shown by earlier calls in that suit. Plus 1 = the top remaining card of the ladder; while that is a Jack it must be your only card in the suit. Plus can also be said over an opponent's bid, in the suit your partner last called. Plus 2 = the top two remaining cards (fresh suit: both Jacks; after a Plus 1: the other Jack and a Nine; once all Jacks and Nines are shown: both Aces). Plus 3 = the top three remaining cards (fresh suit: both Jacks and a Nine). The buttons show what each Plus means right now.</li>
+        <li>NS: a no-trump call that says you hold none of a suit already called. One step above the current bid points at the most recent suit, two steps at the suit before that, and so on. Example: after 30 ♣ and 31 ♥, <b>32 NS</b> means no hearts and <b>33 NS</b> means no clubs.</li>
+        <li>Opponents may double, and the bidding team may then redouble, which ends the auction.</li>
+        <li>Follow suit if you can. The highest trump wins, otherwise the highest card of the suit led. When two identical cards fall, the first one played wins.</li>
+        <li>Each team starts with 12 tables. Bids of 28–39 win 1 or lose 2, 40–47 win 2 or lose 3, 48–55 win 3 or lose 4, and 56 wins 4 or loses 5. Doubling multiplies by 2, redoubling by 4. A team out of tables loses the match.</li>
+      </ul>
+    </details>
+  </div>
+</main>
+
+<!-- Table -->
+<main id="table" class="screen hidden">
+  <header class="topbar">
+    <button id="codeChip" class="chip code" title="Copy invite link">Table <b id="roomCode"></b></button>
+    <div id="contractChip" class="chip contract hidden"></div>
+    <div class="scores">
+      <div class="team-score t0"><span class="tname">Team A</span><span class="tables" id="tables0"></span><span class="hpts" id="hpts0"></span></div>
+      <div class="team-score t1"><span class="tname">Team B</span><span class="tables" id="tables1"></span><span class="hpts" id="hpts1"></span></div>
+    </div>
+    <button id="railToggle" class="chip icon" aria-label="Show chat and log">Chat</button>
+  </header>
+
+  <section class="arena">
+    <div class="mat" id="mat">
+      <div id="center" class="center"></div>
+      <div id="trick" class="trick"></div>
+    </div>
+    <div id="seats"></div>
+  </section>
+
+  <section id="bidPanel" class="bid-panel hidden" aria-label="Your bid">
+    <div class="bid-head">
+      <span id="bidPrompt">Your bid</span>
+      <div class="stepper">
+        <button id="bidMinus" class="btn small" aria-label="Lower bid">−</button>
+        <output id="bidValue">28</output>
+        <button id="bidPlus" class="btn small" aria-label="Raise bid">+</button>
+      </div>
+      <div id="levelJumps" class="levels"></div>
+    </div>
+    <div id="suitBtns" class="suits"></div>
+    <div id="plusBtns" class="levels"></div>
+    <div id="nsBtns" class="levels"></div>
+    <div class="bid-actions">
+      <button id="passBtn" class="btn">Pass</button>
+      <button id="doubleBtn" class="btn warn">Double</button>
+      <button id="redoubleBtn" class="btn warn">Redouble</button>
+    </div>
+  </section>
+
+  <section id="hand" class="hand" aria-label="Your cards"></section>
+
+  <aside id="rail" class="rail">
+    <div class="rail-head">
+      <button id="lastTrickBtn" class="btn small">Last trick</button>
+      <button id="leaveBtn" class="btn small ghost">Leave table</button>
+    </div>
+    <ol id="log" class="log"></ol>
+    <ol id="chat" class="chat"></ol>
+    <form id="chatForm" class="chat-form">
+      <input id="chatInput" maxlength="200" placeholder="Say something" autocomplete="off">
+      <button class="btn small">Send</button>
+    </form>
+  </aside>
+
+  <div id="modal" class="modal hidden" role="dialog" aria-modal="true"><div class="modal-card" id="modalBody"></div></div>
+</main>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>

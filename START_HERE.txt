@@ -1,6 +1,17 @@
 KERALA 56 - HOW TO START THE GAME
 =================================
 
+QUICKEST: play online, nothing to install
+-----------------------------------------
+Open  https://kerala-56.onrender.com  in any browser (phone or PC).
+The first visit after a quiet spell can take about a minute to wake up.
+Type your name (required), then click the 6-PLAYER TABLE or the 8-PLAYER TABLE.
+Everyone who opens the link sees the same two tables, so just tell your friends
+which one. Pick a seat; the first person seated is the host and deals.
+You can also "Start a new table" for a private game and share its code.
+
+The options below are only needed if you want to run the game yourself.
+
 A. Play on your own computer (you + bots, or friends on the same Wi-Fi)
 ----------------------------------------------------------------------
 1. Double-click  start_game.bat

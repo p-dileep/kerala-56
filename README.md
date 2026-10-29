@@ -1,7 +1,10 @@
 # 56 (Ambathiyaaru): a Kerala card table
 
-A real-time 6-player (3 vs 3) web version of 56. A host starts a table and shares the 5-letter code
+A real-time web version of 56 for 6 players (3 vs 3, 8 cards each) or 8 players (4 vs 4, 6 cards each). A host starts a table and shares the 5-letter code
 or link. Friends join from phone or desktop, and bots fill any empty seats. The server enforces every rule.
+
+## Play online
+The game is hosted on Render at **https://kerala-56.onrender.com** (free plan: it sleeps after 15 idle minutes, so the first visit can take about a minute to wake). Open the link, type your name (required) and walk into the permanent **6-player table** or **8-player table**; everyone who opens the link sees the same two tables. The first person seated is the host (deals, picks bot style); when they leave the next player becomes host. A table resets itself once it has been empty for a while. You can still **Start a new table** (6 or 8 players) for a private game and share its code. Source: https://github.com/p-dileep/kerala-56. Every push to `main` redeploys automatically; a redeploy ends tables in progress.
 
 ## Run locally
 ```bash
@@ -13,6 +16,12 @@ npm test             # rules sim (200 bot matches) + socket end-to-end test
 Or on Windows just double-click `start_game.bat`: it installs Node.js (via winget) if missing, runs `npm install` on first use, starts the server and opens the browser.
 
 To play with friends over the internet without any hosting, double-click `start_online.bat` instead. It does everything `start_game.bat` does, downloads the portable `cloudflared.exe` into `tools/` on first use (no Cloudflare account needed), opens a quick tunnel, prints and copies the public `https://....trycloudflare.com` address, and opens the browser there. Create the table at that address and click the table code to copy the invite link. The address changes every time the tunnel is restarted.
+
+## Variants
+`players` in the table settings is 6 or 8. Both use the same 48-card pack, so 8 players get 6 cards and play 6 tricks; bids, levels and tables are unchanged. Bots scale their hand estimates to the hand size.
+
+## Deploy on Render (how the public link is set up)
+New Web Service from the GitHub repo, language Docker (the `Dockerfile` is used, no build or start command needed), branch `main`, Free instance. Render sets `PORT` itself.
 
 ## Deploy on a VPS
 ```bash
@@ -43,6 +52,7 @@ Run a **single** process. Rooms are held in memory. A restart ends the tables in
 - Bids are 28–56 with a suit or NT. The opener must bid at least 28. You cannot name a suit you are void in.
   Raising **your own** standing bid must jump to the next level (40/48/56).
 - Jack signal: a bid is shown as "30 ♥" when the caller holds the Jack of that suit and "♥ 30" when they do not. The engine derives this from the hand.
+- After a hand, "Show the initial hands" (in the result window, the table centre, or the top bar) reveals every player's cards as dealt. Hands stay private until then.
 - After a hand the table waits: the host clicks "Next hand" (in the result window or the centre of the table) when everyone has reviewed the result.
 - A hand stops as soon as the result is decided: the bidding team reaches the target, or the points still unplayed cannot get them there. The remaining cards are not played.
 - Plus convention: the opener may open with "Plus N" in a suit (= 28+N in that suit, fresh-ladder meaning); otherwise only a partner of the high bidder may say "Plus N", raising by N in the same suit. Meanings are relative to the power ladder J J 9 9 A A 10 10 K K Q Q minus cards already shown by earlier calls in that suit (a Jack-signal call shows one Jack; each Plus shows what it claimed). Plus 1 = the top remaining card of the ladder; while that is a Jack it must be the only card held in the suit. Plus may also be said over an opponent's bid, in the last suit a partner called (Plus N = current bid + N in that suit). Plus 2 = the top two remaining cards (fresh: both Jacks; after a Plus 1: the other Jack and a Nine; after all Jacks and Nines: both Aces). Plus 3 = the top three remaining cards (fresh: both Jacks and a Nine). The engine offers each only when the hand qualifies; `legalBidActions().plusMeaning` gives the current meaning.

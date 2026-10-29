@@ -46,19 +46,21 @@ const paramsFor = (style) => ({ ...DEFAULT_PARAMS, ...(STYLES[style] || {}) });
 
 // ---------------------------------------------------------------- bidding
 
-function estimate(hand, suit, P = DEFAULT_PARAMS) {
-  // Baseline: a team expects ~28 of 56 on an average hand (avg hand ≈ 9.3 points).
+function estimateFor(hand, suit, P = DEFAULT_PARAMS, players = 6) {
+  // Baseline: a team expects ~28 of 56 on an average hand (avg hand = 56/players points).
+  // Averages scale with hand size: 8 cards at 6 players, 6 cards at 8 players.
+  const hs = 48 / players, avgPts = 56 / players, avgLen = 1.33 * hs / 8, avgJ = 1.33 * hs / 8;
   const myPts = hand.reduce((s, c) => s + pts(c), 0);
-  let est = P.estBase + (myPts - 9.3) * P.estPtsW;
+  let est = P.estBase + (myPts - avgPts) * P.estPtsW;
   if (suit !== 'NT') {
     const t = hand.filter((c) => c.suit === suit);
     const jacks = t.filter((c) => c.rank === 'J').length;
     const nines = t.filter((c) => c.rank === '9').length;
-    est += (t.length - 1.33) * P.estLenW + jacks * P.estJackW + (jacks ? nines : 0) * P.estNineW;
+    est += (t.length - avgLen) * P.estLenW + jacks * P.estJackW + (jacks ? nines : 0) * P.estNineW;
   } else {
     // No-trump wants top cards everywhere
     const js = hand.filter((c) => c.rank === 'J').length;
-    est += (js - 1.33) * P.estNtJackW - P.estNtPenalty;
+    est += (js - avgJ) * P.estNtJackW - P.estNtPenalty;
   }
   return Math.round(est);
 }
@@ -68,6 +70,8 @@ function chooseBid(view, P = DEFAULT_PARAMS) {
   const hand = view.hand;
   const b = view.bidding;
   const seat = view.mySeat;
+  const N = view.players || 6;
+  const estimate = (h, s, PP) => estimateFor(h, s, PP, N);
   const options = [...legal.suits].map((s) => ({ suit: s, est: estimate(hand, s, P) }))
     .sort((a, b2) => b2.est - a.est);
   const best = options[0];
@@ -208,7 +212,7 @@ const isMaster = (card, view) => unseenHigher(card, view) === 0;
 // plus what the bidding conventions revealed (NS = void in a suit).
 function track(view) {
   const trump = view.contract.suit === 'NT' ? null : view.contract.suit;
-  const voids = Array.from({ length: E.NUM_SEATS }, () => new Set());
+  const voids = Array.from({ length: view.players || 6 }, () => new Set());
   const byTrick = new Map();
   for (const p of view.played || []) {
     if (!byTrick.has(p.trick)) byTrick.set(p.trick, []);
@@ -304,12 +308,13 @@ function choosePlay(view, P = DEFAULT_PARAMS) {
   const wi = E.winningIndex(cards, trump);
   const winCard = cards[wi].card;
   const partnerWinning = E.team(cards[wi].seat) === myTeam;
-  const last = cards.length === E.NUM_SEATS - 1;
+  const N = view.players || 6;
+  const last = cards.length === N - 1;
   const trickPts = cards.reduce((s, x) => s + pts(x.card), 0);
   const following = legal[0].suit === led;
   // opponents still to play in this trick
   const toPlay = [];
-  for (let s2 = E.nextSeat(seat); toPlay.length < E.NUM_SEATS - cards.length - 1; s2 = E.nextSeat(s2)) toPlay.push(s2);
+  for (let s2 = E.nextSeat(seat, N); toPlay.length < N - cards.length - 1; s2 = E.nextSeat(s2, N)) toPlay.push(s2);
   const oppsToPlay = toPlay.filter((s2) => E.team(s2) !== myTeam);
   const safeWin = T
     ? (c) => !T.canBeat(c, led, oppsToPlay)
@@ -356,4 +361,5 @@ function botView(state, seat) {
   return v;
 }
 
+const estimate = estimateFor;
 module.exports = { decide, botView, estimate, chooseBid, choosePlay, track, DEFAULT_PARAMS, STYLES, paramsFor };

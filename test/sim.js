@@ -24,6 +24,22 @@ for (let m=0;m<200;m++){
   assert.equal(s.phase,'matchover'); matches++;
 }
 console.log({matches, hands, avgHandsPerMatch:(hands/matches).toFixed(1), contractMadeRate:(made/hands).toFixed(2)});
+// 8-player matches (4 vs 4, 6 cards each): same rules, bots must cope with the shorter hand
+{ let m8=0, h8=0, made8=0;
+  for (let m=0;m<60;m++){
+    const s = E.newMatch({players:8}); let guard=0;
+    assert.equal(s.hands.length, 8); assert.equal(s.hands[0].length, 6);
+    while (s.phase!=='matchover' && guard++<500000){
+      if (s.phase==='handover'){ E.nextHand(s); continue; }
+      if (s.phase==='playing' && s.trick.complete){ assert.equal(s.trick.cards.length, 8); E.collectTrick(s); if(s.phase!=='playing') {h8++; if(s.result.made) made8++; assert.ok(s.trickNo<=6);} continue; }
+      const v = B.botView(s, s.turn); const d = B.decide(v);
+      if (d.kind==='bid') E.applyBid(s, s.turn, d.action); else E.playCard(s, s.turn, d.cardId);
+      assert.equal(s.tables[0]+s.tables[1], 24);
+    }
+    assert.equal(s.phase,'matchover'); m8++;
+  }
+  console.log({matches8: m8, hands8: h8, contractMadeRate8:(made8/h8).toFixed(2)});
+}
 // legality checks
 const s = E.newMatch({}, ()=>0.3);
 assert.throws(()=>E.applyBid(s, s.turn, {type:'pass'}), /Opener/);
@@ -100,6 +116,16 @@ assert.throws(()=>E.applyBid(s, s.turn, {type:'pass'}), /Opener/);
     assert.equal(L.plusSuit, 'S'); assert.deepEqual(L.plus, [1]); assert.deepEqual(L.plusMeaning[1], ['9']);
     E.applyBid(y, at(2), {type:'plus', n:1});
     assert.deepEqual([y.bidding.high.value, y.bidding.high.suit, y.bidding.high.seat], [32, 'S', at(2)]);
+  }
+  // the deal is hidden while playing and revealed to everyone once the hand is over
+  { const d = E.newMatch({}, ()=>0.3);
+    assert.equal(E.getView(d, 0).dealt, null); assert.equal(E.getView(d, null).dealt, null);
+    const firstDeal = d.hands.map((h)=>h.map((c)=>c.id));
+    let g=0; while (d.phase!=='handover' && d.phase!=='matchover' && g++<10000) {
+      if (d.phase==='playing' && d.trick.complete) { E.collectTrick(d); continue; }
+      const a = B.decide(B.botView(d, d.turn)); if (a.kind==='bid') E.applyBid(d, d.turn, a.action); else E.playCard(d, d.turn, a.cardId);
+    }
+    assert.deepEqual(E.getView(d, null).dealt.map((h)=>h.map((c)=>c.id)), firstDeal);
   }
   // early stop: a hand ends as soon as the bidders reach the target or cannot reach it
   { const e = E.newMatch({}, ()=>0.3); let g=0, stopped=false;

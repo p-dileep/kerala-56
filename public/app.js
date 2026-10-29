@@ -10,6 +10,9 @@
   const SEAT_POS = [[50, 93], [93, 69], [93, 27], [50, 7], [7, 27], [7, 69]];
   const SEAT_POS_NARROW = [[50, 95], [85, 69], [85, 29], [50, 5], [15, 29], [15, 69]];
   const TRICK_POS = [[50, 72], [69, 62], [69, 36], [50, 27], [31, 36], [31, 62]];
+  const SEAT_POS8 = [[50, 93], [82, 86], [95, 50], [82, 14], [50, 7], [18, 14], [5, 50], [18, 86]];
+  const SEAT_POS8_NARROW = [[50, 95], [82, 82], [86, 50], [82, 18], [50, 5], [18, 18], [14, 50], [18, 82]];
+  const TRICK_POS8 = [[50, 72], [65, 66], [71, 50], [65, 34], [50, 27], [35, 34], [29, 50], [35, 66]];
   const narrow = () => window.matchMedia('(max-width: 700px)').matches;
   window.addEventListener('resize', () => room && room.game !== undefined && render());
 
@@ -50,11 +53,17 @@
   const initialCode = new URLSearchParams(location.search).get('room');
   if (initialCode) $('codeInput').value = initialCode.toUpperCase();
 
-  $('createBtn').onclick = () => socket.emit('createRoom', { name: myName() });
+  const needName = () => { if (myName()) return true; toast('Please type your name first.'); $('nameInput').focus(); return false; };
+  $('createBtn').onclick = () => { if (needName()) socket.emit('createRoom', { name: myName(), players: Number($('newPlayers').value) }); };
+  document.querySelectorAll('[data-fixed]').forEach((b) => (b.onclick = () => { if (needName()) socket.emit('joinRoom', { code: b.dataset.fixed, name: myName() }); }));
+  socket.on('lobby', (tables) => tables.forEach((t) => {
+    const el = $(t.players === 8 ? 'info8' : 'info6'); if (!el) return;
+    el.textContent = `${t.players === 8 ? '4 vs 4 · 6 cards each' : '3 vs 3 · 8 cards each'} · ${t.seated ? `${t.seated} seated` : 'empty'}${t.playing ? ', playing' : ''}`;
+  }));
   $('joinBtn').onclick = () => {
     const code = $('codeInput').value.trim().toUpperCase();
-    if (code.length !== 5) return toast('Enter the 5-letter table code.');
-    socket.emit('joinRoom', { code, name: myName() });
+    if (code.length < 5) return toast('Enter the table code.');
+    if (needName()) socket.emit('joinRoom', { code, name: myName() });
   };
   $('codeInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('joinBtn').click(); });
 
@@ -105,7 +114,10 @@
   // ------------------------------------------------------------ helpers
   function esc(s) { return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
   function nameOf(seat) { return room.seats[seat]?.name || `Seat ${seat + 1}`; }
-  function rel(seat) { return room.mySeat === null ? seat : (seat - room.mySeat + 6) % 6; }
+  const N = () => (room && room.players) || 6;
+  function rel(seat) { return room.mySeat === null ? seat : (seat - room.mySeat + N()) % N(); }
+  const seatPos = () => N() === 8 ? (narrow() ? SEAT_POS8_NARROW : SEAT_POS8) : (narrow() ? SEAT_POS_NARROW : SEAT_POS);
+  const trickPos = () => (N() === 8 ? TRICK_POS8 : TRICK_POS);
   // hasJack=false renders suit-first ("Hearts 30"): the caller lacks the Jack of that suit.
   function bidText(v, s, hasJack = true) { return s === 'NT' ? `${v} NT` : hasJack ? `${v} ${SYM[s]}` : `${SYM[s]} ${v}`; }
   // wrap suit symbols so hearts/diamonds show red and all suits a little larger
@@ -137,6 +149,7 @@
     $('modalBody').querySelectorAll('[data-close]').forEach((b) => (b.onclick = closeModal));
     $('modalBody').querySelectorAll('[data-start]').forEach((b) => (b.onclick = () => { closeModal(); socket.emit('start'); }));
     $('modalBody').querySelectorAll('[data-next]').forEach((b) => (b.onclick = () => { closeModal(); socket.emit('nextHand'); }));
+    $('modalBody').querySelectorAll('[data-hands]').forEach((b) => (b.onclick = showDealtHands));
   }
   function closeModal() { $('modal').classList.add('hidden'); $('modalBody').innerHTML = ''; }
   $('modal').onclick = (e) => { if (e.target === $('modal') && $('modal').dataset.closable) closeModal(); };
@@ -145,6 +158,7 @@
   // ------------------------------------------------------------ render
   function render() {
     const g = room.game;
+    $('handsBtn').classList.toggle('hidden', !(g && g.dealt));
     $('roomCode').textContent = room.code;
     renderScores(g);
     renderSeats(g);
@@ -175,7 +189,7 @@
     const lastBy = {};
     if (g && g.phase === 'bidding') g.bidding.actions.forEach((a) => (lastBy[a.seat] = a));
     $('seats').innerHTML = room.seats.map((s) => {
-      const [x, y] = (narrow() ? SEAT_POS_NARROW : SEAT_POS)[rel(s.seat)];
+      const [x, y] = seatPos()[rel(s.seat)];
       const isMe = s.seat === room.mySeat;
       const cls = ['seat', `t${s.team}`];
       if (s.kind === 'empty') cls.push('empty');
@@ -200,7 +214,7 @@
       } else {
         const meta = [];
         if (g && g.dealer === s.seat) meta.push('<span class="dealer" title="Dealer">D</span>');
-        if (g && g.phase !== 'handover' && g.phase !== 'matchover' && (g.dealer + 1) % 6 === s.seat) meta.push('<span class="starts" title="Starts the bidding and leads the first trick">starts</span>');
+        if (g && g.phase !== 'handover' && g.phase !== 'matchover' && (g.dealer + 1) % N() === s.seat) meta.push('<span class="starts" title="Starts the bidding and leads the first trick">starts</span>');
         meta.push(`${TEAM[s.team]}${s.kind === 'bot' ? ' bot' : ''}`);
         if (g) meta.push(`${g.handCounts[s.seat]} cards`);
         if (s.kind === 'human' && !s.connected) meta.push('<span class="away">away</span>');
@@ -228,12 +242,27 @@
   }
   function wireBotStyle() { const el = $('botStyle'); if (el) el.onchange = () => socket.emit('botStyle', { style: el.value }); }
 
+  function showDealtHands() {
+    const g = room.game;
+    if (!g || !g.dealt) return toast('Hands are shown only after the hand is over.');
+    const c = g.contract;
+    openModal(`<h2>Hand ${g.handNo}: the deal</h2>
+      <p class="sub">${esc(nameOf(c.seat))} played ${bidText(c.value, c.suit, c.hasJack)}. ${esc(nameOf(g.dealer))} dealt.</p>
+      <div class="deal-list">${g.dealt.map((cards, seat) => `
+        <div class="deal-row t${seat % 2} ${seat === c.seat ? 'bidder' : ''}">
+          <div class="who t${seat % 2}">${esc(nameOf(seat))}</div>
+          <div class="deal-cards">${cards.map((x) => cardHTML(x)).join('')}</div>
+        </div>`).join('')}</div>
+      <div class="row"><button class="btn primary" data-close>Close</button></div>`, true);
+  }
+  $('handsBtn').onclick = showDealtHands;
+
   function renderCenter(g) {
     const c = $('center');
     if (!g) {
       const humans = room.seats.filter((s) => s.kind === 'human').length;
       c.innerHTML = `<div class="big">Table ${esc(room.code)}</div>
-        <div class="sub">${humans} of 6 seated. Send the code to friends; empty seats become bots when the match starts.</div>
+        <div class="sub">${humans} of ${N()} seated${room.fixed ? '' : '. Send the code to friends'}; empty seats become bots when the host deals.</div>
         ${botStyleHtml()}
         ${room.isHost ? '<button class="btn primary" id="startBtn">Deal the first hand</button>' : '<div class="sub">Waiting for the host to deal.</div>'}`;
       const sb = $('startBtn');
@@ -242,14 +271,14 @@
       return;
     }
     if (g.phase === 'bidding') {
-      const acts = g.bidding.actions.slice(-6).reverse();
+      const acts = g.bidding.actions.slice(-N()).reverse();
       const waiting = g.turn === room.mySeat ? 'Your call' : `<span class="who t${g.turn % 2}">${esc(nameOf(g.turn))}</span> to call`;
       c.innerHTML = `<ul class="bidlog">${acts.map((a) => `<li><span class="who t${a.seat % 2}">${esc(nameOf(a.seat))}</span>: ${colourSuits(esc(actionText(a)))}</li>`).join('')}</ul>
         <div class="sub">${acts.length ? '' : `Hand ${g.handNo}. `}${waiting}</div>`;
       return;
     }
     if (g.phase === 'playing') {
-      c.innerHTML = g.trick.cards.length ? '' : `<div class="sub">Trick ${g.trickNo + 1} of 8 · ${g.turn === room.mySeat ? 'your lead' : `${esc(nameOf(g.turn))} leads`}</div>`;
+      c.innerHTML = g.trick.cards.length ? '' : `<div class="sub">Trick ${g.trickNo + 1} of ${g.handSize || 8} · ${g.turn === room.mySeat ? 'your lead' : `${esc(nameOf(g.turn))} leads`}</div>`;
       return;
     }
     if (g.phase === 'matchover') {
@@ -264,10 +293,12 @@
     if (g.phase === 'handover') {
       const r = g.result;
       c.innerHTML = `<div class="big">${TEAM[r.contract.team]} ${r.made ? 'made' : 'went down on'} ${bidText(r.contract.value, r.contract.suit, r.contract.hasJack)}</div>
-        <div class="sub">Use "Last trick" and the log on the right to review the hand.</div>
+        <div class="sub">Use "Last trick", "Show the hands" and the log on the right to review the hand.</div>
+        <button class="btn" id="handsBtn2">Show the initial hands</button>
         ${room.isHost ? '<button class="btn primary" id="nextBtn">Next hand</button>' : '<div class="sub">The host deals the next hand.</div>'}`;
       const nb = $('nextBtn');
       if (nb) nb.onclick = () => socket.emit('nextHand');
+      $('handsBtn2').onclick = showDealtHands;
       return;
     }
     c.innerHTML = '';
@@ -282,9 +313,9 @@
     if (!g || g.phase !== 'playing') { t.innerHTML = ''; sweepKey = null; return; }
     const key = g.trick.complete ? `${g.handNo}:${g.trickNo}` : null;
     const swept = key && key === sweepKey;
-    const [wx, wy] = key ? (narrow() ? SEAT_POS_NARROW : SEAT_POS)[rel(g.trick.winner)] : [0, 0];
+    const [wx, wy] = key ? seatPos()[rel(g.trick.winner)] : [0, 0];
     t.innerHTML = g.trick.cards.map((x) => {
-      const [px, py] = swept ? [wx, wy] : TRICK_POS[rel(x.seat)];
+      const [px, py] = swept ? [wx, wy] : trickPos()[rel(x.seat)];
       const win = g.trick.complete && g.trick.winner === x.seat ? 'win' : '';
       return cardHTML(x.card, `${win} ${swept ? 'swept' : ''}`).replace('class="card', `style="left:${px}%;top:${py}%;--tilt:${(rel(x.seat) - 2.5) * 4}deg" class="card`);
     }).join('');
@@ -391,7 +422,7 @@
     openModal(`
       <h2>${verdict}</h2>
       <p>${esc(nameOf(c.seat))} bid ${bidText(c.value, c.suit, c.hasJack)}${c.mult > 1 ? ` ×${c.mult}` : ''}. ${flow}</p>
-      ${g.trickNo < 8 ? `<p class="sub">Stopped after trick ${g.trickNo}: ${r.made ? 'target reached' : 'target out of reach'}.</p>` : ''}
+      ${g.trickNo < (g.handSize || 8) ? `<p class="sub">Stopped after trick ${g.trickNo}: ${r.made ? 'target reached' : 'target out of reach'}.</p>` : ''}
       <div class="tally">
         <span>${TEAM[0]} points</span><span class="v">${r.points[0]}</span>
         <span>${TEAM[1]} points</span><span class="v">${r.points[1]}</span>
@@ -401,6 +432,7 @@
       ${over ? `<p><b>${TEAM[g.winner]} wins the match.</b></p>` : room.isHost ? '' : '<p class="sub">The host deals the next hand.</p>'}
       <div class="row">
         ${over && room.isHost ? '<button class="btn primary" data-start>Start a new match</button>' : ''}
+        <button class="btn" data-hands>Show the initial hands</button>
         ${!over && room.isHost ? '<button class="btn primary" data-next>Next hand</button>' : ''}
         <button class="btn" data-close>Close</button>
       </div>`, true, 'phase');

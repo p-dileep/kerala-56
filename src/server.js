@@ -37,11 +37,13 @@ function makeCode() {
 const clean = (s, n = 18) => String(s || '').replace(/[<>]/g, '').trim().slice(0, n);
 const emptySeat = () => ({ kind: 'empty', name: null, token: null, socketId: null, connected: false });
 
-function createRoom(hostToken) {
+function createRoom(hostToken, players = 6, code = null) {
   const room = {
-    code: makeCode(),
+    code: code || makeCode(),
     hostToken,
-    seats: Array.from({ length: E.NUM_SEATS }, emptySeat),
+    players,
+    fixed: !!code,          // permanent lobby table: never deleted, reset when empty
+    seats: Array.from({ length: players }, emptySeat),
     game: null,
     botStyle: 'medium',
     chat: [],
@@ -52,6 +54,23 @@ function createRoom(hostToken) {
   };
   rooms.set(room.code, room);
   return room;
+}
+
+// Two permanent tables everyone can walk into from the lobby.
+const FIXED = [{ code: 'TABLE6', players: 6 }, { code: 'TABLE8', players: 8 }];
+FIXED.forEach((t) => createRoom(null, t.players, t.code));
+
+// The host is the first connected human; when they leave, the next one takes over.
+function ensureHost(room) {
+  const cur = room.seats.find((s) => s.kind === 'human' && s.token === room.hostToken);
+  if (cur && cur.connected) return;
+  const next = room.seats.find((s) => s.kind === 'human' && s.connected) || cur;
+  if (next && next.token !== room.hostToken) { room.hostToken = next.token; sysChat(room, `${next.name} is now the host.`); }
+}
+
+function lobbyInfo() {
+  return FIXED.map((t) => { const r = rooms.get(t.code); return { code: t.code, players: t.players,
+    seated: r.seats.filter((s) => s.kind === 'human' && s.connected).length, playing: !!r.game && r.game.phase !== 'matchover' }; });
 }
 
 function seatOfToken(room, token) {
@@ -68,6 +87,8 @@ function publicSeats(room) {
 function broadcast(room) {
   room.version++;
   room.touched = Date.now();
+  ensureHost(room);
+  if (room.fixed) io.emit('lobby', lobbyInfo());
   const sockets = io.sockets.adapter.rooms.get(room.code) || new Set();
   for (const sid of sockets) {
     const sock = io.sockets.sockets.get(sid);
@@ -75,6 +96,8 @@ function broadcast(room) {
     const seat = seatOfToken(room, sock.data.token);
     sock.emit('room', {
       code: room.code,
+      players: room.players,
+      fixed: room.fixed,
       isHost: sock.data.token === room.hostToken,
       botStyle: room.botStyle,
       mySeat: seat >= 0 ? seat : null,
@@ -139,7 +162,7 @@ function startMatch(room) {
   room.seats.forEach((s, i) => {
     if (s.kind === 'empty') room.seats[i] = { ...emptySeat(), kind: 'bot', name: freeNames.shift() || `Bot ${i + 1}` };
   });
-  room.game = E.newMatch();
+  room.game = E.newMatch({ players: room.players });
   sysChat(room, 'Match started. Good luck!');
 }
 
@@ -155,11 +178,13 @@ io.on('connection', (socket) => {
   socket.on('hello', ({ token } = {}) => {
     socket.data.token = typeof token === 'string' && token.length >= 16 ? token.slice(0, 64) : crypto.randomUUID();
     socket.emit('token', socket.data.token);
+    socket.emit('lobby', lobbyInfo());
   });
 
-  socket.on('createRoom', ({ name } = {}) => {
+  socket.on('createRoom', ({ name, players } = {}) => {
     if (!socket.data.token) return fail('Not ready');
-    const room = createRoom(socket.data.token);
+    if (!clean(name)) return fail('Please type your name first.');
+    const room = createRoom(socket.data.token, Number(players) === 8 ? 8 : 6);
     room.seats[0] = { kind: 'human', name: clean(name) || 'Host', token: socket.data.token, socketId: socket.id, connected: true };
     socket.join(room.code);
     socket.data.room = room.code;
@@ -171,6 +196,7 @@ io.on('connection', (socket) => {
     if (!socket.data.token) return fail('Not ready');
     const room = rooms.get(String(code || '').toUpperCase().trim());
     if (!room) return fail('Room not found. Check the code.');
+    if (!clean(name) && seatOfToken(room, socket.data.token) < 0) return fail('Please type your name first.');
     socket.join(room.code);
     socket.data.room = room.code;
 
@@ -194,7 +220,7 @@ io.on('connection', (socket) => {
     const room = getRoom();
     if (!room) return;
     seat = Number(seat);
-    if (!(seat >= 0 && seat < E.NUM_SEATS)) return;
+    if (!(seat >= 0 && seat < room.players)) return;
     const target = room.seats[seat];
     const canTake = target.kind === 'empty' ? !room.game : target.kind === 'bot';
     if (!canTake) return fail('That seat is taken.');
@@ -315,7 +341,10 @@ setInterval(() => {
     const anyone = room.seats.some((s) => s.kind === 'human' && s.connected);
     if (!anyone && now - room.touched > ROOM_IDLE_MS) {
       clearTimeout(room.timer);
-      rooms.delete(code);
+      if (room.fixed) {            // reset the permanent table for the next group
+        room.seats = Array.from({ length: room.players }, emptySeat);
+        room.game = null; room.chat = []; room.hostToken = null; room.botStyle = 'medium'; room.touched = now;
+      } else rooms.delete(code);
     }
   }
 }, 60 * 1000).unref();

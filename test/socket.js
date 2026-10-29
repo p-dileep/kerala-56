@@ -7,7 +7,8 @@ server.listen(0, () => {
   const s = io(url, { transports: ['websocket'] });
   let started = false, hands = 0, guest;
   s.on('connect', () => s.emit('hello', {}));
-  s.on('token', () => s.emit('createRoom', { name: 'Tester' }));
+  s.on('token', () => s.emit('createRoom', { name: 'Tester', players: 8 }));
+  s.on('lobby', (t) => { if (!s.lobbySeen) { s.lobbySeen = true; const codes = t.map((x) => x.code).sort(); if (codes.join() !== 'TABLE6,TABLE8') { console.error('lobby tables missing', codes); process.exit(1); } } });
   s.on('errorMsg', (m) => { console.error('server error:', m); process.exit(1); });
   s.on('room', (r) => {
     if (!guest) {                         // a second human joins via code
@@ -16,6 +17,7 @@ server.listen(0, () => {
       guest.on('token', () => guest.emit('joinRoom', { code: r.code, name: 'Guest' }));
       guest.on('room', (gr) => { if (gr.game && gr.game.turn === gr.mySeat) act(guest, gr); });
     }
+    if (r.players !== 8 || r.seats.length !== 8) { console.error('expected an 8-seat room'); process.exit(1); }
     if (!started && r.seats.filter((x) => x.kind === 'human').length === 2) {
       if (r.botStyle !== 'aggressive') { s.emit('botStyle', { style: 'aggressive' }); return; }
       started = true; s.emit('start'); return;

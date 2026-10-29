@@ -1,6 +1,6 @@
 'use strict';
 /**
- * 56 (Ambathiyaaru) — Kerala rules engine, 6 players (3 vs 3).
+ * 56 (Ambathiyaaru) — Kerala rules engine, 6 players (3 vs 3) or 8 players (4 vs 4, 6 cards each).
  *
  * Seats 0..5. Turn order goes seat -> seat+1 (shown counter-clockwise on screen).
  * Teams alternate: even seats = team 0, odd seats = team 1.
@@ -14,19 +14,22 @@ const RANKS = ['J', '9', 'A', '10', 'K', 'Q'];           // high -> low
 const RANK_POWER = { J: 6, 9: 5, A: 4, 10: 3, K: 2, Q: 1 };
 const POINTS = { J: 3, 9: 2, A: 1, 10: 1, K: 0, Q: 0 };
 const LEVELS = [28, 40, 48, 56];
-const NUM_SEATS = 6;
-const HAND_SIZE = 8;
+const NUM_SEATS = 6;            // default table size; settings.players may be 6 or 8
+const HAND_SIZE = 8;            // default hand size; 48 cards / players
 const MIN_BID = 28;
 const MAX_BID = 56;
 
 const DEFAULT_SETTINGS = {
   startingTables: 12,      // tables (kuttu) each team starts with
   redoubleMultiplier: 4,   // some groups use 3
-  selfRaiseNextLevel: true // raising your own standing bid must reach the next level (40/48/56)
+  selfRaiseNextLevel: true, // raising your own standing bid must reach the next level (40/48/56)
+  players: 6               // 6 (3 vs 3, 8 cards each) or 8 (4 vs 4, 6 cards each)
 };
 
 const team = (seat) => seat % 2;
-const nextSeat = (seat) => (seat + 1) % NUM_SEATS;
+const nextSeat = (seat, n = NUM_SEATS) => (seat + 1) % n;
+const seatsOf = (state) => state.settings.players;
+const handSizeOf = (state) => 48 / state.settings.players;
 
 function makeDeck() {
   const deck = [];
@@ -66,11 +69,12 @@ function nextLevelAbove(value) {
 
 function newMatch(settings = {}, rng = Math.random) {
   const s = { ...DEFAULT_SETTINGS, ...settings };
+  if (s.players !== 6 && s.players !== 8) throw new Error('players must be 6 or 8');
   const state = {
     settings: s,
     phase: 'bidding',
     handNo: 0,
-    dealer: Math.floor(rng() * NUM_SEATS),
+    dealer: Math.floor(rng() * s.players),
     tables: [s.startingTables, s.startingTables],
     history: [],          // per-hand results
     winner: null,         // match winner team
@@ -84,9 +88,10 @@ function startHand(state, rng = Math.random) {
   const deck = shuffle(makeDeck(), rng);
   state.handNo += 1;
   state.phase = 'bidding';
-  state.hands = Array.from({ length: NUM_SEATS }, (_, i) =>
-    sortHand(deck.slice(i * HAND_SIZE, (i + 1) * HAND_SIZE)));
-  const first = nextSeat(state.dealer);         // player to dealer's right
+  const n = seatsOf(state), hs = handSizeOf(state);
+  state.hands = Array.from({ length: n }, (_, i) => sortHand(deck.slice(i * hs, (i + 1) * hs)));
+  state.dealt = state.hands.map((h) => h.slice());   // the deal as it was, revealed once the hand is over
+  const first = nextSeat(state.dealer, n);         // player to dealer's right
   state.turn = first;
   state.bidding = {
     opener: first,
@@ -271,8 +276,8 @@ function applyBid(state, seat, action) {
     return finishAuction(state);                 // redouble ends the auction
   } else throw new Error('Unknown bid action');
 
-  if (b.high && b.passesInRow >= NUM_SEATS - 1) return finishAuction(state);
-  state.turn = nextSeat(seat);
+  if (b.high && b.passesInRow >= seatsOf(state) - 1) return finishAuction(state);
+  state.turn = nextSeat(seat, seatsOf(state));
 }
 
 function finishAuction(state) {
@@ -323,8 +328,8 @@ function playCard(state, seat, cardId) {
   state.trick.cards.push({ seat, card });
   state.played.push({ seat, card, trick: state.trickNo });
 
-  if (state.trick.cards.length < NUM_SEATS) {
-    state.turn = nextSeat(seat);
+  if (state.trick.cards.length < seatsOf(state)) {
+    state.turn = nextSeat(seat, seatsOf(state));
     return;
   }
   const wi = winningIndex(state.trick.cards, trumpSuit(state));
@@ -343,7 +348,7 @@ function collectTrick(state) {
   state.tricksTaken[team(winner)] += 1;
   state.lastTrick = { cards: state.trick.cards, winner, points };
   state.trickNo += 1;
-  if (state.trickNo >= HAND_SIZE) return scoreHand(state);
+  if (state.trickNo >= handSizeOf(state)) return scoreHand(state);
   // Stop early once the outcome is decided: the bidding team has reached the target, or the points
   // still on the table can no longer get them there.
   const bt = state.contract.team, mine = state.points[bt];
@@ -388,7 +393,7 @@ function scoreHand(state) {
 
 function nextHand(state, rng = Math.random) {
   if (state.phase !== 'handover') return;
-  state.dealer = nextSeat(state.dealer);
+  state.dealer = nextSeat(state.dealer, seatsOf(state));
   startHand(state, rng);
 }
 
@@ -399,6 +404,8 @@ function getView(state, seat) {
   return {
     phase: state.phase,
     handNo: state.handNo,
+    players: seatsOf(state),
+    handSize: handSizeOf(state),
     dealer: state.dealer,
     turn: state.turn,
     tables: state.tables,
@@ -417,7 +424,8 @@ function getView(state, seat) {
     history: state.history,
     winner: state.winner,
     log: state.log.slice(-30),
-    // revealed hands at end of hand are not needed; keep private
+    // the original deal is public once the hand is over (review only)
+    dealt: state.phase === 'handover' || state.phase === 'matchover' ? state.dealt : null,
     legal: mine
       ? { bid: legalBidActions(state, seat), cards: legalCards(state, seat) }
       : null

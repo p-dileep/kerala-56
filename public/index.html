@@ -16,29 +16,33 @@
 <main id="lobby" class="screen">
   <div class="lobby-card">
     <h1 class="wordmark"><span class="num">56</span><span class="ml">അമ്പത്തിയാറ്</span></h1>
-    <p class="lede">Six players, two teams of three, two packs. Start a table and send the code to your friends. Bots fill any empty seats.</p>
-    <ol class="howto">
-      <li>Type your name and click <b>Start a new table</b>.</li>
-      <li>On the table screen, click the <b>table code</b> at the top-left to copy the shareable link.</li>
-      <li>Send that link to your friends. They open it, type their name, and pick a seat.</li>
-      <li>Empty seats are played by bots. Keep the server window open while you play.</li>
-    </ol>
+    <p class="lede">Two teams, two packs, 56 points. Type your name, walk into the 6-player or 8-player table, and pick a seat. Bots fill any empty seats.</p>
     <label class="field">
-      <span>Your name</span>
-      <input id="nameInput" maxlength="18" autocomplete="nickname" placeholder="e.g. Dileep">
+      <span>Your name <em class="req">(required)</em></span>
+      <input id="nameInput" maxlength="18" autocomplete="nickname" placeholder="e.g. Dileep" required>
     </label>
-    <button id="createBtn" class="btn primary">Start a new table</button>
+    <div class="fixed-tables">
+      <button class="btn primary big-btn" data-fixed="TABLE6"><b>6-player table</b><span id="info6" class="sub">3 vs 3 · 8 cards each</span></button>
+      <button class="btn primary big-btn" data-fixed="TABLE8"><b>8-player table</b><span id="info8" class="sub">4 vs 4 · 6 cards each</span></button>
+    </div>
+    <div class="join-row">
+      <label class="field grow">
+        <span>Or start a private table</span>
+        <select id="newPlayers"><option value="6">6 players</option><option value="8">8 players</option></select>
+      </label>
+      <button id="createBtn" class="btn">Start a new table</button>
+    </div>
     <div class="join-row">
       <label class="field grow">
         <span>Have a code?</span>
-        <input id="codeInput" maxlength="5" placeholder="ABCDE" autocapitalize="characters">
+        <input id="codeInput" maxlength="6" placeholder="ABCDE" autocapitalize="characters">
       </label>
       <button id="joinBtn" class="btn">Join table</button>
     </div>
     <details class="rules">
       <summary>How 56 is played here</summary>
       <ul>
-        <li>Cards rank J, 9, A, 10, K, Q. Points: J 3, 9 2, A 1, 10 1. The 48 cards hold 56 points.</li>
+        <li>Cards rank J, 9, A, 10, K, Q. Points: J 3, 9 2, A 1, 10 1. The 48 cards hold 56 points. Six players get 8 cards each (3 vs 3); eight players get 6 cards each (4 vs 4). Bids, levels and tables are the same at both sizes.</li>
         <li>Bidding goes round from the dealer's right. Bids run 28–56 with a trump suit or no-trump. The first bidder must open with at least 28.</li>
         <li>You cannot name a suit you hold none of. To raise your own standing bid you must jump to the next level (40, 48 or 56).</li>
         <li>Jack signal: a call shows as <b>30 ♥</b> when the caller holds the Jack of that suit and <b>♥ 30</b> when they do not.</li>
@@ -98,6 +102,7 @@
   <aside id="rail" class="rail">
     <div class="rail-head">
       <button id="lastTrickBtn" class="btn small">Last trick</button>
+      <button id="handsBtn" class="btn small hidden" title="Everyone's cards as dealt (after the hand)">Show the hands</button>
       <button id="leaveBtn" class="btn small ghost">Leave table</button>
     </div>
     <ol id="log" class="log"></ol>

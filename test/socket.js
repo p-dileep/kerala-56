@@ -8,7 +8,8 @@ server.listen(0, () => {
   let started = false, hands = 0, guest;
   s.on('connect', () => s.emit('hello', {}));
   s.on('token', () => s.emit('createRoom', { name: 'Tester', players: 8 }));
-  s.on('lobby', (t) => { if (!s.lobbySeen) { s.lobbySeen = true; const codes = t.map((x) => x.code).sort(); if (codes.join() !== 'TABLE6,TABLE8') { console.error('lobby tables missing', codes); process.exit(1); } } });
+  s.on('lobby', (t) => { if (!s.lobbySeen) { s.lobbySeen = true; const codes = t.map((x) => x.code).sort(); if (codes.join() !== 'TABLE6,TABLE8') { console.error('lobby tables missing', codes); process.exit(1); }
+    if (t.some((x) => x.seated !== 0 || x.hasGame)) { console.error('fixed tables should start empty', t); process.exit(1); } } });
   s.on('errorMsg', (m) => { console.error('server error:', m); process.exit(1); });
   s.on('room', (r) => {
     if (!guest) {                         // a second human joins via code

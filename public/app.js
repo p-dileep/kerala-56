@@ -58,7 +58,10 @@
   document.querySelectorAll('[data-fixed]').forEach((b) => (b.onclick = () => { if (needName()) socket.emit('joinRoom', { code: b.dataset.fixed, name: myName() }); }));
   socket.on('lobby', (tables) => tables.forEach((t) => {
     const el = $(t.players === 8 ? 'info8' : 'info6'); if (!el) return;
-    el.textContent = `${t.players === 8 ? '4 vs 4 · 6 cards each' : '3 vs 3 · 8 cards each'} · ${t.seated ? `${t.seated} seated` : 'empty'}${t.playing ? ', playing' : ''}`;
+    if (t.seated) el.innerHTML = `<span class="live">LIVE</span> ${t.seated} seated${t.playing ? ', playing' : ''}`;
+    else el.innerHTML = t.hasGame ? 'empty, old game waiting' : 'empty';
+    const rb = document.querySelector(`[data-reset-table="${t.code}"]`);
+    if (rb) { rb.classList.toggle('hidden', !(t.hasGame && !t.seated)); rb.onclick = () => socket.emit('resetTable', { code: t.code }); }
   }));
   $('joinBtn').onclick = () => {
     const code = $('codeInput').value.trim().toUpperCase();

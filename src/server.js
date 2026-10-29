@@ -68,9 +68,15 @@ function ensureHost(room) {
   if (next && next.token !== room.hostToken) { room.hostToken = next.token; sysChat(room, `${next.name} is now the host.`); }
 }
 
+function resetFixed(room) {
+  clearTimeout(room.timer);
+  room.seats = Array.from({ length: room.players }, emptySeat);
+  room.game = null; room.chat = []; room.hostToken = null; room.botStyle = 'medium'; room.touched = Date.now();
+}
+
 function lobbyInfo() {
   return FIXED.map((t) => { const r = rooms.get(t.code); return { code: t.code, players: t.players,
-    seated: r.seats.filter((s) => s.kind === 'human' && s.connected).length, playing: !!r.game && r.game.phase !== 'matchover' }; });
+    seated: r.seats.filter((s) => s.kind === 'human' && s.connected).length, playing: !!r.game && r.game.phase !== 'matchover', hasGame: !!r.game }; });
 }
 
 function seatOfToken(room, token) {
@@ -269,6 +275,15 @@ io.on('connection', (socket) => {
     broadcast(room);
   });
 
+  // Lobby: clear a permanent table that still holds an old game but has nobody connected
+  socket.on('resetTable', ({ code } = {}) => {
+    const room = rooms.get(String(code || '').toUpperCase());
+    if (!room || !room.fixed) return;
+    if (room.seats.some((s) => s.kind === 'human' && s.connected)) return fail('Someone is still at that table.');
+    resetFixed(room);
+    io.emit('lobby', lobbyInfo());
+  });
+
   socket.on('resetChips', () => {
     const room = getRoom();
     if (!room || socket.data.token !== room.hostToken) return fail('Only the host can reset the chips');
@@ -353,10 +368,8 @@ setInterval(() => {
     const anyone = room.seats.some((s) => s.kind === 'human' && s.connected);
     if (!anyone && now - room.touched > ROOM_IDLE_MS) {
       clearTimeout(room.timer);
-      if (room.fixed) {            // reset the permanent table for the next group
-        room.seats = Array.from({ length: room.players }, emptySeat);
-        room.game = null; room.chat = []; room.hostToken = null; room.botStyle = 'medium'; room.touched = now;
-      } else rooms.delete(code);
+      if (room.fixed) resetFixed(room);   // the permanent table is cleared for the next group
+      else rooms.delete(code);
     }
   }
 }, 60 * 1000).unref();

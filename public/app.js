@@ -228,8 +228,8 @@
         if (s.kind === 'bot' && !isMe)
           actions += `<button class="btn small" data-sit="${s.seat}" title="${seated && g ? 'Move here; a bot takes your current seat' : 'Play this seat'}">${seated && g ? 'Move here' : 'Take seat'}</button>`;
         if (host && !g && s.kind === 'bot') actions += `<button class="btn small ghost" data-unbot="${s.seat}">Remove</button>`;
-        // host may replace anyone; any seated player may replace someone who has dropped off
-        if (s.kind === 'human' && !isMe && (host || (seated && !s.connected)))
+        // any seated player (or the host) may remove / replace another player
+        if (s.kind === 'human' && !isMe && (host || seated))
           actions += `<button class="btn small ghost" data-kick="${s.seat}">${g ? 'Replace with bot' : 'Remove'}</button>`;
         body = `<div class="nm">${esc(s.name)}</div><div class="meta">${meta.join(' ')}</div>
           ${actions ? `<div class="seat-actions">${actions}</div>` : ''}`;

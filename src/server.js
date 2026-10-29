@@ -258,9 +258,8 @@ io.on('connection', (socket) => {
     if (!room) return;
     const s = room.seats[Number(seat)];
     if (!s || s.kind !== 'human' || s.token === socket.data.token) return;
-    const isHost = socket.data.token === room.hostToken;
-    const seated = seatOfToken(room, socket.data.token) >= 0;
-    if (!isHost && !(seated && !s.connected)) return fail('Only the host can replace a player who is still connected.');
+    // any seated player (or the host) may remove another player: small friends-only tables
+    if (socket.data.token !== room.hostToken && seatOfToken(room, socket.data.token) < 0) return fail('Sit down first.');
     sysChat(room, `${s.name} was replaced by a bot.`);
     room.seats[Number(seat)] = room.game ? { ...emptySeat(), kind: 'bot', name: BOT_NAMES[Number(seat)] } : emptySeat();
     broadcast(room);

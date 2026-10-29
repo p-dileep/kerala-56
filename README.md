@@ -52,7 +52,7 @@ Run a **single** process. Rooms are held in memory. A restart ends the tables in
 - Bids are 28–56 with a suit or NT. The opener must bid at least 28. You cannot name a suit you are void in.
   Raising **your own** standing bid must jump to the next level (40/48/56).
 - Jack signal: a bid is shown as "30 ♥" when the caller holds the Jack of that suit and "♥ 30" when they do not. The engine derives this from the hand.
-- Seats can change at any time, even mid-hand: anyone can take a bot's seat ("Take seat" / "Move here"), the host can replace any player with a bot, and any seated player can replace someone who has dropped off (shown as "away"). A player who leaves is replaced by a bot.
+- Seats can change at any time, even mid-hand: anyone can take a bot's seat ("Take seat" / "Move here"), and any seated player can remove another player (before the deal) or replace them with a bot (during a hand), for example a stale session of your own. A player who leaves is replaced by a bot.
 - After a hand, "Show the initial hands" (in the result window, the table centre, or the top bar) reveals every player's cards as dealt. Hands stay private until then.
 - The host can reset both teams to 12 chips at any time ("Reset chips" in the top bar).
 - After a hand the table waits: the host clicks "Next hand" (in the result window or the centre of the table) when everyone has reviewed the result.

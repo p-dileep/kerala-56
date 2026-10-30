@@ -193,6 +193,14 @@
     }
   }
 
+  // On touch screens the seat actions stay hidden until the seat is tapped; a tap elsewhere closes them.
+  let openSeat = null;
+  document.addEventListener('pointerdown', (e) => {
+    if (e.target.closest('button')) return;           // let the button's own click go through
+    const el = e.target.closest('.seat');
+    const next = el ? Number(el.dataset.seat) : null;
+    if (next !== openSeat) { openSeat = next; if (room) renderSeats(room.game); }
+  });
   function renderSeats(g) {
     const host = room.isHost;
     const lastBy = {};
@@ -204,6 +212,7 @@
       if (s.kind === 'empty') cls.push('empty');
       if (isMe) cls.push('me');
       if (g) cls.push('ingame');
+      if (openSeat === s.seat) cls.push('open');
       if (s.kind === 'human' && !s.connected) cls.push('away');
       if (g && g.turn === s.seat) cls.push('turn');
       const tookTrick = g && g.phase === 'playing' && g.trick.complete && g.trick.winner === s.seat;
@@ -250,7 +259,7 @@
           <div class="nm">${esc(s.name)}</div>${meta.length ? `<div class="meta">${meta.join(' ')}</div>` : ''}
           ${actions ? `<div class="seat-actions">${actions}</div>` : ''}`;
       }
-      return `<div class="${cls.join(' ')}" style="left:${x}%;top:${y}%" title="${TEAM[s.team]}">${said}${body}</div>`;
+      return `<div class="${cls.join(' ')}" data-seat="${s.seat}" style="left:${x}%;top:${y}%" title="${TEAM[s.team]}">${said}${body}</div>`;
     }).join('');
     $('seats').querySelectorAll('[data-sit]').forEach((b) => (b.onclick = () => socket.emit('sit', { seat: b.dataset.sit, name: myName() })));
     $('seats').querySelectorAll('[data-bot]').forEach((b) => (b.onclick = () => socket.emit('setBot', { seat: b.dataset.bot, on: true })));

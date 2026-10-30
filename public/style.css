@@ -146,7 +146,7 @@ button, input { font: inherit; }
 .seat.away { opacity: .55; }
 .seat.ingame:not(.empty) .seat-actions { display: none; }
 .seat.ingame:not(.empty):hover .seat-actions, .seat.ingame:not(.empty):focus-within .seat-actions { display: flex; }
-@media (hover: none) { .seat.ingame:not(.empty) .seat-actions { display: flex; } }
+@media (hover: none) { .seat.ingame:not(.empty) .seat-actions { display: none; } .seat.ingame:not(.empty).open .seat-actions { display: flex; } }
 .seat .nm { font-weight: 700; color: var(--ivory); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; }
 .seat .meta { font-size: .78rem; opacity: .7; white-space: nowrap; }
 .seat .said {

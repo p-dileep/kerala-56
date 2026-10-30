@@ -109,12 +109,12 @@ button, input { font: inherit; }
 .center .big { font-size: clamp(26px, 4vw, 40px); font-weight: 700; line-height: 1.1; }
 .center .sub { font-size: .98rem; margin-top: 6px; }
 .center .btn { margin-top: 14px; }
-.center .bidlog { list-style: none; margin: 0; padding: 0; font-size: 1.15rem; max-height: 11em; overflow: hidden; display: flex; flex-direction: column-reverse; }
-.center .bidlog li { padding: 1px 0; }
-.center .bidlog li:first-child { font-weight: 700; font-size: 1.4rem; }
-.center .bidlog .suit { font-size: 1.25em; line-height: 1; }
-.center .bidlog .suit.red { color: #c4161c; }
-.center .bidlog .suit.black { color: #111; }
+.center .bidval { font-size: clamp(36px, 5.5vw, 60px); font-weight: 700; line-height: 1; }
+.center .bidval .suit { font-size: .95em; }
+.center .bidval .suit.red { color: #c4161c; }
+.center .bidval .suit.black { color: #111; }
+.center .sub.wait { margin-top: 14px; }
+.center .dbl { background: var(--kumkum); color: var(--ivory); border-radius: 999px; padding: 0 8px; font-weight: 700; font-size: .85rem; margin-left: 4px; }
 .center .who { font-weight: 700; padding: 0 5px; border-radius: 6px; }
 .center .who.t0 { color: #7a5200; background: rgba(217,169,58,.35); }
 .center .who.t1 { color: #7a1420; background: rgba(194,57,74,.30); }
@@ -144,6 +144,12 @@ button, input { font: inherit; }
   box-shadow: 0 4px 12px rgba(0,0,0,.3);
 }
 .seat .said.red { color: var(--kumkum); }
+.seat.top .said { top: auto; bottom: -12px; transform: translate(-50%, 100%); }
+.seat.left .said { left: auto; right: -12px; top: 50%; transform: translate(100%, -50%); }
+.seat.right .said { left: -12px; top: 50%; transform: translate(-100%, -50%); }
+.seat .said.quiet { background: rgba(251,246,233,.55); color: rgba(30,26,20,.8); font-weight: 400; font-size: .85rem; padding: 2px 9px 1px; box-shadow: none; }
+.seat .said.high { font-size: 1.2rem; padding: 5px 13px 3px; box-shadow: 0 0 0 3px var(--kasavu), 0 6px 16px rgba(0,0,0,.35); }
+.seat .said.dbl { background: var(--kumkum); color: var(--ivory); }
 .seat .seat-actions .btn { white-space: nowrap; }
 .seat .seat-actions { display: flex; gap: 6px; justify-content: center; margin-top: 6px; }
 .seat.empty { border-style: dashed; border-color: rgba(207,227,226,.35); background: rgba(8,42,48,.6); }

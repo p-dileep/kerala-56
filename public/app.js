@@ -202,10 +202,19 @@
       if (g && g.turn === s.seat) cls.push('turn');
       const tookTrick = g && g.phase === 'playing' && g.trick.complete && g.trick.winner === s.seat;
       if (tookTrick) cls.push('won');
+      // the call bubble faces the mat: below the seats across the table, beside the seats at the ends
+      if (y < 15) cls.push('top'); else if (y <= 85) cls.push(x < 50 ? 'left' : 'right');
       let said = '';
       const a = lastBy[s.seat];
       if (tookTrick) said = `<div class="said won">takes ${g.trick.points ? `${g.trick.points} pts` : 'the trick'}</div>`;
-      else if (a) said = `<div class="said ${a.type === 'bid' && RED.has(a.suit) ? 'red' : ''}">${esc(actionText(a))}</div>`;
+      else if (a) {
+        const k = [];
+        if (a.type === 'pass') k.push('quiet');
+        if (a.type === 'double' || a.type === 'redouble') k.push('dbl');
+        if (a.suit && a.suit !== 'NT' && RED.has(a.suit)) k.push('red');
+        if (g.bidding.high && g.bidding.high.seat === s.seat && a.type !== 'pass') k.push('high');
+        said = `<div class="said ${k.join(' ')}">${esc(actionText(a))}</div>`;
+      }
       else if (g && g.contract && g.contract.seat === s.seat && g.phase === 'playing')
         said = `<div class="said ${RED.has(g.contract.suit) ? 'red' : ''}">${esc(bidText(g.contract.value, g.contract.suit, g.contract.hasJack))}</div>`;
 
@@ -281,10 +290,15 @@
       return;
     }
     if (g.phase === 'bidding') {
-      const acts = g.bidding.actions.slice(-N()).reverse();
+      // The mat holds only the standing bid; each player's own call sits beside their seat.
+      const h = g.bidding.high;
       const waiting = g.turn === room.mySeat ? 'Your call' : `<span class="who t${g.turn % 2}">${esc(nameOf(g.turn))}</span> to call`;
-      c.innerHTML = `<ul class="bidlog">${acts.map((a) => `<li><span class="who t${a.seat % 2}">${esc(nameOf(a.seat))}</span>: ${colourSuits(esc(actionText(a)))}</li>`).join('')}</ul>
-        <div class="sub">${acts.length ? '' : `Hand ${g.handNo}. `}${waiting}</div>`;
+      const dbl = g.bidding.doubled ? `<span class="dbl">${g.bidding.doubled === 2 ? 'Redoubled' : 'Doubled'}</span>` : '';
+      c.innerHTML = h
+        ? `<div class="bidval">${colourSuits(esc(bidText(h.value, h.suit, h.hasJack)))}</div>
+           <div class="sub"><span class="who t${h.seat % 2}">${esc(nameOf(h.seat))}</span> ${dbl}</div>
+           <div class="sub wait">${waiting}</div>`
+        : `<div class="sub">Hand ${g.handNo}</div><div class="sub wait">${waiting}</div>`;
       return;
     }
     if (g.phase === 'playing') {
@@ -392,8 +406,9 @@
     $('plusBtns').querySelectorAll('[data-plus]').forEach((b) => (b.onclick = () => socket.emit('bid', { type: 'plus', n: Number(b.dataset.plus) })));
     if (L.plusOpen && L.plusOpen.length) {
       const fresh = { 1: ['J'], 2: ['J', 'J'], 3: ['J', 'J', '9'] };
-      $('plusBtns').innerHTML = L.plusOpen.map((o) => `<button class="btn small ${RED.has(o.suit) ? 'red' : ''}" data-popen="${o.n}" data-suit="${o.suit}"
-        title="Open ${28 + o.n} ${SUIT_NAME[o.suit]}: I hold ${fresh[o.n].join(' and ')} of ${SUIT_NAME[o.suit]}${o.n === 1 ? ' and nothing else in it' : ''}">Plus ${o.n} ${SYM[o.suit]} · ${fresh[o.n].join('+')}</button>`).join('');
+      const base = g.bidding.high ? g.bidding.high.value : 28;
+      $('plusBtns').innerHTML += L.plusOpen.map((o) => `<button class="btn small ${RED.has(o.suit) ? 'red' : ''}" data-popen="${o.n}" data-suit="${o.suit}"
+        title="${g.bidding.high ? 'Bid' : 'Open'} ${base + o.n} ${SUIT_NAME[o.suit]}: I hold ${fresh[o.n].join(' and ')} of ${SUIT_NAME[o.suit]}${o.n === 1 ? ' and nothing else in it' : ''}">Plus ${o.n} ${SYM[o.suit]} · ${fresh[o.n].join('+')}</button>`).join('');
       $('plusBtns').querySelectorAll('[data-popen]').forEach((b) => (b.onclick = () => socket.emit('bid', { type: 'plus', n: Number(b.dataset.popen), suit: b.dataset.suit })));
     }
     $('nsBtns').innerHTML = (L.ns || []).map((o) => `<button class="btn small ${RED.has(o.suit) ? 'red' : ''}" data-ns="${o.value}"

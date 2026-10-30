@@ -192,17 +192,23 @@ function legalBidActions(state, seat) {
     if (room >= 2 && m[2] && holds(m[2])) out.plus.push(2);
     if (room >= 3 && m[3] && holds(m[3])) out.plus.push(3);
   }
-  // Opening Plus: the opener may open "Plus N" in a suit = MIN_BID + N in that suit, showing the fresh-ladder holding.
+  // Fresh-suit Plus: any bidder may say "Plus N <suit>" in a suit nobody has called yet
+  // (= high + N in that suit, or MIN_BID + N when opening), showing the fresh-ladder holding:
+  // Plus 1 = a lone Jack, Plus 2 = both Jacks, Plus 3 = both Jacks and a Nine.
   out.plusOpen = [];
-  if (!b.high && seat === b.opener) {
+  const base = b.high ? b.high.value : MIN_BID;
+  const calledSuits = new Set(b.actions.filter((a) => (a.type === 'bid' || a.type === 'plus') && a.suit !== 'NT').map((a) => a.suit));
+  if (out.minBid !== null) {
     for (const suit of SUITS) {
+      if (calledSuits.has(suit)) continue;
       const inSuit = hand.filter((c) => c.suit === suit);
       const count = (r) => inSuit.filter((c) => c.rank === r).length;
       const holds = (ranks) => RANKS.every((r) => count(r) >= ranks.filter((x) => x === r).length);
+      const ok = (n) => base + n >= out.minBid && base + n <= MAX_BID;
       const m = plusMeaning([], suit);
-      if (m[1] && inSuit.length === 1 && holds(m[1])) out.plusOpen.push({ n: 1, suit });   // fresh: lone Jack
-      if (m[2] && holds(m[2])) out.plusOpen.push({ n: 2, suit });
-      if (m[3] && holds(m[3])) out.plusOpen.push({ n: 3, suit });
+      if (ok(1) && m[1] && inSuit.length === 1 && holds(m[1])) out.plusOpen.push({ n: 1, suit });   // fresh: lone Jack
+      if (ok(2) && m[2] && holds(m[2])) out.plusOpen.push({ n: 2, suit });
+      if (ok(3) && m[3] && holds(m[3])) out.plusOpen.push({ n: 3, suit });
     }
   }
   // NS convention: "value NS" is a no-trump bid that says "I hold no cards of a called suit".
@@ -250,10 +256,10 @@ function applyBid(state, seat, action) {
   } else if (type === 'plus') {
     const n = Number(action.n);
     let value, suit;
-    if (!b.high) {
+    if (!b.high || action.suit) {
       suit = action.suit;
-      if (!legal.plusOpen.some((o) => o.n === n && o.suit === suit)) throw new Error('Cannot open with Plus ' + (Number.isInteger(n) ? n : '') + ' in that suit');
-      value = MIN_BID + n;
+      if (!legal.plusOpen.some((o) => o.n === n && o.suit === suit)) throw new Error('Cannot say Plus ' + (Number.isInteger(n) ? n : '') + ' in that suit');
+      value = (b.high ? b.high.value : MIN_BID) + n;
     } else {
       if (!legal.plus.includes(n)) throw new Error('Cannot say Plus ' + (Number.isInteger(n) ? n : '') + ' now');
       value = b.high.value + n;

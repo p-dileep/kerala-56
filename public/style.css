@@ -319,6 +319,47 @@ button, input { font: inherit; }
   .seat .cnt { top: -9px; right: 6px; background: rgba(8,42,48,.9); color: var(--mist); border-radius: 999px; padding: 1px 6px 0; opacity: 1; font-size: .65rem; line-height: 1.3; }
   .chip.contract .stake { display: none; }
 }
+/* phone held sideways: the bid panel floats over the mat instead of taking its height */
+@media (max-height: 520px) and (orientation: landscape) {
+  :root { --cw: 44px; }
+  #table { grid-template-rows: auto 1fr auto; grid-template-areas: "top" "arena" "hand"; grid-template-columns: minmax(0, 1fr); }
+  .topbar { padding: 3px 8px; gap: 6px; flex-wrap: nowrap; overflow: hidden; }
+  .chip, .team-score { padding: .25em .6em .15em; font-size: .8rem; }
+  .chip.contract .stake, .team-score .hpts { display: none; }
+  .team-score .tables { font-size: .95rem; }
+  .scores { margin-left: auto; }
+  .chip.icon { display: inline-block; margin-left: 0; }
+  .arena { margin: 0 56px 2px; }
+  .mat { inset: 6% 3%; }
+  .mat-info { top: 3%; font-size: .78rem; }
+  .center .bidval { font-size: clamp(24px, 7vh, 40px); }
+  .center .sub { font-size: .82rem; margin-top: 2px; }
+  .center .sub.wait { margin-top: 6px; }
+  .seat { min-width: 0; padding: 3px 8px 2px; font-size: .78rem; border-radius: 10px; }
+  .seat .nm { max-width: 90px; }
+  .seat .meta { display: none; }
+  .seat .said { padding: 2px 8px 1px; font-size: .85rem; }
+  .seat .said.high { font-size: .95rem; }
+  .seat .tok { font-size: .6rem; }
+  .seat .cnt { top: -8px; right: 4px; background: rgba(8,42,48,.9); color: var(--mist); border-radius: 999px; padding: 1px 5px 0; opacity: 1; font-size: .6rem; line-height: 1.3; }
+  .hand { padding: 2px 8px 6px; min-height: 0; }
+  .hand .card { margin-left: calc(var(--cw) * -.25); }
+  .hand.active .card.legal { transform: translateY(-4px); }
+  .hand.active .card.legal:hover, .hand.active .card.legal:focus-visible { transform: translateY(-10px); }
+  .bid-panel {
+    position: fixed; left: 50%; bottom: calc(var(--cw) * 1.42 + 12px); transform: translateX(-50%); z-index: 6;
+    width: min(600px, 96vw); margin: 0; padding: 6px 8px; gap: 5px; border-radius: 12px;
+  }
+  .bid-head { font-size: .82rem; }
+  .suits { gap: 5px; }
+  .suits .btn { font-size: .95rem; padding: .3em 0 .2em; border-radius: 9px; }
+  .suits .tag { top: 2px; right: 4px; font-size: .55rem; }
+  .levels .btn, .conv .btn { padding: .25em .6em .15em; font-size: .8rem; }
+  .raise { gap: 6px; }
+  .raise-label { font-size: .75rem; }
+  .stepper output { font-size: 1.05rem; }
+  .bid-actions .btn { padding: .35em 1em .25em; font-size: .9rem; }
+}
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }
 }

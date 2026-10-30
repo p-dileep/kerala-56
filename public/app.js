@@ -134,7 +134,8 @@
   function cardHTML(c, extra = '') {
     return `<div class="card ${RED.has(c.suit) ? 'red' : ''} ${extra}" aria-label="${c.rank} of ${SUIT_NAME[c.suit]}">
       <span class="r">${c.rank}</span><span class="s1">${SYM[c.suit]}</span>
-      ${POINTS[c.rank] ? `<span class="pt">${POINTS[c.rank]}</span>` : ''}<span class="s2">${SYM[c.suit]}</span></div>`;
+      ${POINTS[c.rank] ? `<span class="pt">${POINTS[c.rank]}</span>` : ''}<span class="s2">${SYM[c.suit]}</span>
+      <span class="r r2">${c.rank}</span><span class="s1 s3">${SYM[c.suit]}</span></div>`;
   }
   let toastTimer;
   function toast(msg) {

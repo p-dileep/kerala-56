@@ -196,9 +196,11 @@ button, input { font: inherit; }
   user-select: none;
 }
 .card.red { color: var(--kumkum); }
-.card .r { position: absolute; left: 9%; top: 6%; font-weight: 700; font-size: calc(var(--cw) * .33); line-height: 1; }
-.card .s1 { position: absolute; left: 10%; top: 31%; font-size: calc(var(--cw) * .24); line-height: 1; }
-.card .s2 { position: absolute; right: 10%; bottom: 7%; font-size: calc(var(--cw) * .56); line-height: 1; }
+.card .r { position: absolute; left: 9%; top: 6%; font-weight: 700; font-size: calc(var(--cw) * .34); line-height: 1; }
+.card .s1 { position: absolute; left: 10%; top: 32%; font-size: calc(var(--cw) * .22); line-height: 1; }
+.card .r2 { left: auto; top: auto; right: 9%; bottom: 6%; transform: rotate(180deg); }
+.card .s3 { left: auto; top: auto; right: 10%; bottom: 32%; transform: rotate(180deg); }
+.card .s2 { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); font-size: calc(var(--cw) * .5); line-height: 1; }
 .card .pt { position: absolute; right: 9%; top: 7%; font-size: calc(var(--cw) * .17); opacity: .6; font-weight: 700; }
 
 /* hand */

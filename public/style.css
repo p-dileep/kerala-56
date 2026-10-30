@@ -80,6 +80,10 @@ button, input { font: inherit; }
 }
 .chip.code { cursor: pointer; }
 .chip.code b { letter-spacing: .14em; color: var(--ivory); }
+.chip.code.fixed b { letter-spacing: 0; }
+.chip.code.fixed .pre { display: none; }
+.chip.contract .stake { font-weight: 400; opacity: .75; margin-left: 6px; }
+.chip.contract .suit.red { color: #c4161c; }
 .chip.contract { background: var(--ivory); color: var(--ink); border-color: var(--kasavu); font-weight: 700; }
 .chip.icon { display: none; cursor: pointer; margin-left: auto; }
 .scores { display: flex; gap: 8px; margin-left: auto; }
@@ -110,6 +114,10 @@ button, input { font: inherit; }
 .center .sub { font-size: .98rem; margin-top: 6px; }
 .center .btn { margin-top: 14px; }
 .center .bidval { font-size: clamp(36px, 5.5vw, 60px); font-weight: 700; line-height: 1; }
+.center .bidval.pulse { animation: bidpulse .3s ease-out; }
+@keyframes bidpulse { 0% { transform: scale(.92); opacity: .4; } 100% { transform: none; opacity: 1; } }
+.mat-info { position: absolute; left: 50%; top: 13%; transform: translateX(-50%); display: flex; gap: 14px; color: var(--ink); font-size: .95rem; opacity: .8; white-space: nowrap; }
+.mat-info .suit { font-size: 1.2em; } .mat-info .suit.red { color: #c4161c; }
 .center .bidval .suit { font-size: .95em; }
 .center .bidval .suit.red { color: #c4161c; }
 .center .bidval .suit.black { color: #111; }
@@ -131,13 +139,16 @@ button, input { font: inherit; }
 .seat.t1 { border-color: var(--teamB); background: linear-gradient(rgba(194,57,74,.30), rgba(194,57,74,.30)), rgba(8,42,48,.94); }
 .seat.t0 .nm { color: #F3D27A; }
 .seat.t1 .nm { color: #F5A3AD; }
-.seat .starts { background: var(--ivory); color: var(--ink); border-radius: 999px; padding: 0 7px; font-weight: 700; font-size: .72rem; }
-.seat .starts::before { content: 'B6'; font-size: .6rem; margin-right: 3px; }
 .seat.turn { box-shadow: 0 0 0 4px rgba(251,246,233,.85), 0 0 28px rgba(251,246,233,.5); }
+.seat .toks { position: absolute; left: 8px; top: -9px; display: flex; gap: 4px; }
+.seat .tok { background: var(--ivory); color: var(--ink); border-radius: 999px; padding: 1px 7px 0; font-weight: 700; font-size: .68rem; line-height: 1.3; }
+.seat .cnt { position: absolute; right: 8px; top: 4px; font-size: .72rem; font-weight: 700; opacity: .65; }
+.seat.away { opacity: .55; }
+.seat.ingame:not(.empty) .seat-actions { display: none; }
+.seat.ingame:not(.empty):hover .seat-actions, .seat.ingame:not(.empty):focus-within .seat-actions { display: flex; }
+@media (hover: none) { .seat.ingame:not(.empty) .seat-actions { display: flex; } }
 .seat .nm { font-weight: 700; color: var(--ivory); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; }
-.seat .meta { font-size: .8rem; opacity: .8; display: flex; gap: 6px; justify-content: center; align-items: center; }
-.seat .dealer { background: var(--ivory); color: var(--ink); border-radius: 999px; padding: 0 6px; font-weight: 700; font-size: .72rem; }
-.seat .away { color: #F3A6AE; }
+.seat .meta { font-size: .78rem; opacity: .7; white-space: nowrap; }
 .seat .said {
   position: absolute; left: 50%; top: -12px; transform: translate(-50%, -100%);
   background: var(--ivory); color: var(--ink); border-radius: 10px; padding: 4px 10px 2px; font-weight: 700; white-space: nowrap;
@@ -207,17 +218,25 @@ button, input { font: inherit; }
 }
 .bid-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 #bidPrompt { font-weight: 700; }
+.conv { display: flex; gap: 6px; flex-wrap: wrap; }
+.conv:not(:has(.btn)) { display: none; }
+.raise { display: flex; align-items: center; gap: 10px; opacity: .6; transition: opacity .15s; }
+.raise:hover, .raise:focus-within { opacity: 1; }
+.raise-label { font-size: .85rem; }
 .stepper { display: flex; align-items: center; gap: 6px; }
-.stepper output { font-size: 1.8rem; font-weight: 700; min-width: 2.2ch; text-align: center; line-height: 1; padding-top: 4px; }
+.stepper output { font-size: 1.3rem; font-weight: 700; min-width: 2.2ch; text-align: center; line-height: 1; padding-top: 4px; }
+.suits .btn { position: relative; }
+.suits .tag { position: absolute; right: 7px; top: 4px; font-size: .62rem; font-weight: 700; letter-spacing: .06em; color: var(--ink); background: rgba(200,150,46,.28); border-radius: 999px; padding: 1px 5px 0; }
 .bid-panel .btn { background: #fff; color: var(--ink); border-color: #CDBF9F; }
 .bid-panel .btn:hover { border-color: var(--ink); }
-.levels { display: flex; gap: 6px; margin-left: auto; }
+.levels { display: flex; gap: 6px; flex-wrap: wrap; }
 .levels .btn { padding: .35em .7em .2em; }
 .suits { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
 .suits .btn { font-size: 1.15rem; padding: .55em 0 .4em; border-radius: 12px; }
 .suits .btn.red { color: var(--kumkum); }
 .bid-actions { display: flex; gap: 8px; }
 .bid-actions .btn { flex: 1; }
+.bid-actions .btn.warn { flex: 0 0 auto; }
 .bid-panel .btn.warn { color: var(--kumkum); border-color: rgba(163,35,47,.5); }
 
 /* ---------------------------------------------------------- rail */
@@ -228,6 +247,12 @@ button, input { font: inherit; }
 .rail-head { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px; justify-content: space-between; }
 .log, .chat { list-style: none; margin: 0; padding: 6px 14px; overflow-y: auto; font-size: .92rem; line-height: 1.45; }
 .log { border-bottom: 1px solid rgba(207,227,226,.12); opacity: .85; }
+.log li.head { margin-top: 8px; font-weight: 700; color: var(--ivory); }
+.log li.head:first-child { margin-top: 0; }
+.log li.call, .log li.trick-line { padding-left: 10px; }
+.log li b { color: var(--ivory); font-weight: 700; }
+.log li .n { display: inline-block; min-width: 1.6em; opacity: .6; }
+.log .suit.red { color: #F5A3AD; }
 .chat li b { color: var(--ivory); }
 .chat li.sys { opacity: .65; font-style: italic; }
 .chat-form { display: flex; gap: 6px; padding: 10px; }
@@ -284,6 +309,13 @@ button, input { font: inherit; }
   .team-score { padding: .3em .55em .15em; }
   .team-score .hpts { display: none; }
   .levels { margin-left: 0; }
+  .bid-panel { width: calc(100% - 12px); padding: 10px; gap: 8px; }
+  .suits { grid-template-columns: repeat(3, 1fr); }
+  .suits .btn { font-size: 1.05rem; }
+  .raise { flex-wrap: wrap; }
+  .mat-info { font-size: .8rem; top: 4%; }
+  .seat .cnt { top: -9px; right: 6px; background: rgba(8,42,48,.9); color: var(--mist); border-radius: 999px; padding: 1px 6px 0; opacity: 1; font-size: .65rem; line-height: 1.3; }
+  .chip.contract .stake { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }

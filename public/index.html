@@ -61,7 +61,7 @@
 <!-- Table -->
 <main id="table" class="screen hidden">
   <header class="topbar">
-    <button id="codeChip" class="chip code" title="Copy invite link">Table <b id="roomCode"></b></button>
+    <button id="codeChip" class="chip code" title="Copy invite link"><span class="pre">Table </span><b id="roomCode"></b></button>
     <div id="contractChip" class="chip contract hidden"></div>
     <div class="scores">
       <div class="team-score t0"><span class="tname">Team A</span><span class="tables" id="tables0"></span><span class="hpts" id="hpts0"></span></div>
@@ -72,6 +72,7 @@
 
   <section class="arena">
     <div class="mat" id="mat">
+      <div id="matInfo" class="mat-info"></div>
       <div id="center" class="center"></div>
       <div id="trick" class="trick"></div>
     </div>
@@ -79,8 +80,11 @@
   </section>
 
   <section id="bidPanel" class="bid-panel hidden" aria-label="Your bid">
-    <div class="bid-head">
-      <span id="bidPrompt">Your bid</span>
+    <div class="bid-head"><span id="bidPrompt">Your bid</span></div>
+    <div id="suitBtns" class="suits"></div>
+    <div id="convRow" class="conv"><div id="plusBtns" class="levels"></div><div id="nsBtns" class="levels"></div></div>
+    <div class="raise">
+      <span class="raise-label">Bid higher</span>
       <div class="stepper">
         <button id="bidMinus" class="btn small" aria-label="Lower bid">−</button>
         <output id="bidValue">28</output>
@@ -88,9 +92,6 @@
       </div>
       <div id="levelJumps" class="levels"></div>
     </div>
-    <div id="suitBtns" class="suits"></div>
-    <div id="plusBtns" class="levels"></div>
-    <div id="nsBtns" class="levels"></div>
     <div class="bid-actions">
       <button id="passBtn" class="btn">Pass</button>
       <button id="doubleBtn" class="btn warn">Double</button>

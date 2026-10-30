@@ -287,12 +287,24 @@ function applyBid(state, seat, action) {
     if (!legal.redouble) throw new Error('Cannot redouble now');
     b.doubled = 2;
     b.actions.push({ seat, type: 'redouble' });
+    logCall(state, b.actions[b.actions.length - 1]);
     return finishAuction(state);                 // redouble ends the auction
   } else throw new Error('Unknown bid action');
 
+  logCall(state, b.actions[b.actions.length - 1]);
   if (b.high && b.passesInRow >= seatsOf(state) - 1) return finishAuction(state);
   state.turn = nextSeat(seat, seatsOf(state));
 }
+
+const SYM = { S: '♠', H: '♥', D: '♦', C: '♣', NT: 'NT' };
+function callText(a) {
+  const bid = () => a.hasJack ? `${a.value} ${SYM[a.suit]}` : `${SYM[a.suit]} ${a.value}`;
+  if (a.type === 'bid') return bid();
+  if (a.type === 'plus') return `Plus ${a.n} (${bid()})`;
+  if (a.type === 'ns') return `${a.value} NS (no ${SYM[a.ns]})`;
+  return { pass: 'Pass', double: 'Double', redouble: 'Redouble' }[a.type];
+}
+function logCall(state, a) { state.log.push(`Call: seat ${a.seat + 1} — ${callText(a)}`); }
 
 function finishAuction(state) {
   const b = state.bidding;
@@ -362,6 +374,7 @@ function collectTrick(state) {
   state.tricksTaken[team(winner)] += 1;
   state.lastTrick = { cards: state.trick.cards, winner, points };
   state.trickNo += 1;
+  state.log.push(`Trick ${state.trickNo}: seat ${winner + 1} takes ${points} pts`);
   if (state.trickNo >= handSizeOf(state)) return scoreHand(state);
   // Stop early once the outcome is decided: the bidding team has reached the target, or the points
   // still on the table can no longer get them there.
@@ -444,7 +457,7 @@ function getView(state, seat) {
     result: state.result,
     history: state.history,
     winner: state.winner,
-    log: state.log.slice(-30),
+    log: state.log.slice(-80),
     // the original deal is public once the hand is over (review only)
     dealt: state.phase === 'handover' || state.phase === 'matchover' ? state.dealt : null,
     legal: mine

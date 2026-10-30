@@ -164,7 +164,8 @@
     const g = room.game;
     $('handsBtn').classList.toggle('hidden', !(g && g.dealt));
     $('resetChipsBtn').classList.toggle('hidden', !(g && room.isHost));
-    $('roomCode').textContent = room.code;
+    $('roomCode').textContent = room.fixed ? `${room.players}-player table` : room.code;
+    $('codeChip').classList.toggle('fixed', !!room.fixed);
     renderScores(g);
     renderSeats(g);
     renderCenter(g);
@@ -185,7 +186,9 @@
     const c = g && g.contract;
     $('contractChip').classList.toggle('hidden', !c);
     if (c) {
-      $('contractChip').textContent = `${nameOf(c.seat)} · ${TEAM[c.team]} needs ${bidText(c.value, c.suit, c.hasJack)}${c.mult > 1 ? ` ×${c.mult}` : ''}`;
+      const [win, lose] = c.value >= 56 ? [4, 5] : c.value >= 48 ? [3, 4] : c.value >= 40 ? [2, 3] : [1, 2];
+      $('contractChip').innerHTML = `<b>${esc(nameOf(c.seat))}</b> needs ${colourSuits(esc(bidText(c.value, c.suit, c.hasJack)))}${c.mult > 1 ? ` ×${c.mult}` : ''} for ${TEAM[c.team]}
+        <span class="stake">wins ${win * c.mult}, loses ${lose * c.mult} chips</span>`;
     }
   }
 
@@ -199,6 +202,8 @@
       const cls = ['seat', `t${s.team}`];
       if (s.kind === 'empty') cls.push('empty');
       if (isMe) cls.push('me');
+      if (g) cls.push('ingame');
+      if (s.kind === 'human' && !s.connected) cls.push('away');
       if (g && g.turn === s.seat) cls.push('turn');
       const tookTrick = g && g.phase === 'playing' && g.trick.complete && g.trick.winner === s.seat;
       if (tookTrick) cls.push('won');
@@ -227,11 +232,11 @@
           </div>`;
       } else {
         const meta = [];
-        if (g && g.dealer === s.seat) meta.push('<span class="dealer" title="Dealer">D</span>');
-        if (g && g.phase !== 'handover' && g.phase !== 'matchover' && (g.dealer + 1) % N() === s.seat) meta.push('<span class="starts" title="Starts the bidding and leads the first trick">starts</span>');
-        meta.push(`${TEAM[s.team]}${s.kind === 'bot' ? ' bot' : ''}`);
-        if (g) meta.push(`${g.handCounts[s.seat]} cards`);
-        if (s.kind === 'human' && !s.connected) meta.push('<span class="away">away</span>');
+        if (s.kind === 'bot') meta.push('bot');
+        if (s.kind === 'human' && !s.connected) meta.push('away');
+        const toks = [];
+        if (g && g.dealer === s.seat) toks.push('<span class="tok" title="Dealt this hand">deals</span>');
+        if (g && g.phase !== 'handover' && g.phase !== 'matchover' && (g.dealer + 1) % N() === s.seat) toks.push('<span class="tok" title="Opens the bidding and leads the first trick">opens</span>');
         let actions = '';
         const seated = room.mySeat !== null;
         if (s.kind === 'bot' && !isMe)
@@ -240,10 +245,11 @@
         // any seated player (or the host) may remove / replace another player
         if (s.kind === 'human' && !isMe && (host || seated))
           actions += `<button class="btn small ghost" data-kick="${s.seat}">${g ? 'Replace with bot' : 'Remove'}</button>`;
-        body = `<div class="nm">${esc(s.name)}</div><div class="meta">${meta.join(' ')}</div>
+        body = `${g ? `<span class="cnt" title="Cards in hand">${g.handCounts[s.seat]}</span>` : ''}${toks.length ? `<div class="toks">${toks.join('')}</div>` : ''}
+          <div class="nm">${esc(s.name)}</div>${meta.length ? `<div class="meta">${meta.join(' ')}</div>` : ''}
           ${actions ? `<div class="seat-actions">${actions}</div>` : ''}`;
       }
-      return `<div class="${cls.join(' ')}" style="left:${x}%;top:${y}%">${said}${body}</div>`;
+      return `<div class="${cls.join(' ')}" style="left:${x}%;top:${y}%" title="${TEAM[s.team]}">${said}${body}</div>`;
     }).join('');
     $('seats').querySelectorAll('[data-sit]').forEach((b) => (b.onclick = () => socket.emit('sit', { seat: b.dataset.sit, name: myName() })));
     $('seats').querySelectorAll('[data-bot]').forEach((b) => (b.onclick = () => socket.emit('setBot', { seat: b.dataset.bot, on: true })));
@@ -276,8 +282,14 @@
   $('resetChipsBtn').onclick = () => openModal(`<h2>Reset chips?</h2><p>Both teams go back to 12 chips. The current hand continues.</p>
     <div class="row"><button class="btn primary" data-reset>Reset</button><button class="btn" data-close>Cancel</button></div>`, true);
 
+  let lastHighKey = '';
   function renderCenter(g) {
     const c = $('center');
+    const mi = $('matInfo');
+    if (g && g.phase === 'playing' && g.contract) {
+      const lead = g.trick.cards.length ? g.trick.cards[0].card.suit : null;
+      mi.innerHTML = `<span>${g.contract.suit === 'NT' ? 'No trump' : `Trump ${colourSuits(SYM[g.contract.suit])}`}</span>${lead ? `<span>Lead ${colourSuits(SYM[lead])}</span>` : ''}`;
+    } else mi.innerHTML = '';
     if (!g) {
       const humans = room.seats.filter((s) => s.kind === 'human').length;
       c.innerHTML = `<div class="big">Table ${esc(room.code)}</div>
@@ -294,8 +306,11 @@
       const h = g.bidding.high;
       const waiting = g.turn === room.mySeat ? 'Your call' : `<span class="who t${g.turn % 2}">${esc(nameOf(g.turn))}</span> to call`;
       const dbl = g.bidding.doubled ? `<span class="dbl">${g.bidding.doubled === 2 ? 'Redoubled' : 'Doubled'}</span>` : '';
+      const hk = h ? `${g.handNo}:${h.seat}:${h.value}:${h.suit}` : '';
+      const pulse = h && hk !== lastHighKey ? ' pulse' : '';
+      lastHighKey = hk;
       c.innerHTML = h
-        ? `<div class="bidval">${colourSuits(esc(bidText(h.value, h.suit, h.hasJack)))}</div>
+        ? `<div class="bidval${pulse}">${colourSuits(esc(bidText(h.value, h.suit, h.hasJack)))}</div>
            <div class="sub"><span class="who t${h.seat % 2}">${esc(nameOf(h.seat))}</span> ${dbl}</div>
            <div class="sub wait">${waiting}</div>`
         : `<div class="sub">Hand ${g.handNo}</div><div class="sub wait">${waiting}</div>`;
@@ -396,8 +411,11 @@
     $('levelJumps').querySelectorAll('[data-level]').forEach((b) => (b.onclick = () => { bidVal = Number(b.dataset.level); renderBidPanel(); }));
     $('suitBtns').innerHTML = ['S', 'H', 'D', 'C', 'NT'].map((s) => {
       const ok = canBid && L.suits.includes(s);
+      // the power cards you hold in the suit, so the call's meaning is visible as you make it
+      const power = g.hand.filter((c) => c.suit === s && (c.rank === 'J' || c.rank === '9')).map((c) => c.rank).sort().reverse();
+      const hasJ = power.includes('J');
       return `<button class="btn ${RED.has(s) ? 'red' : ''}" data-suit="${s}" ${ok ? '' : 'disabled'}
-        title="${ok ? `Bid ${bidVal} ${SUIT_NAME[s]}` : `You hold no ${SUIT_NAME[s]}`}">${bidText(bidVal, s)}</button>`;
+        title="${ok ? `Bid ${bidVal} ${SUIT_NAME[s]}${hasJ ? '' : s === 'NT' ? '' : ' (suit first: you hold no Jack of it)'}` : `You hold no ${SUIT_NAME[s]}`}">${bidText(bidVal, s, s === 'NT' || hasJ)}${power.length ? `<span class="tag">${power.join(' ')}</span>` : ''}</button>`;
     }).join('');
     $('suitBtns').querySelectorAll('[data-suit]').forEach((b) => (b.onclick = () => socket.emit('bid', { type: 'bid', value: bidVal, suit: b.dataset.suit })));
     const pm = L.plusMeaning || {};
@@ -421,7 +439,23 @@
   }
 
   function renderRail(g) {
-    $('log').innerHTML = (g ? g.log : []).map((l) => `<li>${esc(l.replace(/seat (\d)/gi, (_, n) => nameOf(Number(n) - 1)))}</li>`).join('');
+    // Calls are remembered, not read back: during the auction the rail keeps only the latest round
+    // (one call per seat); once play starts the calls are gone.
+    const lines = g ? g.log : [];
+    let calls = 0;
+    const kept = [];
+    for (let i = lines.length - 1; i >= 0; i--) {
+      if (lines[i].startsWith('Call:') && (g.phase !== 'bidding' || ++calls > N())) continue;
+      kept.unshift(lines[i]);
+    }
+    $('log').innerHTML = kept.map((raw) => {
+      const l = raw.replace(/seat (\d)/gi, (_, n) => nameOf(Number(n) - 1));
+      let m;
+      if ((m = /^Call: (.+?) — (.+)$/.exec(l))) return `<li class="call"><b>${esc(m[1])}</b> ${colourSuits(esc(m[2]))}</li>`;
+      if ((m = /^Trick (\d+): (.+?) takes (.+)$/.exec(l))) return `<li class="trick-line"><span class="n">${m[1]}</span><b>${esc(m[2])}</b> ${esc(m[3])}</li>`;
+      if (/^(Hand \d|Contract)/.test(l)) return `<li class="head">${colourSuits(esc(l))}</li>`;
+      return `<li>${colourSuits(esc(l))}</li>`;
+    }).join('');
     $('log').scrollTop = 1e6;
     $('chat').innerHTML = room.chat.map((m) => m.from === null
       ? `<li class="sys">${esc(m.text)}</li>`

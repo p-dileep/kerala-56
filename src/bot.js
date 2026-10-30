@@ -30,6 +30,8 @@ const DEFAULT_PARAMS = {
   doubleMinValue: 44, doubleMinPts: 15,
   // play
   cutMinPts: 3, fightMinPts: 2,
+  // cutting over a partner who is already winning with the master trump needs this many points on the table
+  cutOverPartnerMasterPts: 5,
   // card tracking (1 = use inferred voids / remaining trumps, 0 = plain heuristics)
   useTracking: 1,
   // Monte Carlo check before a level bid (40/48/56) or a contested bid at 36+: deals laid out
@@ -415,7 +417,15 @@ function choosePlay(view, P = DEFAULT_PARAMS) {
     const trumps = legal.filter((c) => c.suit === trump);
     if (bidding && trumps.length) {
       const top = trumps.slice().sort((a, b) => pow(b) - pow(a))[0];
-      if (isMaster(top, view)) return top.id;
+      if (isMaster(top, view)) {
+        // A partner showed the Jack of trump in the auction and still holds it: lead a low trump
+        // so their Jack takes this trick and mine stays the sole master. Two sure tricks, not one.
+        const facts = inferFacts(view);
+        const partnerJack = top.rank === 'J' && trumps.length > 1 && partners.some((p) => facts.must[p].includes(`J${trump}`)) &&
+          !(view.played || []).some((x) => x.card.suit === trump && x.card.rank === 'J' && E.team(x.seat) === myTeam && x.seat !== seat);
+        if (partnerJack) return lowest(trumps).id;
+        return top.id;
+      }
     }
     const masters = legal.filter((c) => c.suit !== trump && isMaster(c, view))
       .sort((a, b) => pts(b) - pts(a));
@@ -458,8 +468,12 @@ function choosePlay(view, P = DEFAULT_PARAMS) {
     ? !T.canBeat(winCard, led, oppsToPlay)
     : (last || (winCard.suit === trump ? isMaster(winCard, view) : isMaster(winCard, view) && winCard.suit === led)));
 
+  // Points to add to a partner's safe trick: never a master (the sole top trump or a sure winner
+  // elsewhere), which wins its own trick later, points included.
+  const spare = (cards_) => { const keep = cards_.filter((c) => !isMaster(c, view)); return keep.length ? keep : cards_; };
+
   if (following) {
-    if (partnerSafe) return highestPoints(legal).id;
+    if (partnerSafe) return highestPoints(spare(legal)).id;
     const winners = legal.filter((c) => beats(c, winCard, led, trump));
     if (!partnerWinning && winners.length) {
       const sure = winners.filter(safeWin).sort((a, b) => pow(a) - pow(b));
@@ -474,12 +488,14 @@ function choosePlay(view, P = DEFAULT_PARAMS) {
   if (!partnerSafe && trumps.length) {
     const winningTrumps = trumps.filter((c) => beats(c, winCard, led, trump)).sort((a, b) => pow(a) - pow(b));
     if (winningTrumps.length && (trickPts >= P.cutMinPts || last || !partnerWinning)) {
-      return winningTrumps[0].id;
+      const cut = winningTrumps[0];
+      // partner is winning: do not spend the master trump to protect a small trick
+      if (!partnerWinning || !isMaster(cut, view) || trickPts >= P.cutOverPartnerMasterPts || last) return cut.id;
     }
   }
   const nonTrump = legal.filter((c) => c.suit !== trump);
   const pool = nonTrump.length ? nonTrump : legal;
-  return (partnerSafe ? highestPoints(pool) : lowest(pool)).id;
+  return (partnerSafe ? highestPoints(spare(pool)) : lowest(pool)).id;
 }
 
 function decide(view, P = DEFAULT_PARAMS) {

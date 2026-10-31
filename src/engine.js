@@ -98,7 +98,8 @@ function startHand(state, rng = Math.random) {
     actions: [],          // {seat, type, value?, suit?}
     high: null,           // {seat, value, suit}
     doubled: 0,           // 0 none, 1 doubled, 2 redoubled
-    passesInRow: 0
+    passesInRow: 0,
+    raised: false         // the declarer's one-time self-raise to 40/48/56 has been used
   };
   state.contract = null;
   state.trick = { leader: first, cards: [], complete: false, winner: null };
@@ -139,10 +140,28 @@ function plusMeaning(actions, suit) {
 }
 
 function legalBidActions(state, seat) {
-  const out = { pass: false, double: false, redouble: false, minBid: null, suits: [], plus: [], plusMeaning: {}, ns: [] };
-  if (state.phase !== 'bidding' || state.turn !== seat) return out;
+  const out = { pass: false, double: false, redouble: false, minBid: null, suits: [], plus: [], plusMeaning: {}, plusOpen: [], ns: [], keep: false, raiseLevels: [] };
   const b = state.bidding;
+
+  // Self-raise window: after the auction closes, the declarer alone may convert once to a higher tier.
+  if (state.phase === 'selfraise') {
+    if (state.turn === seat && b.high && seat === b.high.seat) {
+      out.keep = true;
+      out.raiseLevels = LEVELS.filter((l) => l > b.high.value);
+    }
+    return out;
+  }
+
+  if (state.phase !== 'bidding' || state.turn !== seat) return out;
   const hand = state.hands[seat];
+
+  // After a self-raise nobody can bid higher: only Pass / Double / Redouble remain.
+  if (b.raised) {
+    out.pass = true;
+    if (b.high && b.doubled === 0 && team(b.high.seat) !== team(seat)) out.double = true;
+    if (b.high && b.doubled === 1 && team(b.high.seat) === team(seat)) out.redouble = true;
+    return out;
+  }
 
   // The opener cannot pass the very first call: someone must open at 28+.
   out.pass = !(b.high === null && seat === b.opener);
@@ -192,23 +211,33 @@ function legalBidActions(state, seat) {
     if (room >= 2 && m[2] && holds(m[2])) out.plus.push(2);
     if (room >= 3 && m[3] && holds(m[3])) out.plus.push(3);
   }
-  // Fresh-suit Plus: any bidder may say "Plus N <suit>" in a suit nobody has called yet
-  // (= high + N in that suit, or MIN_BID + N when opening), showing the fresh-ladder holding:
-  // Plus 1 = a lone Jack, Plus 2 = both Jacks, Plus 3 = both Jacks and a Nine.
+  // Named-suit Plus: any bidder may say "Plus N <suit>" in any suit they hold, over anyone's bid
+  // (including the suit an opponent just called) = current bid + N in that suit. The claim is still
+  // relative to the cards that suit has revealed so far (see plusMeaning), the player must actually
+  // hold what Plus N claims, and the result must stay within 28-56. Partner's standing suit is offered
+  // through out.plus above, so it is skipped here to avoid a duplicate button.
   out.plusOpen = [];
   const base = b.high ? b.high.value : MIN_BID;
-  const calledSuits = new Set(b.actions.filter((a) => (a.type === 'bid' || a.type === 'plus') && a.suit !== 'NT').map((a) => a.suit));
   if (out.minBid !== null) {
     for (const suit of SUITS) {
-      if (calledSuits.has(suit)) continue;
+      if (suit === out.plusSuit) continue;                 // partner's suit: offered via out.plus
       const inSuit = hand.filter((c) => c.suit === suit);
-      const count = (r) => inSuit.filter((c) => c.rank === r).length;
+      if (!inSuit.length) continue;                        // cannot claim cards in a void suit
+      // Cards this seat already showed in the suit (its Jack signal, earlier Plus) cannot be claimed again.
+      const shown = [];
+      let jackCounted = false;
+      b.actions.forEach((a, i) => {
+        if (a.seat !== seat || a.suit !== suit) return;
+        if (a.type === 'bid' && a.hasJack && !jackCounted) { jackCounted = true; shown.push('J'); }
+        if (a.type === 'plus') shown.push(...(plusMeaning(b.actions.slice(0, i), suit)[a.n] || []));
+      });
+      const count = (r) => inSuit.filter((c) => c.rank === r).length - shown.filter((x) => x === r).length;
       const holds = (ranks) => RANKS.every((r) => count(r) >= ranks.filter((x) => x === r).length);
       const ok = (n) => base + n >= out.minBid && base + n <= MAX_BID;
-      const m = plusMeaning([], suit);
-      if (ok(1) && m[1] && inSuit.length === 1 && holds(m[1])) out.plusOpen.push({ n: 1, suit });   // fresh: lone Jack
-      if (ok(2) && m[2] && holds(m[2])) out.plusOpen.push({ n: 2, suit });
-      if (ok(3) && m[3] && holds(m[3])) out.plusOpen.push({ n: 3, suit });
+      const m = plusMeaning(b.actions, suit);
+      if (ok(1) && m[1] && holds(m[1]) && (m[1][0] !== 'J' || inSuit.length === 1)) out.plusOpen.push({ n: 1, suit, cards: m[1] });
+      if (ok(2) && m[2] && holds(m[2])) out.plusOpen.push({ n: 2, suit, cards: m[2] });
+      if (ok(3) && m[3] && holds(m[3])) out.plusOpen.push({ n: 3, suit, cards: m[3] });
     }
   }
   // NS convention: "value NS" is a no-trump bid that says "I hold no cards of a called suit".
@@ -230,11 +259,34 @@ function legalBidActions(state, seat) {
 }
 
 function applyBid(state, seat, action) {
-  if (state.phase !== 'bidding') throw new Error('Not in bidding');
+  if (state.phase !== 'bidding' && state.phase !== 'selfraise') throw new Error('Not in bidding');
   if (state.turn !== seat) throw new Error('Not your turn');
   const legal = legalBidActions(state, seat);
   const b = state.bidding;
   const type = action.type;
+
+  // Self-raise window: the declarer alone either keeps the won bid or converts it once to 40/48/56.
+  if (state.phase === 'selfraise') {
+    if (type === 'keep') {
+      if (!legal.keep) throw new Error('Only the bidder may keep the contract');
+      b.raised = true;
+      return finishAuction(state);
+    }
+    if (type === 'raise') {
+      const level = Number(action.value);
+      if (!legal.raiseLevels.includes(level)) throw new Error('Self-raise must be to a higher tier (40/48/56) in the same suit');
+      b.high = { ...b.high, value: level };     // same seat, same suit, same Jack signal
+      b.raised = true;
+      b.doubled = 0;                            // the raised contract reopens the double window
+      b.passesInRow = 0;
+      b.actions.push({ seat, type: 'raise', value: level, suit: b.high.suit, hasJack: b.high.hasJack });
+      logCall(state, b.actions[b.actions.length - 1]);
+      state.phase = 'bidding';
+      state.turn = nextSeat(seat, seatsOf(state));
+      return;
+    }
+    throw new Error('Only keep or raise in the self-raise window');
+  }
 
   if (type === 'pass') {
     if (!legal.pass) throw new Error('Opener must bid at least 28');
@@ -292,7 +344,7 @@ function applyBid(state, seat, action) {
   } else throw new Error('Unknown bid action');
 
   logCall(state, b.actions[b.actions.length - 1]);
-  if (b.high && b.passesInRow >= seatsOf(state) - 1) return finishAuction(state);
+  if (b.high && b.passesInRow >= seatsOf(state) - 1) return closeBidding(state);
   state.turn = nextSeat(seat, seatsOf(state));
 }
 
@@ -300,11 +352,24 @@ const SYM = { S: '♠', H: '♥', D: '♦', C: '♣', NT: 'NT' };
 function callText(a) {
   const bid = () => a.hasJack ? `${a.value} ${SYM[a.suit]}` : `${SYM[a.suit]} ${a.value}`;
   if (a.type === 'bid') return bid();
+  if (a.type === 'raise') return `Raise to ${bid()}`;
   if (a.type === 'plus') return `Plus ${a.n} (${bid()})`;
   if (a.type === 'ns') return `${a.value} NS (no ${SYM[a.ns]})`;
   return { pass: 'Pass', double: 'Double', redouble: 'Redouble' }[a.type];
 }
 function logCall(state, a) { state.log.push(`Call: seat ${a.seat + 1} — ${callText(a)}`); }
+
+// The competitive auction has closed. Before play, offer the declarer a one-time self-raise to the
+// next tier (40/48/56); if none is possible (already at 56, or already raised), finalise straight away.
+function closeBidding(state) {
+  const b = state.bidding;
+  if (!b.raised && b.high && nextLevelAbove(b.high.value) !== null) {
+    state.phase = 'selfraise';
+    state.turn = b.high.seat;
+    return;
+  }
+  return finishAuction(state);
+}
 
 function finishAuction(state) {
   const b = state.bidding;

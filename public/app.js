@@ -173,6 +173,7 @@
     renderTrick(g);
     renderHand(g);
     renderBidPanel();
+    renderSelfRaise();
     renderRail(g);
     renderPhaseModal(g);
     const myTurn = g && g.turn !== null && g.turn === room.mySeat;
@@ -326,6 +327,13 @@
         : `<div class="sub">Hand ${g.handNo}</div><div class="sub wait">${waiting}</div>`;
       return;
     }
+    if (g.phase === 'selfraise') {
+      const h = g.bidding.high;
+      const who = g.turn === room.mySeat ? 'You' : `<span class="who t${g.turn % 2}">${esc(nameOf(g.turn))}</span>`;
+      c.innerHTML = `<div class="bidval">${colourSuits(esc(bidText(h.value, h.suit, h.hasJack)))}</div>
+        <div class="sub wait">${who} won the bid — ${g.turn === room.mySeat ? 'keep it or raise to a higher tier' : 'deciding whether to raise'}</div>`;
+      return;
+    }
     if (g.phase === 'playing') {
       c.innerHTML = g.trick.cards.length ? '' : `<div class="sub">Trick ${g.trickNo + 1} of ${g.handSize || 8} · ${g.turn === room.mySeat ? 'your lead' : `${esc(nameOf(g.turn))} leads`}</div>`;
       return;
@@ -433,10 +441,9 @@
       title="${L.plusSuit ? `Bid ${(g.bidding.high ? g.bidding.high.value : 28) + n} ${SUIT_NAME[L.plusSuit]}: ` : ''}I hold ${(pm[n] || []).join(' and ')} of ${L.plusSuit ? SUIT_NAME[L.plusSuit] : 'this suit'}${n === 1 && (pm[n] || [])[0] === 'J' ? ' and nothing else in it' : ''}">Plus ${n}${L.plusSuit ? ` <span class="${RED.has(L.plusSuit) ? 'red' : ''}">${SYM[L.plusSuit]}</span>` : ''} · ${(pm[n] || []).join('+')}</button>`).join('');
     $('plusBtns').querySelectorAll('[data-plus]').forEach((b) => (b.onclick = () => socket.emit('bid', { type: 'plus', n: Number(b.dataset.plus) })));
     if (L.plusOpen && L.plusOpen.length) {
-      const fresh = { 1: ['J'], 2: ['J', 'J'], 3: ['J', 'J', '9'] };
       const base = g.bidding.high ? g.bidding.high.value : 28;
-      $('plusBtns').innerHTML += L.plusOpen.map((o) => `<button class="btn small ${RED.has(o.suit) ? 'red' : ''}" data-popen="${o.n}" data-suit="${o.suit}"
-        title="${g.bidding.high ? 'Bid' : 'Open'} ${base + o.n} ${SUIT_NAME[o.suit]}: I hold ${fresh[o.n].join(' and ')} of ${SUIT_NAME[o.suit]}${o.n === 1 ? ' and nothing else in it' : ''}">Plus ${o.n} ${SYM[o.suit]} · ${fresh[o.n].join('+')}</button>`).join('');
+      $('plusBtns').innerHTML += L.plusOpen.map((o) => { const cards = o.cards || []; return `<button class="btn small ${RED.has(o.suit) ? 'red' : ''}" data-popen="${o.n}" data-suit="${o.suit}"
+        title="${g.bidding.high ? 'Bid' : 'Open'} ${base + o.n} ${SUIT_NAME[o.suit]}: I hold ${cards.join(' and ')} of ${SUIT_NAME[o.suit]}${o.n === 1 && cards[0] === 'J' ? ' and nothing else in it' : ''}">Plus ${o.n} ${SYM[o.suit]} · ${cards.join('+')}</button>`; }).join('');
       $('plusBtns').querySelectorAll('[data-popen]').forEach((b) => (b.onclick = () => socket.emit('bid', { type: 'plus', n: Number(b.dataset.popen), suit: b.dataset.suit })));
     }
     $('nsBtns').innerHTML = (L.ns || []).map((o) => `<button class="btn small ${RED.has(o.suit) ? 'red' : ''}" data-ns="${o.value}"
@@ -446,6 +453,21 @@
     $('passBtn').title = L.pass ? '' : 'The first bidder must open with 28 or more';
     $('doubleBtn').classList.toggle('hidden', !L.double);
     $('redoubleBtn').classList.toggle('hidden', !L.redouble);
+  }
+
+  // The declarer's one-time self-raise window: keep the won bid, or convert it to a higher tier (40/48/56).
+  function renderSelfRaise() {
+    const g = room && room.game;
+    const p = $('selfRaisePanel');
+    const mine = g && g.phase === 'selfraise' && g.turn === room.mySeat && g.legal && g.legal.bid.keep;
+    p.classList.toggle('hidden', !mine);
+    if (!mine) return;
+    const high = g.bidding.high, L = g.legal.bid;
+    $('selfRaisePrompt').innerHTML = `You won the bid at ${colourSuits(esc(bidText(high.value, high.suit, high.hasJack)))} — keep it, or convert to a higher tier.`;
+    $('raiseBtns').innerHTML = (L.raiseLevels || []).map((v) =>
+      `<button class="btn" data-raise="${v}" title="Raise your contract to ${v} ${high.suit === 'NT' ? 'NT' : SUIT_NAME[high.suit]}: bigger stake, more points needed">${colourSuits(esc(bidText(v, high.suit, high.hasJack)))}</button>`).join('');
+    $('raiseBtns').querySelectorAll('[data-raise]').forEach((b) => (b.onclick = () => socket.emit('bid', { type: 'raise', value: Number(b.dataset.raise) })));
+    $('keepBtn').onclick = () => socket.emit('bid', { type: 'keep' });
   }
 
   function renderRail(g) {

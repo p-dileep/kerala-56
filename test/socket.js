@@ -36,7 +36,8 @@ server.listen(0, () => {
     if (g.phase === 'bidding') {
       const L = g.legal.bid;
       sock.emit('bid', L.pass ? { type: 'pass' } : { type: 'bid', value: L.minBid, suit: L.suits[0] });
-    } else if (g.phase === 'playing' && g.legal.cards.length) sock.emit('play', { cardId: g.legal.cards[0] });
+    } else if (g.phase === 'selfraise' && g.legal.bid.keep) sock.emit('bid', { type: 'keep' });
+    else if (g.phase === 'playing' && g.legal.cards.length) sock.emit('play', { cardId: g.legal.cards[0] });
   }
   setTimeout(() => { console.error('timeout'); process.exit(1); }, 20000);
 });

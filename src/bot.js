@@ -498,8 +498,20 @@ function choosePlay(view, P = DEFAULT_PARAMS) {
   return (partnerSafe ? highestPoints(spare(pool)) : lowest(pool)).id;
 }
 
+// Self-raise window: the bot won the bid and may convert it once to 40/48/56. Lay the unseen cards
+// out consistent with the auction and go to the highest tier its team collects in most layouts.
+function chooseSelfRaise(view, P) {
+  const high = view.bidding.high;
+  if (!high || !E.LEVELS.some((l) => l > high.value)) return { type: 'keep' };
+  const q = P.simDeals ? simPoints(view, high.suit, P) : null;
+  if (q === null) return { type: 'keep' };
+  const level = [56, 48, 40].find((L) => L > high.value && q >= L + P.simMargin);
+  return level ? { type: 'raise', value: level } : { type: 'keep' };
+}
+
 function decide(view, P = DEFAULT_PARAMS) {
   if (view.phase === 'bidding') return { kind: 'bid', action: chooseBid(view, P) };
+  if (view.phase === 'selfraise') return { kind: 'bid', action: chooseSelfRaise(view, P) };
   if (view.phase === 'playing') return { kind: 'play', cardId: choosePlay(view, P) };
   return null;
 }

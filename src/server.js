@@ -133,11 +133,11 @@ function schedule(room) {
     return;
   }
   if (g.phase === 'handover') return;   // the host clicks "Next hand" when everyone has seen the result
-  if (g.turn === null || (g.phase !== 'bidding' && g.phase !== 'playing')) return;
+  if (g.turn === null || (g.phase !== 'bidding' && g.phase !== 'selfraise' && g.phase !== 'playing')) return;
 
   const seat = room.seats[g.turn];
   let delay = null;
-  if (seat.kind === 'bot') delay = g.phase === 'bidding' ? BOT_BID_DELAY_MS : BOT_DELAY_MS;
+  if (seat.kind === 'bot') delay = g.phase === 'playing' ? BOT_DELAY_MS : BOT_BID_DELAY_MS;
   else if (seat.kind === 'human' && !seat.connected) {
     const since = room.awaySince[g.turn] || Date.now();
     delay = Math.max(800, AWAY_TAKEOVER_MS - (Date.now() - since));

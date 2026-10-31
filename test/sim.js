@@ -43,6 +43,35 @@ console.log({matches, hands, avgHandsPerMatch:(hands/matches).toFixed(1), contra
 // legality checks
 const s = E.newMatch({}, ()=>0.3);
 assert.throws(()=>E.applyBid(s, s.turn, {type:'pass'}), /Opener/);
+// self-raise: after the auction closes the declarer alone may convert once to 40/48/56, reopening doubling
+{ const g = E.newMatch({}, ()=>0.3); const op = g.turn; const suit = g.hands[op][0].suit;
+  E.applyBid(g, op, { type:'bid', value:32, suit });
+  while (g.phase === 'bidding') E.applyBid(g, g.turn, { type:'pass' });   // everyone else passes
+  assert.equal(g.phase, 'selfraise'); assert.equal(g.turn, op);
+  const L = E.legalBidActions(g, op); assert.ok(L.keep); assert.deepEqual(L.raiseLevels, [40,48,56]);
+  assert.throws(()=>E.applyBid(g, (op+1)%6, { type:'keep' }), /turn/);    // only the declarer acts
+  E.applyBid(g, op, { type:'raise', value:48 });
+  assert.equal(g.phase, 'bidding'); assert.equal(g.bidding.raised, true);
+  assert.equal(g.bidding.high.value, 48); assert.equal(g.bidding.high.suit, suit);
+  assert.equal(E.legalBidActions(g, g.turn).minBid, null);               // nobody can bid higher now
+  while (g.phase === 'bidding') E.applyBid(g, g.turn, { type:'pass' });   // double window closes
+  assert.equal(g.phase, 'playing'); assert.equal(g.contract.value, 48); }
+// keep: the declarer may decline the self-raise and play the won bid as-is
+{ const g = E.newMatch({}, ()=>0.3); const op = g.turn; const suit = g.hands[op][0].suit;
+  E.applyBid(g, op, { type:'bid', value:30, suit });
+  while (g.phase === 'bidding') E.applyBid(g, g.turn, { type:'pass' });
+  assert.equal(g.phase, 'selfraise'); E.applyBid(g, op, { type:'keep' });
+  assert.equal(g.phase, 'playing'); assert.equal(g.contract.value, 30); }
+// Plus anytime: over an opponent's bid you may Plus in any suit you hold, including the opponent's own suit
+{ const g = E.newMatch({}, ()=>0.3); const op = g.turn;
+  g.hands[op] = [{id:'9Ha',suit:'H',rank:'9'},{id:'AHa',suit:'H',rank:'A'},{id:'KSa',suit:'S',rank:'K'},{id:'QSa',suit:'S',rank:'Q'},{id:'KCa',suit:'C',rank:'K'},{id:'QCa',suit:'C',rank:'Q'},{id:'KDa',suit:'D',rank:'K'},{id:'QDa',suit:'D',rank:'Q'}];
+  E.applyBid(g, op, { type:'bid', value:28, suit:'H' });                  // suit-first (no Jack of H): the H ladder is untouched
+  const opp = g.turn;                                                     // an opponent of the opener
+  g.hands[opp] = [{id:'JHx',suit:'H',rank:'J'},{id:'JHy',suit:'H',rank:'J'},{id:'ASx',suit:'S',rank:'A'},{id:'10Sx',suit:'S',rank:'10'},{id:'ACx',suit:'C',rank:'A'},{id:'10Cx',suit:'C',rank:'10'},{id:'ADx',suit:'D',rank:'A'},{id:'10Dx',suit:'D',rank:'10'}];
+  const L = E.legalBidActions(g, opp);
+  assert.ok(L.plusOpen.some((o)=>o.suit==='H' && o.n===2));               // both Jacks = top two remaining hearts
+  E.applyBid(g, opp, { type:'plus', n:2, suit:'H' });
+  assert.equal(g.bidding.high.value, 30); assert.equal(g.bidding.high.suit, 'H'); assert.equal(g.bidding.high.seat, opp); }
 // Jack convention: hasJack reflects whether the caller holds the J of the called suit
 {
   const t = E.newMatch({}, ()=>0.3);

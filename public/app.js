@@ -497,15 +497,18 @@
     }).join('');
     $('suitBtns').querySelectorAll('[data-suit]').forEach((b) => (b.onclick = () => socket.emit('bid', { type: 'bid', value: bidVal, suit: b.dataset.suit })));
     const pm = L.plusMeaning || {};
-    $('plusBtns').innerHTML = (L.plus || []).map((n) => `<button class="btn small" data-plus="${n}"
+    // Build the whole Plus row first, then wire it: appending with innerHTML += would rebuild the
+    // partner Plus buttons and drop their click handlers.
+    let plusHtml = (L.plus || []).map((n) => `<button class="btn small" data-plus="${n}"
       title="${L.plusSuit ? `Bid ${(g.bidding.high ? g.bidding.high.value : 28) + n} ${SUIT_NAME[L.plusSuit]}: ` : ''}I hold ${(pm[n] || []).join(' and ')} of ${L.plusSuit ? SUIT_NAME[L.plusSuit] : 'this suit'}${n === 1 && (pm[n] || [])[0] === 'J' ? ' and nothing else in it' : ''}">Plus ${n}${L.plusSuit ? ` <span class="${RED.has(L.plusSuit) ? 'red' : ''}">${SYM[L.plusSuit]}</span>` : ''} · ${(pm[n] || []).join('+')}</button>`).join('');
-    $('plusBtns').querySelectorAll('[data-plus]').forEach((b) => (b.onclick = () => socket.emit('bid', { type: 'plus', n: Number(b.dataset.plus) })));
     if (L.plusOpen && L.plusOpen.length) {
       const base = g.bidding.high ? g.bidding.high.value : 27;   // opening Plus N = 27 + N
-      $('plusBtns').innerHTML += L.plusOpen.map((o) => { const cards = o.cards || []; return `<button class="btn small ${RED.has(o.suit) ? 'red' : ''}" data-popen="${o.n}" data-suit="${o.suit}"
+      plusHtml += L.plusOpen.map((o) => { const cards = o.cards || []; return `<button class="btn small ${RED.has(o.suit) ? 'red' : ''}" data-popen="${o.n}" data-suit="${o.suit}"
         title="${g.bidding.high ? 'Bid' : 'Open'} ${base + o.n} ${SUIT_NAME[o.suit]}: I hold ${cards.join(' and ')} of ${SUIT_NAME[o.suit]}${o.n === 1 && cards[0] === 'J' ? ' and nothing else in it' : ''}">Plus ${o.n} ${SYM[o.suit]} · ${cards.join('+')}</button>`; }).join('');
-      $('plusBtns').querySelectorAll('[data-popen]').forEach((b) => (b.onclick = () => socket.emit('bid', { type: 'plus', n: Number(b.dataset.popen), suit: b.dataset.suit })));
     }
+    $('plusBtns').innerHTML = plusHtml;
+    $('plusBtns').querySelectorAll('[data-plus]').forEach((b) => (b.onclick = () => socket.emit('bid', { type: 'plus', n: Number(b.dataset.plus) })));
+    $('plusBtns').querySelectorAll('[data-popen]').forEach((b) => (b.onclick = () => socket.emit('bid', { type: 'plus', n: Number(b.dataset.popen), suit: b.dataset.suit })));
     $('nsBtns').innerHTML = (L.ns || []).map((o) => `<button class="btn small ${RED.has(o.suit) ? 'red' : ''}" data-ns="${o.value}"
       title="No trump; tells the table you hold no ${SUIT_NAME[o.suit]}">${o.value} NS · no ${SYM[o.suit]}</button>`).join('');
     $('nsBtns').querySelectorAll('[data-ns]').forEach((b) => (b.onclick = () => socket.emit('bid', { type: 'ns', value: Number(b.dataset.ns) })));

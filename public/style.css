@@ -136,7 +136,7 @@ button, input { font: inherit; }
 /* seats */
 #seats { position: absolute; inset: 0; pointer-events: none; }
 .seat {
-  position: absolute; transform: translate(-50%, -50%); pointer-events: auto;
+  position: absolute; transform: translate(calc(-50% + var(--nudge, 0px)), -50%); pointer-events: auto;
   min-width: 128px; padding: 8px 12px 6px; border-radius: 14px;
   background: rgba(8,42,48,.92); border: 2px solid transparent; text-align: center;
   transition: border-color .2s, box-shadow .2s;
@@ -183,7 +183,7 @@ button, input { font: inherit; }
 .seat.won.collect { animation: collect .7s ease-out both; }
 .seat .said.won { background: var(--ivory); color: var(--ink); font-weight: 700; }
 @keyframes wonpulse { 0% { box-shadow: 0 0 0 0 rgba(255,250,230,.8); } 100% { box-shadow: 0 0 0 14px rgba(255,250,230,0); } }
-@keyframes collect { 0% { transform: translate(-50%, -50%) scale(1); } 60% { transform: translate(-50%, -50%) scale(1.12); } 100% { transform: translate(-50%, -50%) scale(1); } }
+@keyframes collect { 0% { transform: translate(calc(-50% + var(--nudge, 0px)), -50%) scale(1); } 60% { transform: translate(calc(-50% + var(--nudge, 0px)), -50%) scale(1.12); } 100% { transform: translate(calc(-50% + var(--nudge, 0px)), -50%) scale(1); } }
 
 .group-label { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; font-size: .92rem; margin-top: 6px; }
 .group-label span { font-weight: 700; color: var(--kasavu); letter-spacing: .04em; text-transform: uppercase; font-size: .8rem; }
@@ -364,6 +364,8 @@ button, input { font: inherit; }
   .mat { inset: 12% 10% 12%; }
   .seat { min-width: 0; padding: 5px 8px 3px; font-size: .85rem; }
   .seat .nm { max-width: 84px; }
+  .seat .seat-actions { gap: 4px; margin-top: 4px; }
+  .seat .seat-actions .btn { padding: .35em .6em .2em; font-size: .78rem; }
   .hand { --cw: min(64px, calc((100vw - 28px) / 6.2)); padding-top: 14px; }
   .hand .card { margin-left: calc(var(--cw) * -.3); }
   .hand .card.gap { margin-left: calc(var(--cw) * -.12); }

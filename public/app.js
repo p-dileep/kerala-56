@@ -347,6 +347,19 @@
     $('seats').querySelectorAll('[data-bot]').forEach((b) => (b.onclick = () => socket.emit('setBot', { seat: b.dataset.bot, on: true })));
     $('seats').querySelectorAll('[data-unbot]').forEach((b) => (b.onclick = () => socket.emit('setBot', { seat: b.dataset.unbot, on: false })));
     $('seats').querySelectorAll('[data-kick]').forEach((b) => (b.onclick = () => socket.emit('kick', { seat: b.dataset.kick })));
+    keepSeatsOnScreen();
+  }
+
+  // Side seats are centred on a point near the screen edge; on a narrow phone a wide seat (name plus
+  // buttons) spills past it. Measure each one and nudge it sideways until it fits.
+  function keepSeatsOnScreen() {
+    const vw = document.documentElement.clientWidth, pad = 4;
+    $('seats').querySelectorAll('.seat').forEach((el) => {
+      el.style.setProperty('--nudge', '0px');
+      const r = el.getBoundingClientRect();
+      const dx = r.left < pad ? pad - r.left : r.right > vw - pad ? vw - pad - r.right : 0;
+      if (dx) el.style.setProperty('--nudge', `${Math.round(dx)}px`);
+    });
   }
 
   const STYLE_TEXT = { mixed: 'Mixed: each bot keeps its own temperament (hover a bot for it)', defensive: 'Defensive: bid low, rarely raise or go for levels', medium: 'Medium: balanced (default)', aggressive: 'Aggressive: bid up, support partner, go for 40 / 48 / 56' };

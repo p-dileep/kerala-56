@@ -21,14 +21,10 @@
       <span>Your name <em class="req">(required)</em></span>
       <input id="nameInput" maxlength="18" autocomplete="nickname" placeholder="e.g. BGK" required>
     </label>
-    <div class="fixed-tables">
-      <div class="fixed-col"><button class="btn primary big-btn" data-fixed="TABLE6"><b>6-player table</b><span class="sub">3 vs 3 · 8 cards each</span><span id="info6" class="status"></span></button><button class="btn small ghost hidden" data-reset-table="TABLE6">Reset table for a new game</button></div>
-      <div class="fixed-col"><button class="btn primary big-btn" data-fixed="TABLE8"><b>8-player table</b><span class="sub">4 vs 4 · 6 cards each</span><span id="info8" class="status"></span></button><button class="btn small ghost hidden" data-reset-table="TABLE8">Reset table for a new game</button></div>
-    </div>
     <p class="hint">Want to try 56 first? Start a private table and play against the bots, or bring your own friends by sharing the table code with them.</p>
     <div class="join-row">
       <label class="field grow">
-        <span>Or start a private table</span>
+        <span>Start a private table</span>
         <select id="newPlayers"><option value="6">6 players</option><option value="8">8 players</option></select>
       </label>
       <button id="createBtn" class="btn">Start a new table</button>
@@ -40,6 +36,10 @@
       </label>
       <button id="joinBtn" class="btn">Join table</button>
     </div>
+    <div class="fixed-tables">
+      <div class="fixed-col"><button class="btn primary big-btn" data-fixed="TABLE6"><b>6-player table</b><span class="sub">3 vs 3 · 8 cards each</span><span id="info6" class="status"></span></button><button class="btn small ghost hidden" data-reset-table="TABLE6">Reset table for a new game</button></div>
+      <div class="fixed-col"><button class="btn primary big-btn" data-fixed="TABLE8"><b>8-player table</b><span class="sub">4 vs 4 · 6 cards each</span><span id="info8" class="status"></span></button><button class="btn small ghost hidden" data-reset-table="TABLE8">Reset table for a new game</button></div>
+    </div>
     <details class="rules">
       <summary>How 56 is played here</summary>
       <ul>
@@ -48,7 +48,7 @@
         <li>You cannot name a suit you hold none of. To raise your own standing bid you must jump to the next level (40, 48 or 56).</li>
         <li>Jack signal: a call shows as <b>30 ♥</b> when the caller holds the Jack of that suit and <b>♥ 30</b> when they do not.</li>
         <li>A hand stops early once the bidders have reached the target or can no longer reach it.</li>
-        <li>Plus: the opener may open with <b>Plus N</b> in a suit (28+N in that suit); otherwise only a partner of the high bidder may say <b>Plus N</b>, raising by N in the same suit. Meanings follow the power ladder J J 9 9 A A 10 10 K K Q Q minus the cards already shown by earlier calls in that suit. Plus 1 = the top remaining card of the ladder; while that is a Jack it must be your only card in the suit. Plus can also be said over an opponent's bid, in the suit your partner last called. Plus 2 = the top two remaining cards (fresh suit: both Jacks; after a Plus 1: the other Jack and a Nine; once all Jacks and Nines are shown: both Aces). Plus 3 = the top three remaining cards (fresh suit: both Jacks and a Nine). The buttons show what each Plus means right now.</li>
+        <li>Plus: the opener may open with <b>Plus N</b> in a suit, which counts as 27+N (Plus 1 opens at 28, Plus 2 at 29, Plus 3 at 30); otherwise only a partner of the high bidder may say <b>Plus N</b>, raising by N in the same suit. Meanings follow the power ladder J J 9 9 A A 10 10 K K Q Q minus the cards already shown by earlier calls in that suit. Plus 1 = the top remaining card of the ladder; while that is a Jack it must be your only card in the suit. Plus can also be said over an opponent's bid, in the suit your partner last called. Plus 2 = the top two remaining cards (fresh suit: both Jacks; after a Plus 1: the other Jack and a Nine; once all Jacks and Nines are shown: both Aces). Plus 3 = the top three remaining cards (fresh suit: both Jacks and a Nine). The buttons show what each Plus means right now.</li>
         <li>NS: a no-trump call that says you hold none of a suit already called. One step above the current bid points at the most recent suit, two steps at the suit before that, and so on. Example: after 30 ♣ and 31 ♥, <b>32 NS</b> means no hearts and <b>33 NS</b> means no clubs.</li>
         <li>Seats can change any time: take over a bot, move to a bot's seat, or replace another player with a bot. The hand continues.</li>
         <li>Opponents may double, and the bidding team may then redouble, which ends the auction.</li>

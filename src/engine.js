@@ -212,12 +212,13 @@ function legalBidActions(state, seat) {
     if (room >= 3 && m[3] && holds(m[3])) out.plus.push(3);
   }
   // Named-suit Plus: any bidder may say "Plus N <suit>" in any suit they hold, over anyone's bid
-  // (including the suit an opponent just called) = current bid + N in that suit. The claim is still
+  // (including the suit an opponent just called) = current bid + N in that suit; as the opening call
+  // Plus N = 27 + N (Plus 1 opens at 28, Plus 2 at 29, Plus 3 at 30). The claim is still
   // relative to the cards that suit has revealed so far (see plusMeaning), the player must actually
   // hold what Plus N claims, and the result must stay within 28-56. Partner's standing suit is offered
   // through out.plus above, so it is skipped here to avoid a duplicate button.
   out.plusOpen = [];
-  const base = b.high ? b.high.value : MIN_BID;
+  const base = b.high ? b.high.value : MIN_BID - 1;
   if (out.minBid !== null) {
     for (const suit of SUITS) {
       if (suit === out.plusSuit) continue;                 // partner's suit: offered via out.plus
@@ -311,7 +312,7 @@ function applyBid(state, seat, action) {
     if (!b.high || action.suit) {
       suit = action.suit;
       if (!legal.plusOpen.some((o) => o.n === n && o.suit === suit)) throw new Error('Cannot say Plus ' + (Number.isInteger(n) ? n : '') + ' in that suit');
-      value = (b.high ? b.high.value : MIN_BID) + n;
+      value = (b.high ? b.high.value : MIN_BID - 1) + n;   // opening Plus N = 27 + N
     } else {
       if (!legal.plus.includes(n)) throw new Error('Cannot say Plus ' + (Number.isInteger(n) ? n : '') + ' now');
       value = b.high.value + n;

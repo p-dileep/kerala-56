@@ -185,8 +185,8 @@ function chooseBid(view, P = DEFAULT_PARAMS) {
   // Forced opener or genuine bid
   if (!legal.pass) {
     const s = options.find((o) => o.suit !== 'NT') || best;
-    // Open with Plus N in our suit when the hand shows it and the estimate covers 28+N
-    const po = (legal.plusOpen || []).filter((o) => o.suit === s.suit && s.est >= E.MIN_BID + o.n).sort((a, c) => c.n - a.n)[0];
+    // Open with Plus N in our suit when the hand shows it and the estimate covers 27+N (the opening value)
+    const po = (legal.plusOpen || []).filter((o) => o.suit === s.suit && s.est >= E.MIN_BID - 1 + o.n).sort((a, c) => c.n - a.n)[0];
     if (po) return { type: 'plus', n: po.n, suit: po.suit };
     return { type: 'bid', value: legal.minBid, suit: s.suit };
   }

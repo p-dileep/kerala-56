@@ -237,7 +237,7 @@ assert.throws(()=>E.applyBid(s, s.turn, {type:'pass'}), /Opener/);
   assert.equal(z.turn, seatsFrom(2));
   const zd = B.decide(B.botView(z, seatsFrom(2)));
   assert.deepEqual(zd.action, {type:'bid', value:31, suit:'H'});
-  // opening Plus: opener may open Plus N in a suit = 28+N, fresh-ladder meaning
+  // opening Plus: opener may open Plus N in a suit = 27+N (Plus 3 opens at 30), fresh-ladder meaning
   const w = E.newMatch({}, ()=>0.3); const wo = w.turn; const ws = w.hands[wo][0].suit;
   const wothers = w.hands[wo].filter((c)=>c.suit!==ws);
   const WJ = (k)=>({id:'J'+ws+k, rank:'J', suit:ws}), WN = (k)=>({id:'9'+ws+k, rank:'9', suit:ws});
@@ -246,7 +246,7 @@ assert.throws(()=>E.applyBid(s, s.turn, {type:'pass'}), /Opener/);
   assert.deepEqual(po, [2,3]);
   assert.throws(()=>E.applyBid(w, wo, {type:'plus', n:1, suit:ws}), /Plus/);
   E.applyBid(w, wo, {type:'plus', n:3, suit:ws});
-  assert.equal(w.bidding.high.value, 31); assert.equal(w.bidding.high.suit, ws);
+  assert.equal(w.bidding.high.value, 30); assert.equal(w.bidding.high.suit, ws);
   assert.deepEqual(E.plusMeaning(w.bidding.actions, ws)[2], ['9','A']);
   assert.deepEqual(E.plusMeaning(w.bidding.actions, ws)[1], ['9']);
 }

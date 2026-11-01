@@ -490,7 +490,7 @@
       title="${L.plusSuit ? `Bid ${(g.bidding.high ? g.bidding.high.value : 28) + n} ${SUIT_NAME[L.plusSuit]}: ` : ''}I hold ${(pm[n] || []).join(' and ')} of ${L.plusSuit ? SUIT_NAME[L.plusSuit] : 'this suit'}${n === 1 && (pm[n] || [])[0] === 'J' ? ' and nothing else in it' : ''}">Plus ${n}${L.plusSuit ? ` <span class="${RED.has(L.plusSuit) ? 'red' : ''}">${SYM[L.plusSuit]}</span>` : ''} · ${(pm[n] || []).join('+')}</button>`).join('');
     $('plusBtns').querySelectorAll('[data-plus]').forEach((b) => (b.onclick = () => socket.emit('bid', { type: 'plus', n: Number(b.dataset.plus) })));
     if (L.plusOpen && L.plusOpen.length) {
-      const base = g.bidding.high ? g.bidding.high.value : 28;
+      const base = g.bidding.high ? g.bidding.high.value : 27;   // opening Plus N = 27 + N
       $('plusBtns').innerHTML += L.plusOpen.map((o) => { const cards = o.cards || []; return `<button class="btn small ${RED.has(o.suit) ? 'red' : ''}" data-popen="${o.n}" data-suit="${o.suit}"
         title="${g.bidding.high ? 'Bid' : 'Open'} ${base + o.n} ${SUIT_NAME[o.suit]}: I hold ${cards.join(' and ')} of ${SUIT_NAME[o.suit]}${o.n === 1 && cards[0] === 'J' ? ' and nothing else in it' : ''}">Plus ${o.n} ${SYM[o.suit]} · ${cards.join('+')}</button>`; }).join('');
       $('plusBtns').querySelectorAll('[data-popen]').forEach((b) => (b.onclick = () => socket.emit('bid', { type: 'plus', n: Number(b.dataset.popen), suit: b.dataset.suit })));

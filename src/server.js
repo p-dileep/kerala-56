@@ -49,6 +49,7 @@ function createRoom(hostToken, players = 6, code = null) {
     seats: Array.from({ length: players }, emptySeat),
     game: null,
     botStyle: 'mixed',
+    teamNames: ['Team A', 'Team B'],
     chat: [],
     timer: null,
     awaySince: {},
@@ -75,7 +76,7 @@ function ensureHost(room) {
 function resetFixed(room) {
   clearTimeout(room.timer);
   room.seats = Array.from({ length: room.players }, emptySeat);
-  room.game = null; room.chat = []; room.hostToken = null; room.botStyle = 'mixed'; room.touched = Date.now();
+  room.game = null; room.chat = []; room.hostToken = null; room.botStyle = 'mixed'; room.teamNames = ['Team A', 'Team B']; room.touched = Date.now();
 }
 
 function lobbyInfo() {
@@ -151,6 +152,7 @@ function broadcast(room) {
       fixed: room.fixed,
       isHost: sock.data.token === room.hostToken,
       botStyle: room.botStyle,
+      teamNames: room.teamNames,
       botPersonality: Bot.BOT_PERSONALITY,
       mySeat: seat >= 0 ? seat : null,
       seats: publicSeats(room),
@@ -318,6 +320,20 @@ io.on('connection', (socket) => {
     if (!Bot.STYLES[style] && style !== 'mixed') return fail('Unknown bot style');
     room.botStyle = style;
     sysChat(room, `Bots set to ${style}.`);
+    broadcast(room);
+  });
+
+  // Any seated player may rename a team; the name is shared by everyone at the table.
+  socket.on('teamName', ({ team, name } = {}) => {
+    const room = getRoom();
+    if (!room) return;
+    if (socket.data.token !== room.hostToken && seatOfToken(room, socket.data.token) < 0) return fail('Sit down first.');
+    team = Number(team);
+    if (team !== 0 && team !== 1) return;
+    const n = clean(name, 14) || ['Team A', 'Team B'][team];
+    if (n === room.teamNames[team]) return;
+    sysChat(room, `${room.teamNames[team]} is now called ${n}.`);
+    room.teamNames[team] = n;
     broadcast(room);
   });
 

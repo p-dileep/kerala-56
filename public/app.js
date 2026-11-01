@@ -6,7 +6,7 @@
   const SUIT_NAME = { S: 'Spades', H: 'Hearts', D: 'Diamonds', C: 'Clubs', NT: 'No trump' };
   const RED = new Set(['H', 'D']);
   const POINTS = { J: 3, 9: 2, A: 1, 10: 1, K: 0, Q: 0 };
-  const TEAM = ['Team A', 'Team B'];
+  const TEAM_DEFAULT = ['Team A', 'Team B'];
   const SEAT_POS = [[50, 93], [93, 69], [93, 27], [50, 7], [7, 27], [7, 69]];
   const SEAT_POS_NARROW = [[50, 95], [85, 69], [85, 29], [50, 5], [15, 29], [15, 69]];
   const TRICK_POS = [[50, 72], [69, 62], [69, 36], [50, 27], [31, 36], [31, 62]];
@@ -100,12 +100,58 @@
     if (!g || !g.lastTrick) return toast('No trick has been completed yet.');
     openModal(`
       <h2>Last trick</h2>
-      <p>${esc(nameOf(g.lastTrick.winner))} won it for ${TEAM[g.lastTrick.winner % 2]} (${g.lastTrick.points} pts).</p>
+      <p>${esc(nameOf(g.lastTrick.winner))} won it for ${teamName(g.lastTrick.winner % 2)} (${g.lastTrick.points} pts).</p>
       <div class="mini-trick">${g.lastTrick.cards.map((x) => `
         <figure class="${x.seat === g.lastTrick.winner ? 'win' : ''}">${cardHTML(x.card)}<figcaption>${esc(nameOf(x.seat))}</figcaption></figure>`).join('')}
       </div>
       <div class="row"><button class="btn primary" data-close>Close</button></div>`, true);
   };
+
+  $('teamNamesBtn').onclick = () => {
+    if (room.mySeat === null && !room.isHost) return toast('Sit down first to rename the teams.');
+    openModal(`<h2>Team names</h2>
+      <p class="sub">Shown to everyone at this table.</p>
+      <div class="team-edit">
+        ${[0, 1].map((t) => `<label class="field t${t}"><span>${esc(TEAM_DEFAULT[t])}</span><input id="teamName${t}" maxlength="14" value="${teamName(t)}" placeholder="${esc(TEAM_DEFAULT[t])}"></label>`).join('')}
+      </div>
+      <div class="row"><button class="btn primary" id="teamNamesSave">Save</button><button class="btn" data-close>Cancel</button></div>`, true);
+    $('teamName0').focus();
+    const save = () => {
+      [0, 1].forEach((t) => { const v = $(`teamName${t}`).value.trim(); if (v !== rawTeam(t)) socket.emit('teamName', { team: t, name: v }); });
+      closeModal();
+    };
+    $('teamNamesSave').onclick = save;
+    $('modalBody').querySelectorAll('input').forEach((i) => i.addEventListener('keydown', (e) => { if (e.key === 'Enter') save(); }));
+  };
+
+  // Match won: a trophy fills the screen for a few seconds (or until tapped), then the result modal follows.
+  const TROPHY = `<svg viewBox="0 0 120 130" aria-hidden="true">
+    <defs><linearGradient id="gold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFE9A6"/><stop offset=".45" stop-color="#E2B33C"/><stop offset="1" stop-color="#9A6A1A"/></linearGradient>
+    <linearGradient id="gold2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F6D77A"/><stop offset="1" stop-color="#B3802A"/></linearGradient></defs>
+    <path d="M22 18h76l-4 34c-3 18-16 30-34 30S31 70 28 52z" fill="url(#gold)"/>
+    <path d="M22 18c-14 0-18 10-14 20 3 9 10 16 20 17l-2-10c-5-1-10-5-11-10-1-5 1-9 7-9z M98 18c14 0 18 10 14 20-3 9-10 16-20 17l2-10c5-1 10-5 11-10 1-5-1-9-7-9z" fill="url(#gold2)"/>
+    <rect x="52" y="82" width="16" height="16" fill="url(#gold2)"/>
+    <path d="M38 98h44c4 0 6 3 6 6v6H32v-6c0-3 2-6 6-6z" fill="url(#gold)"/>
+    <rect x="28" y="110" width="64" height="10" rx="3" fill="#7A2026"/>
+    <path d="M34 22q6 26 20 44" stroke="#FFF6D6" stroke-width="4" stroke-linecap="round" fill="none" opacity=".75"/>
+    <path d="M60 36l4 9 10 1-7 7 2 10-9-5-9 5 2-10-7-7 10-1z" fill="#7A2026" opacity=".85"/></svg>`;
+  // matchWin: the big six-second "Champions" version; otherwise a shorter one for the hand's winner.
+  function celebrate(team, matchWin, sub, after) {
+    const old = $('cheer'); if (old) old.remove();
+    const el = document.createElement('div');
+    el.id = 'cheer'; el.className = `cheer t${team}${matchWin ? ' match' : ''}`;
+    const bits = Array.from({ length: matchWin ? 70 : 36 }, (_, i) => `<i style="--x:${Math.random() * 100}%;--d:${(Math.random() * 1.6).toFixed(2)}s;--t:${(2.6 + Math.random() * 2).toFixed(2)}s;--r:${Math.round(Math.random() * 720 - 360)}deg;--s:${(.6 + Math.random() * .9).toFixed(2)}" class="c${i % 5}"></i>`).join('');
+    el.innerHTML = `<div class="confetti">${bits}</div>
+      <div class="cheer-card"><div class="rays"></div><div class="trophy">${TROPHY}</div>
+        <div class="kicker">${matchWin ? 'Champions' : 'Hand won'}</div><div class="team">${teamName(team)}</div><div class="sub">${sub}</div>
+        <div class="tap">tap to continue</div></div>`;
+    document.body.appendChild(el);
+    let done = false;
+    const finish = () => { if (done) return; done = true; el.classList.add('out'); setTimeout(() => { el.remove(); after && after(); }, 420); };
+    el.onclick = finish;
+    setTimeout(finish, matchWin ? 6000 : 3800);
+  }
+  if (location.hostname === 'localhost') window.demoWin = (t = 0, match = true) => celebrate(t, match, match ? 'wins the match' : 'takes 2 chips');
 
   // ------------------------------------------------------------ bidding controls
   $('bidMinus').onclick = () => { bidVal = Math.max(bidVal - 1, room.game.legal.bid.minBid); renderBidPanel(); };
@@ -117,6 +163,8 @@
   // ------------------------------------------------------------ helpers
   function esc(s) { return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
   function nameOf(seat) { return room.seats[seat]?.name || `Seat ${seat + 1}`; }
+  const rawTeam = (t) => (room && room.teamNames && room.teamNames[t]) || TEAM_DEFAULT[t];
+  function teamName(t) { return esc(rawTeam(t)); }   // always used inside HTML
   const N = () => (room && room.players) || 6;
   function rel(seat) { return room.mySeat === null ? seat : (seat - room.mySeat + N()) % N(); }
   const seatPos = () => N() === 8 ? (narrow() ? SEAT_POS8_NARROW : SEAT_POS8) : (narrow() ? SEAT_POS_NARROW : SEAT_POS);
@@ -182,6 +230,7 @@
 
   function renderScores(g) {
     for (const t of [0, 1]) {
+      $(`tname${t}`).textContent = rawTeam(t);
       $(`tables${t}`).textContent = g ? `${g.tables[t]} chips` : '12 chips';
       $(`hpts${t}`).textContent = g && g.contract ? `${g.points[t]} pts` : '';
     }
@@ -189,7 +238,7 @@
     $('contractChip').classList.toggle('hidden', !c);
     if (c) {
       const [win, lose] = c.value >= 56 ? [4, 5] : c.value >= 48 ? [3, 4] : c.value >= 40 ? [2, 3] : [1, 2];
-      $('contractChip').innerHTML = `<b>${esc(nameOf(c.seat))}</b> needs ${colourSuits(esc(bidText(c.value, c.suit, c.hasJack)))}${c.mult > 1 ? ` ×${c.mult}` : ''} for ${TEAM[c.team]}
+      $('contractChip').innerHTML = `<b>${esc(nameOf(c.seat))}</b> needs ${colourSuits(esc(bidText(c.value, c.suit, c.hasJack)))}${c.mult > 1 ? ` ×${c.mult}` : ''} for ${teamName(c.team)}
         <span class="stake">wins ${win * c.mult}, loses ${lose * c.mult} chips</span>`;
     }
   }
@@ -236,7 +285,7 @@
 
       let body;
       if (s.kind === 'empty') {
-        body = `<div class="nm">Open seat</div><div class="meta">${TEAM[s.team]}</div>
+        body = `<div class="nm">Open seat</div><div class="meta">${teamName(s.team)}</div>
           <div class="seat-actions">
             <button class="btn small" data-sit="${s.seat}">Sit here</button>
             ${host ? `<button class="btn small ghost" data-bot="${s.seat}">Add bot</button>` : ''}
@@ -260,7 +309,7 @@
           <div class="nm">${esc(s.name)}</div>${meta.length ? `<div class="meta">${meta.join(' ')}</div>` : ''}
           ${actions ? `<div class="seat-actions">${actions}</div>` : ''}`;
       }
-      return `<div class="${cls.join(' ')}" data-seat="${s.seat}" style="left:${x}%;top:${y}%" title="${TEAM[s.team]}">${said}${body}</div>`;
+      return `<div class="${cls.join(' ')}" data-seat="${s.seat}" style="left:${x}%;top:${y}%" title="${teamName(s.team)}">${said}${body}</div>`;
     }).join('');
     $('seats').querySelectorAll('[data-sit]').forEach((b) => (b.onclick = () => socket.emit('sit', { seat: b.dataset.sit, name: myName() })));
     $('seats').querySelectorAll('[data-bot]').forEach((b) => (b.onclick = () => socket.emit('setBot', { seat: b.dataset.bot, on: true })));
@@ -339,7 +388,7 @@
       return;
     }
     if (g.phase === 'matchover') {
-      c.innerHTML = `<div class="big">${TEAM[g.winner]} wins</div>
+      c.innerHTML = `<div class="big">${teamName(g.winner)} wins</div>
         ${botStyleHtml()}
         ${room.isHost ? '<button class="btn primary" id="againBtn">Start a new match</button>' : '<div class="sub">The host can start a new match.</div>'}`;
       const ab = $('againBtn');
@@ -349,7 +398,7 @@
     }
     if (g.phase === 'handover') {
       const r = g.result;
-      c.innerHTML = `<div class="big">${TEAM[r.contract.team]} ${r.made ? 'made' : 'went down on'} ${bidText(r.contract.value, r.contract.suit, r.contract.hasJack)}</div>
+      c.innerHTML = `<div class="big">${teamName(r.contract.team)} ${r.made ? 'made' : 'went down on'} ${bidText(r.contract.value, r.contract.suit, r.contract.hasJack)}</div>
         <div class="sub">Use "Last trick", "Show the hands" and the log on the right to review the hand.</div>
         <button class="btn" id="handsBtn2">Show the initial hands</button>
         ${room.isHost ? '<button class="btn primary" id="nextBtn">Next hand</button>' : '<div class="sub">The host deals the next hand.</div>'}`;
@@ -481,7 +530,7 @@
       kept.unshift(lines[i]);
     }
     $('log').innerHTML = kept.map((raw) => {
-      const l = raw.replace(/seat (\d)/gi, (_, n) => nameOf(Number(n) - 1));
+      const l = raw.replace(/seat (\d)/gi, (_, n) => nameOf(Number(n) - 1)).replace(/Team A/g, rawTeam(0)).replace(/Team B/g, rawTeam(1));
       let m;
       if ((m = /^Call: (.+?) — (.+)$/.exec(l))) return `<li class="call"><b>${esc(m[1])}</b> ${colourSuits(esc(m[2]))}</li>`;
       if ((m = /^Trick (\d+): (.+?) takes (.+)$/.exec(l))) return `<li class="trick-line"><span class="n">${m[1]}</span><b>${esc(m[2])}</b> ${esc(m[3])}</li>`;
@@ -504,28 +553,31 @@
       return;
     }
     const r = g.result, c = r.contract;
-    const bt = TEAM[c.team];
+    const bt = teamName(c.team);
     const verdict = r.made ? `${bt} made it` : `${bt} went down`;
     const flow = r.made
-      ? `${TEAM[r.payer]} pays ${r.amount} chip${r.amount > 1 ? 's' : ''} to ${bt}.`
-      : `${bt} pays ${r.amount} chip${r.amount > 1 ? 's' : ''} to ${TEAM[r.receiver]}.`;
+      ? `${teamName(r.payer)} pays ${r.amount} chip${r.amount > 1 ? 's' : ''} to ${bt}.`
+      : `${bt} pays ${r.amount} chip${r.amount > 1 ? 's' : ''} to ${teamName(r.receiver)}.`;
     const over = g.phase === 'matchover';
-    openModal(`
+    const show = () => openModal(`
       <h2>${verdict}</h2>
       <p>${esc(nameOf(c.seat))} bid ${bidText(c.value, c.suit, c.hasJack)}${c.mult > 1 ? ` ×${c.mult}` : ''}. ${flow}</p>
       ${g.trickNo < (g.handSize || 8) ? `<p class="sub">Stopped after trick ${g.trickNo}: ${r.made ? 'target reached' : 'target out of reach'}.</p>` : ''}
       <div class="tally">
-        <span>${TEAM[0]} points</span><span class="v">${r.points[0]}</span>
-        <span>${TEAM[1]} points</span><span class="v">${r.points[1]}</span>
-        <span>${TEAM[0]} chips</span><span class="v">${g.tables[0]}</span>
-        <span>${TEAM[1]} chips</span><span class="v">${g.tables[1]}</span>
+        <span>${teamName(0)} points</span><span class="v">${r.points[0]}</span>
+        <span>${teamName(1)} points</span><span class="v">${r.points[1]}</span>
+        <span>${teamName(0)} chips</span><span class="v">${g.tables[0]}</span>
+        <span>${teamName(1)} chips</span><span class="v">${g.tables[1]}</span>
       </div>
-      ${over ? `<p><b>${TEAM[g.winner]} wins the match.</b></p>` : room.isHost ? '' : '<p class="sub">The host deals the next hand.</p>'}
+      ${over ? `<p><b>${teamName(g.winner)} wins the match.</b></p>` : room.isHost ? '' : '<p class="sub">The host deals the next hand.</p>'}
       <div class="row">
         ${over && room.isHost ? '<button class="btn primary" data-start>Start a new match</button>' : ''}
         <button class="btn" data-hands>Show the initial hands</button>
         ${!over && room.isHost ? '<button class="btn primary" data-next>Next hand</button>' : ''}
         <button class="btn" data-close>Close</button>
       </div>`, true, 'phase');
+    const chips = `${r.amount} chip${r.amount > 1 ? 's' : ''}`;
+    if (over) celebrate(g.winner, true, 'wins the match', show);
+    else celebrate(r.receiver, false, r.made ? `made ${esc(bidText(c.value, c.suit, c.hasJack))} and takes ${chips}` : `set ${teamName(c.team)} and takes ${chips}`, show);
   }
 })();

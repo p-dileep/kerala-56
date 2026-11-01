@@ -286,6 +286,56 @@ button, input { font: inherit; }
 }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
 
+/* ---------------------------------------------------------- team names */
+.chip.pen { cursor: pointer; padding: .3em .6em .2em; font-size: 1rem; line-height: 1; align-self: center; opacity: .75; }
+.chip.pen:hover { opacity: 1; border-color: var(--mist); }
+.team-edit { display: grid; gap: 12px; margin: 12px 0 4px; }
+.team-edit .field span { font-weight: 700; }
+.team-edit .field.t0 span { color: #8a5a00; } .team-edit .field.t1 span { color: #8a1420; }
+.team-edit .field input { background: #fff; color: var(--ink); border: 1px solid #CDBF9F; border-left-width: 5px; }
+.team-edit .field.t0 input { border-left-color: var(--teamA); } .team-edit .field.t1 input { border-left-color: var(--teamB); }
+.team-edit .field input:focus { border-color: var(--kasavu); }
+.team-edit .field.t0 input:focus { border-left-color: var(--teamA); } .team-edit .field.t1 input:focus { border-left-color: var(--teamB); }
+
+/* ---------------------------------------------------------- match won */
+.cheer {
+  position: fixed; inset: 0; z-index: 25; display: grid; place-items: center; cursor: pointer; overflow: hidden;
+  background: radial-gradient(80% 70% at 50% 45%, rgba(19,80,90,.92), rgba(4,20,24,.96));
+  animation: cheerin .4s ease-out both;
+}
+.cheer.out { animation: cheerout .4s ease-in both; }
+@keyframes cheerin { from { opacity: 0; } }
+@keyframes cheerout { to { opacity: 0; } }
+.cheer-card { position: relative; text-align: center; color: var(--ivory); padding: 20px; max-width: 92vw; }
+.cheer .rays {
+  position: absolute; left: 50%; top: 34%; width: 160vmax; height: 160vmax; transform: translate(-50%, -50%);
+  background: repeating-conic-gradient(from 0deg, rgba(255,230,160,.14) 0 9deg, transparent 9deg 24deg);
+  -webkit-mask: radial-gradient(circle, #000 0%, transparent 42%); mask: radial-gradient(circle, #000 0%, transparent 42%);
+  animation: spin 24s linear infinite; pointer-events: none;
+}
+@keyframes spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
+.cheer:not(.match) .trophy { width: clamp(110px, 22vmin, 170px); }
+.cheer:not(.match) .team { font-size: clamp(30px, 6.5vmin, 54px); }
+.cheer:not(.match) .tap { animation-delay: 1.4s; }
+.cheer .trophy { position: relative; width: clamp(150px, 32vmin, 260px); margin: 0 auto 6px; filter: drop-shadow(0 18px 30px rgba(0,0,0,.5)) drop-shadow(0 0 28px rgba(255,220,140,.45)); animation: trophy 1s cubic-bezier(.2,1.4,.4,1) .15s both; }
+.cheer .trophy svg { display: block; width: 100%; height: auto; }
+@keyframes trophy { 0% { transform: translateY(60px) scale(.2) rotate(-14deg); opacity: 0; } 60% { opacity: 1; } 100% { transform: none; opacity: 1; } }
+.cheer .kicker { font-size: .95rem; letter-spacing: .32em; text-transform: uppercase; color: var(--kasavu); animation: rise .6s ease-out .7s both; }
+.cheer .team { font-size: clamp(38px, 9vmin, 76px); font-weight: 700; line-height: 1.05; margin-top: 4px; animation: rise .6s ease-out .85s both; text-shadow: 0 6px 24px rgba(0,0,0,.5); }
+.cheer.t0 .team { color: #F3D27A; } .cheer.t1 .team { color: #F5A3AD; }
+.cheer .sub { font-size: 1.15rem; margin-top: 6px; opacity: .9; animation: rise .6s ease-out 1s both; }
+.cheer .tap { margin-top: 26px; font-size: .8rem; opacity: 0; letter-spacing: .1em; animation: fadein .6s ease-out 2.4s both; }
+@keyframes rise { from { opacity: 0; transform: translateY(18px); } }
+@keyframes fadein { to { opacity: .55; } }
+.confetti { position: absolute; inset: 0; pointer-events: none; }
+.confetti i {
+  position: absolute; top: -4vh; left: var(--x); width: 10px; height: 16px; border-radius: 2px; transform: scale(var(--s));
+  animation: fall var(--t) linear var(--d) both;
+}
+.confetti i.c0 { background: var(--teamA); } .confetti i.c1 { background: var(--teamB); } .confetti i.c2 { background: var(--ivory); border-radius: 50%; width: 10px; height: 10px; }
+.confetti i.c3 { background: var(--kasavu); } .confetti i.c4 { background: var(--mist); width: 6px; height: 18px; }
+@keyframes fall { 0% { transform: translateY(0) rotate(0) scale(var(--s)); opacity: 1; } 100% { transform: translateY(108vh) rotate(var(--r)) scale(var(--s)); opacity: .3; } }
+
 /* ---------------------------------------------------------- responsive */
 @media (max-width: 1100px) {
   #table { grid-template-columns: minmax(0, 1fr); grid-template-areas: "top" "arena" "bid" "hand"; }
@@ -310,6 +360,7 @@ button, input { font: inherit; }
   .topbar { padding: 8px; gap: 6px; }
   .team-score { padding: .3em .55em .15em; }
   .team-score .hpts { display: none; }
+  .team-score .tname { max-width: 10ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .levels { margin-left: 0; }
   .bid-panel { width: calc(100% - 12px); padding: 10px; gap: 8px; }
   .suits { grid-template-columns: repeat(3, 1fr); }

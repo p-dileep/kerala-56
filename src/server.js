@@ -13,6 +13,9 @@ const BOT_BID_DELAY_MS = Number(process.env.BOT_BID_DELAY_MS) || BOT_DELAY_MS + 
 const TRICK_PAUSE_MS = Number(process.env.TRICK_PAUSE_MS) || 2200;
 const AWAY_TAKEOVER_MS = Number(process.env.AWAY_TAKEOVER_MS) || 20000; // bot plays for a disconnected human
 const ROOM_IDLE_MS = 1000 * 60 * 60 * 3;
+const SUPABASE_URL = process.env.SUPABASE_URL || '';
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || '';
+const GAME_VERSION = process.env.GAME_VERSION || process.env.RENDER_GIT_COMMIT || null;
 
 const BOT_NAMES = ['Kuttan', 'Ammini', 'Pappan', 'Chinnu', 'Unni', 'Kunjamma', 'Appu', 'Sarojini', 'Mathai', 'Leela'];
 
@@ -50,7 +53,8 @@ function createRoom(hostToken, players = 6, code = null) {
     timer: null,
     awaySince: {},
     touched: Date.now(),
-    version: 0
+    version: 0,
+    loggedHand: 0
   };
   rooms.set(room.code, room);
   return room;
@@ -90,8 +94,49 @@ function publicSeats(room) {
   }));
 }
 
+// Fire-and-forget: one row per finished hand. Never blocks or throws into the game loop.
+function logHand(room) {
+  if (!SUPABASE_URL || !SUPABASE_KEY) return;
+  const g = room.game;
+  const row = {
+    room: room.code,
+    players: room.players,
+    hand_no: g.handNo,
+    dealer: g.dealer,
+    bot_style: room.botStyle,
+    seats: room.seats.map((s) => ({ kind: s.kind, name: s.name })),
+    dealt: g.dealt.map((h) => h.map((c) => c.id)),
+    auction: g.bidding.actions,
+    contract: g.contract,
+    played: g.played,
+    result: g.result,
+    tables_after: g.tables,
+    game_version: GAME_VERSION
+  };
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 5000);
+  fetch(`${SUPABASE_URL}/rest/v1/hands`, {
+    method: 'POST',
+    headers: {
+      apikey: SUPABASE_KEY,
+      Authorization: `Bearer ${SUPABASE_KEY}`,
+      'Content-Type': 'application/json',
+      Prefer: 'return=minimal'
+    },
+    body: JSON.stringify(row),
+    signal: ctrl.signal
+  }).then((r) => { if (!r.ok) console.error('hand log failed', r.status); })
+    .catch((err) => console.error('hand log error', err.message))
+    .finally(() => clearTimeout(t));
+}
+
 function broadcast(room) {
   room.version++;
+  const g = room.game;
+  if (g && (g.phase === 'handover' || g.phase === 'matchover') && room.loggedHand !== g.handNo) {
+    room.loggedHand = g.handNo;
+    logHand(room);
+  }
   room.touched = Date.now();
   ensureHost(room);
   if (room.fixed) io.emit('lobby', lobbyInfo());
@@ -170,6 +215,7 @@ function startMatch(room) {
     if (s.kind === 'empty') room.seats[i] = { ...emptySeat(), kind: 'bot', name: freeNames.shift() || `Bot ${i + 1}` };
   });
   room.game = E.newMatch({ players: room.players });
+  room.loggedHand = 0;
   sysChat(room, 'Match started. Good luck!');
 }
 

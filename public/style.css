@@ -57,6 +57,7 @@ button, input { font: inherit; }
 }
 .field input:focus { border-color: var(--kasavu); outline: none; }
 .join-row { display: flex; gap: 10px; align-items: end; }
+.hint { margin: 4px 0 -8px; font-size: .95rem; line-height: 1.5; color: var(--pai); }
 .grow { flex: 1; }
 #codeInput { text-transform: uppercase; letter-spacing: .2em; }
 .howto { margin: 0; padding-left: 1.3em; line-height: 1.55; font-size: .95rem; color: var(--pai); }

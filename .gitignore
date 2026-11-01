@@ -3,3 +3,5 @@ node_modules
 tools/
 .claude/
 *.lnk
+.env
+data/

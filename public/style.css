@@ -87,6 +87,9 @@ button, input { font: inherit; }
 .chip.contract .suit.red { color: #c4161c; }
 .chip.contract { background: var(--ivory); color: var(--ink); border-color: var(--kasavu); font-weight: 700; }
 .chip.icon { display: none; cursor: pointer; margin-left: auto; }
+.chip.watch { cursor: pointer; opacity: .8; }
+.chip.watch:hover { opacity: 1; border-color: var(--mist); }
+.chip.watch .eye { font-size: .95em; margin-right: 2px; }
 .scores { display: flex; gap: 8px; margin-left: auto; }
 .team-score { display: flex; gap: 8px; align-items: baseline; padding: .4em .8em .25em; border-radius: 10px; background: rgba(8,42,48,.6); border-left: 4px solid; }
 .team-score.t0 { border-color: var(--teamA); }
@@ -180,7 +183,10 @@ button, input { font: inherit; }
 @keyframes wonpulse { 0% { box-shadow: 0 0 0 0 rgba(255,250,230,.8); } 100% { box-shadow: 0 0 0 14px rgba(255,250,230,0); } }
 @keyframes collect { 0% { transform: translate(-50%, -50%) scale(1); } 60% { transform: translate(-50%, -50%) scale(1.12); } 100% { transform: translate(-50%, -50%) scale(1); } }
 
-.fixed-tables { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 12px 0 6px; }
+.group-label { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; font-size: .92rem; margin-top: 6px; }
+.group-label span { font-weight: 700; color: var(--kasavu); letter-spacing: .04em; text-transform: uppercase; font-size: .8rem; }
+.group-label em { font-style: normal; opacity: .75; }
+.fixed-tables { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0 0 6px; }
 .fixed-col { display: flex; flex-direction: column; gap: 6px; }
 .fixed-col .big-btn { width: 100%; }
 .big-btn .status { font-size: .8rem; font-weight: 600; margin-top: 4px; min-height: 1em; }

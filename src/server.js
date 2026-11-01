@@ -81,7 +81,19 @@ function resetFixed(room) {
 
 function lobbyInfo() {
   return FIXED.map((t) => { const r = rooms.get(t.code); return { code: t.code, players: t.players,
-    seated: r.seats.filter((s) => s.kind === 'human' && s.connected).length, playing: !!r.game && r.game.phase !== 'matchover', hasGame: !!r.game }; });
+    seated: r.seats.filter((s) => s.kind === 'human' && s.connected).length, watching: watchers(r).length, playing: !!r.game && r.game.phase !== 'matchover', hasGame: !!r.game }; });
+}
+
+// Connected people in the room who hold no seat (one entry per browser token).
+function watchers(room) {
+  const out = [], seen = new Set();
+  for (const sid of io.sockets.adapter.rooms.get(room.code) || []) {
+    const sock = io.sockets.sockets.get(sid);
+    if (!sock || seatOfToken(room, sock.data.token) >= 0 || seen.has(sock.data.token)) continue;
+    seen.add(sock.data.token);
+    out.push(sock.data.name || 'Guest');
+  }
+  return out;
 }
 
 function seatOfToken(room, token) {
@@ -142,6 +154,7 @@ function broadcast(room) {
   ensureHost(room);
   if (room.fixed) io.emit('lobby', lobbyInfo());
   const sockets = io.sockets.adapter.rooms.get(room.code) || new Set();
+  const watching = watchers(room);
   for (const sid of sockets) {
     const sock = io.sockets.sockets.get(sid);
     if (!sock) continue;
@@ -156,6 +169,7 @@ function broadcast(room) {
       botPersonality: Bot.BOT_PERSONALITY,
       mySeat: seat >= 0 ? seat : null,
       seats: publicSeats(room),
+      watchers: watching,
       chat: room.chat.slice(-40),
       game: room.game ? E.getView(room.game, seat >= 0 ? seat : null) : null
     });
@@ -240,6 +254,7 @@ io.on('connection', (socket) => {
     if (!socket.data.token) return fail('Not ready');
     if (!clean(name)) return fail('Please type your name first.');
     const room = createRoom(socket.data.token, Number(players) === 8 ? 8 : 6);
+    socket.data.name = clean(name);
     room.seats[0] = { kind: 'human', name: clean(name) || 'Host', token: socket.data.token, socketId: socket.id, connected: true };
     socket.join(room.code);
     socket.data.room = room.code;
@@ -254,6 +269,7 @@ io.on('connection', (socket) => {
     if (!clean(name) && seatOfToken(room, socket.data.token) < 0) return fail('Please type your name first.');
     socket.join(room.code);
     socket.data.room = room.code;
+    if (clean(name)) socket.data.name = clean(name);
 
     let seat = seatOfToken(room, socket.data.token);
     if (seat >= 0) {                                   // reconnect
@@ -267,6 +283,7 @@ io.on('connection', (socket) => {
         sysChat(room, `${room.seats[seat].name} joined.`);
       }
     }
+    if (seat < 0) sysChat(room, `${socket.data.name || 'Guest'} is watching.`);
     broadcast(room);
   });
 
@@ -281,6 +298,7 @@ io.on('connection', (socket) => {
     if (!canTake) return fail('That seat is taken.');
     const cur = seatOfToken(room, socket.data.token);
     let myName = clean(name);
+    if (myName) socket.data.name = myName;
     if (cur >= 0) {
       myName = myName || room.seats[cur].name;
       room.seats[cur] = room.game ? { ...emptySeat(), kind: 'bot', name: BOT_NAMES[cur] } : emptySeat();
@@ -405,7 +423,7 @@ io.on('connection', (socket) => {
       const name = room.seats[seat].name;
       room.seats[seat] = room.game ? { ...emptySeat(), kind: 'bot', name: BOT_NAMES[seat] } : emptySeat();
       sysChat(room, `${name} left${room.game ? ' — a bot took the seat' : ''}.`);
-    }
+    } else sysChat(room, `${socket.data.name || 'Guest'} stopped watching.`);
     socket.leave(room.code);
     socket.data.room = null;
     broadcast(room);
@@ -419,7 +437,7 @@ io.on('connection', (socket) => {
       room.seats[seat].connected = false;
       room.awaySince[seat] = Date.now();
       broadcast(room);
-    }
+    } else if (seat < 0) broadcast(room);   // a watcher left: refresh the watcher list
   });
 });
 

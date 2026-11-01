@@ -82,6 +82,27 @@
     catch { toast(url); }
   };
   $('railToggle').onclick = () => $('rail').classList.toggle('open');
+  $('railClose').onclick = () => $('rail').classList.remove('open');
+  // On phones the chat slides over the table: a tap on the table outside it closes it too.
+  document.addEventListener('pointerdown', (e) => {
+    const r = $('rail');
+    if (r.classList.contains('open') && !r.contains(e.target) && !e.target.closest('#railToggle')) r.classList.remove('open');
+  });
+
+  // Full screen for phones and tablets (hidden where the browser has no Fullscreen API, e.g. iPhone Safari).
+  const fsEl = document.documentElement;
+  const fsOn = () => document.fullscreenElement || document.webkitFullscreenElement;
+  const canFs = !!(fsEl.requestFullscreen || fsEl.webkitRequestFullscreen) && window.matchMedia('(pointer: coarse)').matches;
+  $('fullBtn').classList.toggle('hidden', !canFs);
+  const syncFs = () => { $('fullBtn').textContent = fsOn() ? '✕' : '⛶'; $('fullBtn').title = fsOn() ? 'Exit full screen' : 'Full screen'; $('fullBtn').setAttribute('aria-label', $('fullBtn').title); };
+  document.addEventListener('fullscreenchange', syncFs);
+  document.addEventListener('webkitfullscreenchange', syncFs);
+  $('fullBtn').onclick = async () => {
+    try {
+      if (fsOn()) await (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+      else await (fsEl.requestFullscreen || fsEl.webkitRequestFullscreen).call(fsEl, { navigationUI: 'hide' });
+    } catch { toast('Full screen is not available in this browser.'); }
+  };
   $('leaveBtn').onclick = () => {
     socket.emit('leave');
     room = null;

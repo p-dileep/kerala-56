@@ -24,14 +24,15 @@ for (let m=0;m<200;m++){
   assert.equal(s.phase,'matchover'); matches++;
 }
 console.log({matches, hands, avgHandsPerMatch:(hands/matches).toFixed(1), contractMadeRate:(made/hands).toFixed(2)});
-// 8-player matches (4 vs 4, 6 cards each): same rules, bots must cope with the shorter hand
+// 8-player matches (4 vs 4, 64 cards with the 8s and 7s, 8 cards each): same rules and points
 { let m8=0, h8=0, made8=0;
   for (let m=0;m<60;m++){
     const s = E.newMatch({players:8}); let guard=0;
-    assert.equal(s.hands.length, 8); assert.equal(s.hands[0].length, 6);
+    assert.equal(s.hands.length, 8); assert.ok(s.hands.every((h) => h.length === 8));
+    assert.equal(E.makeDeck(8).length, 64); assert.equal(E.makeDeck(8).reduce((t, c) => t + E.POINTS[c.rank], 0), 56);
     while (s.phase!=='matchover' && guard++<500000){
       if (s.phase==='handover'){ E.nextHand(s); continue; }
-      if (s.phase==='playing' && s.trick.complete){ assert.equal(s.trick.cards.length, 8); E.collectTrick(s); if(s.phase!=='playing') {h8++; if(s.result.made) made8++; assert.ok(s.trickNo<=6);} continue; }
+      if (s.phase==='playing' && s.trick.complete){ assert.equal(s.trick.cards.length, 8); E.collectTrick(s); if(s.phase!=='playing') {h8++; if(s.result.made) made8++; assert.ok(s.trickNo<=8);} continue; }
       const v = B.botView(s, s.turn); const d = B.decide(v);
       if (d.kind==='bid') E.applyBid(s, s.turn, d.action); else E.playCard(s, s.turn, d.cardId);
       assert.equal(s.tables[0]+s.tables[1], 24);

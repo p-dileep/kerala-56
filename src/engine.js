@@ -1,6 +1,7 @@
 'use strict';
 /**
- * 56 (Ambathiyaaru) — Kerala rules engine, 6 players (3 vs 3) or 8 players (4 vs 4, 6 cards each).
+ * 56 (Ambathiyaaru) — Kerala rules engine, 6 players (3 vs 3) or 8 players (4 vs 4). Both deal 8 cards
+ * each: 6 players use the 48-card deck, 8 players add the 8s and 7s (no points) for 64 cards.
  *
  * Seats 0..5. Turn order goes seat -> seat+1 (shown counter-clockwise on screen).
  * Teams alternate: even seats = team 0, odd seats = team 1.
@@ -10,9 +11,10 @@
  */
 
 const SUITS = ['S', 'H', 'D', 'C'];
-const RANKS = ['J', '9', 'A', '10', 'K', 'Q'];           // high -> low
-const RANK_POWER = { J: 6, 9: 5, A: 4, 10: 3, K: 2, Q: 1 };
-const POINTS = { J: 3, 9: 2, A: 1, 10: 1, K: 0, Q: 0 };
+const RANKS = ['J', '9', 'A', '10', 'K', 'Q'];           // high -> low; the Plus ladder uses these
+const RANKS_8P = [...RANKS, '8', '7'];                    // 8-player deck adds the 8s and 7s below the Queen
+const RANK_POWER = { J: 8, 9: 7, A: 6, 10: 5, K: 4, Q: 3, 8: 2, 7: 1 };
+const POINTS = { J: 3, 9: 2, A: 1, 10: 1, K: 0, Q: 0, 8: 0, 7: 0 };
 const LEVELS = [28, 40, 48, 56];
 const NUM_SEATS = 6;            // default table size; settings.players may be 6 or 8
 const HAND_SIZE = 8;            // default hand size; 48 cards / players
@@ -23,19 +25,20 @@ const DEFAULT_SETTINGS = {
   startingTables: 12,      // tables (kuttu) each team starts with
   redoubleMultiplier: 4,   // some groups use 3
   selfRaiseNextLevel: true, // raising your own standing bid must reach the next level (40/48/56)
-  players: 6               // 6 (3 vs 3, 8 cards each) or 8 (4 vs 4, 6 cards each)
+  players: 6               // 6 (3 vs 3, 48 cards) or 8 (4 vs 4, 64 cards with the 8s and 7s); 8 cards each
 };
 
 const team = (seat) => seat % 2;
 const nextSeat = (seat, n = NUM_SEATS) => (seat + 1) % n;
 const seatsOf = (state) => state.settings.players;
-const handSizeOf = (state) => 48 / state.settings.players;
+const ranksFor = (players = 6) => (players === 8 ? RANKS_8P : RANKS);
+const handSizeOf = (state) => (2 * SUITS.length * ranksFor(state.settings.players).length) / state.settings.players;
 
-function makeDeck() {
+function makeDeck(players = 6) {
   const deck = [];
   for (let copy = 0; copy < 2; copy++)
     for (const suit of SUITS)
-      for (const rank of RANKS) deck.push({ id: `${rank}${suit}${copy}`, rank, suit });
+      for (const rank of ranksFor(players)) deck.push({ id: `${rank}${suit}${copy}`, rank, suit });
   return deck;
 }
 
@@ -85,7 +88,7 @@ function newMatch(settings = {}, rng = Math.random) {
 }
 
 function startHand(state, rng = Math.random) {
-  const deck = shuffle(makeDeck(), rng);
+  const deck = shuffle(makeDeck(seatsOf(state)), rng);
   state.handNo += 1;
   state.phase = 'bidding';
   const n = seatsOf(state), hs = handSizeOf(state);
@@ -533,7 +536,7 @@ function getView(state, seat) {
 }
 
 module.exports = {
-  SUITS, RANKS, RANK_POWER, POINTS, LEVELS, NUM_SEATS, HAND_SIZE, MIN_BID, MAX_BID, DEFAULT_SETTINGS,
+  SUITS, RANKS, RANKS_8P, ranksFor, RANK_POWER, POINTS, LEVELS, NUM_SEATS, HAND_SIZE, MIN_BID, MAX_BID, DEFAULT_SETTINGS,
   team, nextSeat, resetChips, plusMeaning, makeDeck, shuffle, sortHand, bidBaseTables, nextLevelAbove,
   newMatch, startHand, legalBidActions, applyBid, legalCards, winningIndex, playCard,
   collectTrick, scoreHand, nextHand, getView, trumpSuit

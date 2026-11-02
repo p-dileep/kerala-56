@@ -60,8 +60,9 @@ const paramsFor = (style, name) => ({ ...DEFAULT_PARAMS, ...(STYLES[style === 'm
 
 function estimateFor(hand, suit, P = DEFAULT_PARAMS, players = 6) {
   // Baseline: a team expects ~28 of 56 on an average hand (avg hand = 56/players points).
-  // Averages scale with hand size: 8 cards at 6 players, 6 cards at 8 players.
-  const hs = 48 / players, avgPts = 56 / players, avgLen = 1.33 * hs / 8, avgJ = 1.33 * hs / 8;
+  // Both table sizes deal 8 cards (8 players add the pointless 8s and 7s), so suit length keeps its
+  // 6-player baseline; points and Jacks are shared among more players at 8.
+  const avgPts = 56 / players, avgLen = 1.33, avgJ = 8 / players;
   const myPts = hand.reduce((s, c) => s + pts(c), 0);
   let est = P.estBase + (myPts - avgPts) * P.estPtsW;
   if (suit !== 'NT') {
@@ -260,7 +261,7 @@ function inferFacts(view) {
 function dealUnseen(view, facts, rng) {
   const N = view.players || 6, me = view.mySeat;
   const seen = new Set([...view.hand.map((c) => c.id), ...(view.playedIds || [])]);
-  const pool = E.shuffle(E.makeDeck().filter((c) => !seen.has(c.id)), rng);
+  const pool = E.shuffle(E.makeDeck(N).filter((c) => !seen.has(c.id)), rng);
   const hands = Array.from({ length: N }, () => []);
   hands[me] = view.hand.slice();
   const room = view.handCounts.slice();
@@ -295,7 +296,7 @@ function dealUnseen(view, facts, rng) {
 function simPoints(view, suit, P, rng = Math.random) {
   const deals = P.simDeals | 0;
   if (!deals) return null;
-  const N = view.players || 6, me = E.team(view.mySeat), hs = view.handSize || 48 / N;
+  const N = view.players || 6, me = E.team(view.mySeat), hs = view.handSize || 8;
   const facts = inferFacts(view);
   const results = [];
   const playP = { ...DEFAULT_PARAMS, useTracking: 0 };
@@ -332,7 +333,7 @@ function unseenHigher(card, view) {
   const playedIds = new Set(view.playedIds);
   const myIds = new Set(view.hand.map((c) => c.id));
   let n = 0;
-  for (const r of E.RANKS) {
+  for (const r of E.ranksFor(view.players || 6)) {
     if (E.RANK_POWER[r] <= pow(card)) continue;
     for (const copy of [0, 1]) {
       const id = `${r}${card.suit}${copy}`;
@@ -364,7 +365,7 @@ function track(view) {
   // cards of `suit` with power above `minPow` that are neither played nor in my hand
   const outside = (suit, minPow = -1) => {
     let n = 0;
-    for (const r of E.RANKS) {
+    for (const r of E.ranksFor(view.players || 6)) {
       if (E.RANK_POWER[r] <= minPow) continue;
       for (const copy of [0, 1]) if (!seen.has(`${r}${suit}${copy}`)) n++;
     }

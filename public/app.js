@@ -5,7 +5,7 @@
   const SYM = { S: '♠', H: '♥', D: '♦', C: '♣', NT: 'NT' };
   const SUIT_NAME = { S: 'Spades', H: 'Hearts', D: 'Diamonds', C: 'Clubs', NT: 'No trump' };
   const RED = new Set(['H', 'D']);
-  const POINTS = { J: 3, 9: 2, A: 1, 10: 1, K: 0, Q: 0 };
+  const POINTS = { J: 3, 9: 2, A: 1, 10: 1, K: 0, Q: 0, 8: 0, 7: 0 };
   const TEAM_DEFAULT = ['Team A', 'Team B'];
   const SEAT_POS = [[50, 93], [93, 69], [93, 27], [50, 7], [7, 27], [7, 69]];
   const SEAT_POS_NARROW = [[50, 95], [85, 69], [85, 29], [50, 5], [15, 29], [15, 69]];

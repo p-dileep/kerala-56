@@ -1,6 +1,6 @@
 # 56 (Ambathiyaaru): a Kerala card table
 
-A real-time web version of 56 for 6 players (3 vs 3, 8 cards each) or 8 players (4 vs 4, 6 cards each). A host starts a table and shares the 5-letter code
+A real-time web version of 56 for 6 players (3 vs 3, 8 cards each) or 8 players (4 vs 4, 8 cards each with the 8s and 7s added). A host starts a table and shares the 5-letter code
 or link. Friends join from phone or desktop, and bots fill any empty seats. The server enforces every rule.
 
 ## Play online
@@ -18,7 +18,7 @@ Or on Windows just double-click `start_game.bat`: it installs Node.js (via winge
 To play with friends over the internet without any hosting, double-click `start_online.bat` instead. It does everything `start_game.bat` does, downloads the portable `cloudflared.exe` into `tools/` on first use (no Cloudflare account needed), opens a quick tunnel, prints and copies the public `https://....trycloudflare.com` address, and opens the browser there. Create the table at that address and click the table code to copy the invite link. The address changes every time the tunnel is restarted.
 
 ## Variants
-`players` in the table settings is 6 or 8. Both use the same 48-card pack, so 8 players get 6 cards and play 6 tricks; bids, levels and chips are unchanged. Bots scale their hand estimates to the hand size.
+`players` in the table settings is 6 or 8. 6 players use the 48-card pack; 8 players add the 8s and 7s of both packs (no points) for 64 cards. Both deal 8 cards and play 8 tricks; bids, levels and chips are unchanged. Bots scale their hand estimates to the hand size.
 
 ## Deploy on Render (how the public link is set up)
 New Web Service from the GitHub repo, language Docker (the `Dockerfile` is used, no build or start command needed), branch `main`, Free instance. Render sets `PORT` itself.
@@ -47,7 +47,7 @@ Run a **single** process. Rooms are held in memory. A restart ends the tables in
 | `AWAY_TAKEOVER_MS` | 20000 | A bot plays for a disconnected player after this long |
 
 ## Rules implemented (`src/engine.js`)
-- 48 cards (J 9 A 10 K Q ×2 packs). Points: J 3, 9 2, A 1, 10 1 = 56. Teams sit alternately.
+- 48 cards (J 9 A 10 K Q ×2 packs); the 8-player table adds 8 and 7 ×2 packs below the Queen, worth nothing. Points: J 3, 9 2, A 1, 10 1 = 56. Teams sit alternately.
 - Deal and play go round from the dealer's right, and the deal rotates each hand.
 - Bids are 28–56 with a suit or NT. The opener must bid at least 28. You cannot name a suit you are void in.
   Raising **your own** standing bid must jump to the next level (40/48/56).

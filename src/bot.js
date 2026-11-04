@@ -42,6 +42,10 @@ const DEFAULT_PARAMS = {
   // reading the other seats' calls (auctionRead): a shown Jack / Nine of the suit, each call in the
   // suit (length, up to two), and a partner who has only passed. Partners add, opponents subtract.
   readJackW: 2, readNineW: 1, readLenW: 1, readPassW: 1,
+  // an NS (void in suit X) lets that seat cut X: worth this much in any other trump suit
+  readCutW: 2,
+  // answer a partner's NS by naming a suit (1 = on): an NS is a prompt, not a contract to play
+  nsAnswer: 1,
   // Plus 1 only when the team can still stand the raised contract (estimate within this slack)
   plusSlack: 2,
   // contested bids from this value up are checked by the Monte Carlo layout (which honours the auction)
@@ -61,7 +65,11 @@ const STYLES = {
   medium: {},
   aggressive: { estBase: 26, bidContestMargin: 0, raiseMargin: 3, plus2Margin: 1, levelMargin: 2, jumpEst: 38, jumpGap: 6,
     showJackMargin: -1, altMargin: -1, doubleMinPts: 13, raiseMaxValue: 44, plusMaxValue: 48, backMaxValue: 48,
-    simConf: 0.6, simMargin: 0, probeMaxValue: 33 }
+    // Level jumps (40/48/56) and the self-raise need the same Monte Carlo confidence as 'medium':
+    // a 40 pays 2 / costs 3, so jumping over a safe lower contract needs ~75% to pay. At 0.6 with
+    // no margin on 24 noisy layouts, aggressive bots made 63% of their 40+ contracts in self-play;
+    // this (with 48 layouts) makes 80% and gains ~5 tables/match on all-aggressive tables.
+    simConf: 0.75, simMargin: 1, simDeals: 48, probeMaxValue: 33 }
 };
 // Each named bot has its own temperament; the host's table setting 'mixed' uses these.
 const BOT_PERSONALITY = { Kuttan: 'aggressive', Ammini: 'defensive', Pappan: 'medium', Chinnu: 'aggressive', Unni: 'medium',
@@ -93,7 +101,8 @@ function estimateFor(hand, suit, P = DEFAULT_PARAMS, players = 6) {
 // What the other seats' calls have shown about `suit` (public information only), in estimate points.
 // estimateFor assumes average partners and opponents; this moves the estimate by what the auction
 // revealed: shown Jacks / Nines (Jack-signal bids, Plus cards), repeated calls in the suit (length),
-// and a partner who has only passed (a weak hand). Returns { partner, opp }: add partner, subtract opp.
+// an NS void in another suit (that seat can cut it), and a partner who has only passed (a weak hand).
+// Returns { partner, opp }: add partner, subtract opp.
 function auctionRead(view, suit, P) {
   const out = { partner: 0, opp: 0 };
   if (suit === 'NT') return out;
@@ -104,7 +113,8 @@ function auctionRead(view, suit, P) {
     const acts = view.bidding.actions.filter((a) => a.seat === s);
     let v = facts.must[s].filter((rs) => rs === 'J' + suit).length * P.readJackW +
       facts.must[s].filter((rs) => rs === '9' + suit).length * P.readNineW +
-      Math.min(2, acts.filter((a) => (a.type === 'bid' || a.type === 'plus') && a.suit === suit).length) * P.readLenW;
+      Math.min(2, acts.filter((a) => (a.type === 'bid' || a.type === 'plus') && a.suit === suit).length) * P.readLenW +
+      [...facts.voids[s]].filter((x) => x !== suit).length * P.readCutW;
     const partner = E.team(s) === E.team(me);
     if (partner && acts.length && acts.every((a) => a.type === 'pass')) v -= P.readPassW;
     if (partner) out.partner += v; else out.opp += v;
@@ -130,6 +140,17 @@ function chooseBid(view, P = DEFAULT_PARAMS) {
   // Partner holds the bid: only push if our hand clearly adds value.
   if (partnerHolds) {
     const partnerSuit = b.high.suit;
+    // Partner's NS ("I hold none of X, I will cut it") is a prompt, not a no-trump contract they want:
+    // name our own leading suit (their cut on X helps it), otherwise go back to the suit they called
+    // before, otherwise to the suit we called before.
+    if (P.nsAnswer && b.high.ns && legal.minBid && b.high.value < P.backMaxValue) {
+      const ok = (s) => s && s !== 'NT' && s !== b.high.ns && legal.suits.includes(s);
+      const lead = options.find((o) => ok(o.suit) && hand.filter((c) => c.suit === o.suit).length >= P.altMinLen &&
+        hand.some((c) => c.suit === o.suit && (c.rank === 'J' || c.rank === '9')) && o.est >= legal.minBid + P.altMargin);
+      if (lead) return { type: 'bid', value: legal.minBid, suit: lead.suit };
+      const lastSuit = (s2) => [...b.actions].reverse().find((a) => a.seat === s2 && (a.type === 'bid' || a.type === 'plus') && a.suit !== 'NT');
+      for (const a of [lastSuit(b.high.seat), lastSuit(seat)]) if (a && ok(a.suit)) return { type: 'bid', value: legal.minBid, suit: a.suit };
+    }
     // Partner probed: the high bidder earlier named a different suit (their strong one) and is now
     // on a second suit to ask for information. If everyone passes they play the weak suit, so answer
     // once: go back to the first suit when we can support it, otherwise call no-trump when strong.

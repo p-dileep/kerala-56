@@ -4,7 +4,7 @@
  * Candidate params play one team against baseline params on the other, then the same deals
  * are replayed with the teams swapped so luck cancels. Score = mean tables gained per match.
  *
- *   node test/tune.js [rounds=6] [matchesPerEval=60]
+ *   node test/tune.js [rounds=6] [matchesPerEval=60] [keys=all, comma-separated]
  */
 const E = require('../src/engine'); const B = require('../src/bot');
 
@@ -20,6 +20,9 @@ function rngFrom(seed) {               // mulberry32
 // Tables gained by team `candTeam` (playing with cand params) over one match from seed.
 function playMatch(seed, cand, base, candTeam) {
   const rng = rngFrom(seed);
+  // The bot's Monte Carlo layouts use Math.random: seed it too, so candidate and baseline
+  // are compared on the same random layouts as well as the same deals.
+  Math.random = rngFrom(seed ^ 0x9e3779b9);
   const s = E.newMatch({}, rng);
   let guard = 0;
   while (s.phase !== 'matchover' && guard++ < 200000) {
@@ -48,17 +51,18 @@ const STEPS = {
   nsMaxValue: 2, nsMargin: 1,
   bidContestMargin: 1, jumpEst: 2, jumpGap: 2,
   doubleMinValue: 2, doubleMinPts: 1,
-  cutMinPts: 1, fightMinPts: 1
+  cutMinPts: 1, fightMinPts: 1,
+  readJackW: 0.5, readNineW: 0.5, readLenW: 0.5, readPassW: 0.5, plusSlack: 1, simMinValue: 1
 };
 
-function tune(rounds, matches, minGain = 0.15) {
+function tune(rounds, matches, keys = Object.keys(STEPS), minGain = 0.15) {
   let best = { ...B.DEFAULT_PARAMS };
   const base = { ...B.DEFAULT_PARAMS };
   console.log('self-play sanity (should be ~0):', score(best, base, matches).toFixed(3));
   for (let r = 0; r < rounds; r++) {
     let improved = false;
     const seed0 = 1000 * (r + 1);
-    for (const k of Object.keys(STEPS)) {
+    for (const k of keys) {
       const cur = score(best, base, matches, seed0);
       for (const dir of [1, -1]) {
         const cand = { ...best, [k]: +(best[k] + dir * STEPS[k]).toFixed(3) };
@@ -80,8 +84,9 @@ function tune(rounds, matches, minGain = 0.15) {
 
 if (require.main === module) {
   const rounds = Number(process.argv[2] || 6), matches = Number(process.argv[3] || 60);
+  const keys = process.argv[4] ? process.argv[4].split(',') : undefined;
   const t0 = Date.now();
-  tune(rounds, matches);
+  tune(rounds, matches, keys);
   console.log(`took ${((Date.now() - t0) / 1000).toFixed(0)}s`);
 }
 module.exports = { score, playMatch, rngFrom };

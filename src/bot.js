@@ -38,7 +38,19 @@ const DEFAULT_PARAMS = {
   // from what the auction revealed (0 = heuristics only), confidence required, slack below the target
   simDeals: 24, simConf: 0.75, simMargin: 1, simContest: 1,
   // probe: holding one suit, name a second one cheaply so partner can choose (back to the first / NT)
-  probeMaxValue: 31, probeMinLen: 3, probeSlack: 2
+  probeMaxValue: 31, probeMinLen: 3, probeSlack: 2,
+  // reading the other seats' calls (auctionRead): a shown Jack / Nine of the suit, each call in the
+  // suit (length, up to two), and a partner who has only passed. Partners add, opponents subtract.
+  readJackW: 2, readNineW: 1, readLenW: 1, readPassW: 1,
+  // Plus 1 only when the team can still stand the raised contract (estimate within this slack)
+  plusSlack: 2,
+  // contested bids from this value up are checked by the Monte Carlo layout (which honours the auction)
+  simMinValue: 32,
+  // play: place the cards the auction showed (Jacks, Plus cards) with their seat until played (1 = on)
+  trackBids: 1,
+  // play: the bidding side draws trumps when it holds at least this many and at least as many as
+  // the opponents can still have (99 = off)
+  drawMinTrumps: 3
 };
 
 // Behaviour presets: overrides on DEFAULT_PARAMS. 'medium' is the tuned default.
@@ -78,6 +90,28 @@ function estimateFor(hand, suit, P = DEFAULT_PARAMS, players = 6) {
   return Math.round(est);
 }
 
+// What the other seats' calls have shown about `suit` (public information only), in estimate points.
+// estimateFor assumes average partners and opponents; this moves the estimate by what the auction
+// revealed: shown Jacks / Nines (Jack-signal bids, Plus cards), repeated calls in the suit (length),
+// and a partner who has only passed (a weak hand). Returns { partner, opp }: add partner, subtract opp.
+function auctionRead(view, suit, P) {
+  const out = { partner: 0, opp: 0 };
+  if (suit === 'NT') return out;
+  const me = view.mySeat, N = view.players || 6;
+  const facts = inferFacts(view);
+  for (let s = 0; s < N; s++) {
+    if (s === me) continue;
+    const acts = view.bidding.actions.filter((a) => a.seat === s);
+    let v = facts.must[s].filter((rs) => rs === 'J' + suit).length * P.readJackW +
+      facts.must[s].filter((rs) => rs === '9' + suit).length * P.readNineW +
+      Math.min(2, acts.filter((a) => (a.type === 'bid' || a.type === 'plus') && a.suit === suit).length) * P.readLenW;
+    const partner = E.team(s) === E.team(me);
+    if (partner && acts.length && acts.every((a) => a.type === 'pass')) v -= P.readPassW;
+    if (partner) out.partner += v; else out.opp += v;
+  }
+  return out;
+}
+
 function chooseBid(view, P = DEFAULT_PARAMS) {
   const legal = view.legal.bid;
   const hand = view.hand;
@@ -85,7 +119,10 @@ function chooseBid(view, P = DEFAULT_PARAMS) {
   const seat = view.mySeat;
   const N = view.players || 6;
   const estimate = (h, s, PP) => estimateFor(h, s, PP, N);
-  const options = [...legal.suits].map((s) => ({ suit: s, est: estimate(hand, s, P) }))
+  const read = (s) => auctionRead(view, s, P);
+  // own hand plus what partners and opponents have shown in the suit
+  const teamAware = (s) => { const r = read(s); return estimate(hand, s, P) + r.partner - r.opp; };
+  const options = [...legal.suits].map((s) => ({ suit: s, est: teamAware(s) }))
     .sort((a, b2) => b2.est - a.est);
   const best = options[0];
 
@@ -116,7 +153,10 @@ function chooseBid(view, P = DEFAULT_PARAMS) {
     const saidPlus = b.actions.some((a) => a.type === 'plus' && a.seat === seat && a.suit === partnerSuit);
     if (legal.plus.length && !saidPlus && b.high.value < P.plusMaxValue) {
       const support = estimate(hand, partnerSuit, P);
-      if (legal.plus.includes(1)) return { type: 'plus', n: 1 };
+      // Plus 1 raises the team's contract by one and makes us declarer if everyone passes:
+      // say it only when the team, as the auction shows it, can still stand the higher value.
+      const teamPlus = b.high.value + (support - P.estBase) - read(partnerSuit).opp;
+      if (legal.plus.includes(1) && teamPlus >= b.high.value + 1 - P.plusSlack) return { type: 'plus', n: 1 };
       // Plus 2 (two Jacks, or Jack+Nine after a Plus 1) / Plus 3 (Jack+Nine): say the lowest that applies
       const n = legal.plus.find((k) => k >= 2);
       if (n && support >= b.high.value + P.plus2Margin) return { type: 'plus', n };
@@ -138,7 +178,8 @@ function chooseBid(view, P = DEFAULT_PARAMS) {
       const support = estimate(hand, partnerSuit, P);
       // Levels pay more tables: 40+ = 2, 48+ = 3. Partner's bid is their estimate assuming an average
       // partner; add how much our hand exceeds average and go straight to the highest level reached.
-      const teamEst = b.high.value + (support - P.estBase);
+      // Opponents' shown cards and calls in this suit are working against the team.
+      const teamEst = b.high.value + (support - P.estBase) - read(partnerSuit).opp;
       let level = [56, 48, 40].find((L) => L > b.high.value && teamEst >= L + P.levelMargin);
       // With the auction's facts (shown Jacks, Plus cards, voids) laid out, see how many points the
       // team really collects and go to the highest level that holds up; this also overrules the guess.
@@ -164,7 +205,8 @@ function chooseBid(view, P = DEFAULT_PARAMS) {
   // Opponents hold the bid but a partner named a suit: a cheap Plus 1 (top remaining card) keeps the
   // partnership informed; say it once per suit.
   if (legal.plus.includes(1) && b.high && !partnerHolds && b.high.value < P.plusMaxValue &&
-      !b.actions.some((a) => a.type === 'plus' && a.seat === seat && a.suit === legal.plusSuit))
+      !b.actions.some((a) => a.type === 'plus' && a.seat === seat && a.suit === legal.plusSuit) &&
+      teamAware(legal.plusSuit) >= b.high.value + 1 - P.plusSlack)
     return { type: 'plus', n: 1 };
   // NS convention: opponents hold a suit bid and we are void in it. Tell the partnership only
   // when it is worth the raise: a partner has already named a suit we can support (so the void
@@ -206,8 +248,9 @@ function chooseBid(view, P = DEFAULT_PARAMS) {
     // Bid economically: just the minimum, but jump to a level when strong and contested.
     let value = legal.minBid;
     if (b.high && best.est >= P.jumpEst && value < 40 && best.est - value > P.jumpGap) value = 40;
-    // A contested bid at 36 or more is checked by laying the hand out: bid only what holds up.
-    if (P.simDeals && P.simContest && b.high && value >= 36) {
+    // A contested bid at simMinValue or more is checked by laying the hand out (consistent with what
+    // the auction showed): bid only what holds up.
+    if (P.simDeals && P.simContest && b.high && value >= P.simMinValue) {
       const q = simPoints(view, best.suit, P);
       if (q !== null) {
         if (q < value + P.simMargin) return legal.pass ? { type: 'pass' } : { type: 'bid', value, suit: best.suit };
@@ -347,10 +390,12 @@ const isMaster = (card, view) => unseenHigher(card, view) === 0;
 
 // ---------------------------------------------------------------- card tracking
 // Everything here is public information: cards played (and who failed to follow suit),
-// plus what the bidding conventions revealed (NS = void in a suit).
-function track(view) {
+// plus what the bidding conventions revealed (NS = void in a suit; with trackBids, the Jacks and
+// Plus cards each seat showed, and a Plus 1 on the Jack = that seat's only card in the suit).
+function track(view, P = DEFAULT_PARAMS) {
   const trump = view.contract.suit === 'NT' ? null : view.contract.suit;
-  const voids = Array.from({ length: view.players || 6 }, () => new Set());
+  const N = view.players || 6, me = view.mySeat;
+  const voids = Array.from({ length: N }, () => new Set());
   const byTrick = new Map();
   for (const p of view.played || []) {
     if (!byTrick.has(p.trick)) byTrick.set(p.trick, []);
@@ -372,14 +417,34 @@ function track(view) {
     return n;
   };
   const trumpOutside = trump ? outside(trump) : 0;
-  // Can any of `seats` still beat `card` when `led` is the suit led?
+  // Cards the auction placed with a seat that it has not played yet ("J" + suit, "9" + suit, ...)
+  const held = Array.from({ length: N }, () => []);
+  if (P.trackBids) {
+    const facts = inferFacts(view);
+    for (let s = 0; s < N; s++) {
+      if (s === me) continue;
+      const played = (view.played || []).filter((p) => p.seat === s).map((p) => p.card.rank + p.card.suit);
+      for (const rs of facts.must[s]) {
+        const i = played.indexOf(rs);
+        if (i >= 0) played.splice(i, 1); else held[s].push(rs);
+      }
+      for (const suit of facts.lone[s]) if (!held[s].includes('J' + suit)) voids[s].add(suit);
+    }
+  }
+  const partners = [];
+  for (let s = 0; s < N; s++) if (s !== me && E.team(s) === E.team(me)) partners.push(s);
+  // unseen cards of `suit` above `minPow` that a partner is not known to hold (what opponents may have)
+  const oppOutside = (suit, minPow = -1) => outside(suit, minPow) -
+    partners.reduce((n, p) => n + held[p].filter((rs) => rs.slice(-1) === suit && E.RANK_POWER[rs.slice(0, -1)] > minPow).length, 0);
+  const oppTrumps = trump ? oppOutside(trump) : 0;
+  // Can any of the opponents `seats` still beat `card` when `led` is the suit led?
   const canBeat = (card, led, seats) => seats.some((o) => {
-    if (trump && card.suit === trump) return !voids[o].has(trump) && outside(trump, pow(card)) > 0;
-    const follow = !voids[o].has(led) && card.suit === led && outside(led, pow(card)) > 0;
-    const cut = trump && voids[o].has(led) && !voids[o].has(trump) && trumpOutside > 0;
+    if (trump && card.suit === trump) return !voids[o].has(trump) && oppOutside(trump, pow(card)) > 0;
+    const follow = !voids[o].has(led) && card.suit === led && oppOutside(led, pow(card)) > 0;
+    const cut = trump && voids[o].has(led) && !voids[o].has(trump) && oppTrumps > 0;
     return follow || cut;
   });
-  return { trump, voids, outside, trumpOutside, canBeat };
+  return { trump, voids, outside, trumpOutside, oppTrumps, held, canBeat };
 }
 
 function lowest(cards) {
@@ -406,11 +471,13 @@ function choosePlay(view, P = DEFAULT_PARAMS) {
   const myTeam = E.team(seat);
   const bidding = view.contract.team === myTeam;
   const cards = view.trick.cards;
-  const T = P.useTracking ? track(view) : null;
-  const opps = [0, 1, 2, 3, 4, 5].filter((s2) => E.team(s2) !== myTeam);
-  const partners = [0, 1, 2, 3, 4, 5].filter((s2) => s2 !== seat && E.team(s2) === myTeam);
+  const T = P.useTracking ? track(view, P) : null;
+  const N = view.players || 6;
+  const seats = Array.from({ length: N }, (_, s2) => s2);
+  const opps = seats.filter((s2) => E.team(s2) !== myTeam);
+  const partners = seats.filter((s2) => s2 !== seat && E.team(s2) === myTeam);
   // an opponent is void in this suit and trumps remain: a point-bearing lead may be cut
-  const cutThreat = (suit) => !!T && !!trump && suit !== trump && T.trumpOutside > 0 &&
+  const cutThreat = (suit) => !!T && !!trump && suit !== trump && T.oppTrumps > 0 &&
     opps.some((o) => T.voids[o].has(suit) && !T.voids[o].has(trump));
 
   // ---- leading
@@ -426,6 +493,12 @@ function choosePlay(view, P = DEFAULT_PARAMS) {
           !(view.played || []).some((x) => x.card.suit === trump && x.card.rank === 'J' && E.team(x.seat) === myTeam && x.seat !== seat);
         if (partnerJack) return lowest(trumps).id;
         return top.id;
+      }
+      // Draw trumps: we hold at least as many as the opponents can still have, so lead a low one
+      // and pull theirs before they can cut our winners (our higher trumps stay for later).
+      if (T && trumps.length >= P.drawMinTrumps) {
+        const oppTr = opps.every((o) => T.voids[o].has(trump)) ? 0 : T.oppTrumps;
+        if (oppTr > 0 && trumps.length >= oppTr) return lowest(trumps).id;
       }
     }
     const masters = legal.filter((c) => c.suit !== trump && isMaster(c, view))
@@ -454,7 +527,6 @@ function choosePlay(view, P = DEFAULT_PARAMS) {
   const wi = E.winningIndex(cards, trump);
   const winCard = cards[wi].card;
   const partnerWinning = E.team(cards[wi].seat) === myTeam;
-  const N = view.players || 6;
   const last = cards.length === N - 1;
   const trickPts = cards.reduce((s, x) => s + pts(x.card), 0);
   const following = legal[0].suit === led;

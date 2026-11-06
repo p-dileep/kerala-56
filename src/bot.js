@@ -55,6 +55,9 @@ const DEFAULT_PARAMS = {
   // play: the bidding side draws trumps when it holds at least this many and at least as many as
   // the opponents can still have (99 = off)
   drawMinTrumps: 3,
+  // going back to a probing partner's first suit (1 = checked): not after a support bid, not into a
+  // partner's NS suit, team-aware estimate within backSlack of the value, Monte Carlo from simMinValue
+  backCheck: 1, backSlack: 2,
   // play: a partner holds the trick but an opponent still to play could beat it; take it with my
   // cheapest sure winner when the trick holds at least this many points (99 = off: duck as before)
   coverMinPts: 99,
@@ -164,11 +167,28 @@ function chooseBid(view, P = DEFAULT_PARAMS) {
     const firstSuit = own.length ? own[0].suit : null;
     const probeIdx = own.length ? b.actions.indexOf(own[own.length - 1]) : -1;
     const answered = b.actions.some((a, i) => i > probeIdx && a.seat === seat && a.type !== 'pass');
-    if (legal.minBid && firstSuit && firstSuit !== partnerSuit && !answered && b.high.value < P.backMaxValue) {
+    // Not a probe when a teammate had already called the high bidder's new suit: that bid supports them.
+    const supportBid = P.backCheck && b.actions.some((a, i) => i < probeIdx && a.seat !== hb &&
+      E.team(a.seat) === E.team(seat) && (a.type === 'bid' || a.type === 'plus') && a.suit === partnerSuit);
+    if (legal.minBid && firstSuit && firstSuit !== partnerSuit && !answered && !supportBid && b.high.value < P.backMaxValue) {
       const inFirst = hand.filter((c) => c.suit === firstSuit);
       const power = inFirst.some((c) => c.rank === 'J' || c.rank === '9');
       const estFirst = estimate(hand, firstSuit, P), estProbe = estimate(hand, partnerSuit, P);
-      if (legal.suits.includes(firstSuit) && (inFirst.length >= 2 || power) && estFirst >= estProbe + P.backGap)
+      // Going back must still be a contract the team can make: no partner has said NS in that suit, the
+      // auction-aware estimate is near the value, and from simMinValue up the Monte Carlo layout agrees.
+      const backHolds = () => {
+        if (!P.backCheck) return true;
+        const facts = inferFacts(view);
+        if (Array.from({ length: N }, (_, x) => x).some((x) => x !== seat && E.team(x) === E.team(seat) &&
+          [...facts.voids[x]].includes(firstSuit))) return false;
+        if (teamAware(firstSuit) < legal.minBid - P.backSlack) return false;
+        if (P.simDeals && legal.minBid >= P.simMinValue) {
+          const q = simPoints(view, firstSuit, P);
+          if (q !== null && q < legal.minBid + P.simMargin) return false;
+        }
+        return true;
+      };
+      if (legal.suits.includes(firstSuit) && (inFirst.length >= 2 || power) && estFirst >= estProbe + P.backGap && backHolds())
         return { type: 'bid', value: legal.minBid, suit: firstSuit };
       const estNt = estimate(hand, 'NT', P);
       if (legal.suits.includes('NT') && estNt >= legal.minBid + P.backNtMargin && estNt >= estProbe + P.backGap)

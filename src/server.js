@@ -250,19 +250,20 @@ io.on('connection', (socket) => {
     socket.emit('lobby', lobbyInfo());
   });
 
-  socket.on('createRoom', ({ name, players } = {}) => {
+  socket.on('createRoom', ({ name, players, team } = {}) => {
     if (!socket.data.token) return fail('Not ready');
     if (!clean(name)) return fail('Please type your name first.');
     const room = createRoom(socket.data.token, Number(players) === 8 ? 8 : 6);
     socket.data.name = clean(name);
-    room.seats[0] = { kind: 'human', name: clean(name) || 'Host', token: socket.data.token, socketId: socket.id, connected: true };
+    const hostSeat = Number(team) === 1 ? 1 : 0;       // seat parity is the team (even = A, odd = B)
+    room.seats[hostSeat] = { kind: 'human', name: clean(name) || 'Host', token: socket.data.token, socketId: socket.id, connected: true };
     socket.join(room.code);
     socket.data.room = room.code;
-    sysChat(room, `${room.seats[0].name} created the table.`);
+    sysChat(room, `${room.seats[hostSeat].name} created the table.`);
     broadcast(room);
   });
 
-  socket.on('joinRoom', ({ code, name } = {}) => {
+  socket.on('joinRoom', ({ code, name, team } = {}) => {
     if (!socket.data.token) return fail('Not ready');
     const room = rooms.get(String(code || '').toUpperCase().trim());
     if (!room) return fail('Room not found. Check the code.');
@@ -276,8 +277,11 @@ io.on('connection', (socket) => {
       Object.assign(room.seats[seat], { socketId: socket.id, connected: true });
       delete room.awaySince[seat];
       if (name) room.seats[seat].name = clean(name) || room.seats[seat].name;
-    } else if (!room.game) {                           // auto-sit in first empty seat
-      seat = room.seats.findIndex((s) => s.kind === 'empty');
+    } else if (!room.game) {                           // auto-sit: first empty seat on the chosen team, else any
+      const want = team === 0 || team === 1 ? team : null;
+      if (want !== null) seat = room.seats.findIndex((s, i) => s.kind === 'empty' && E.team(i) === want);
+      if (seat < 0) seat = room.seats.findIndex((s) => s.kind === 'empty');
+      if (want !== null && seat >= 0 && E.team(seat) !== want) fail(`${room.teamNames[want]} is full, so you are on ${room.teamNames[1 - want]}.`);
       if (seat >= 0) {
         room.seats[seat] = { kind: 'human', name: clean(name) || `Player ${seat + 1}`, token: socket.data.token, socketId: socket.id, connected: true };
         sysChat(room, `${room.seats[seat].name} joined.`);

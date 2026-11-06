@@ -50,12 +50,33 @@
     if (n) store.set('g56name', n);
     return n;
   };
+  // Team choice, asked after Start / Join: '' = any, 0 = Team A (even seats), 1 = Team B (odd seats).
+  // The last choice is remembered and highlighted. Applies only when you first sit.
+  const pickTeam = (title, send) => {
+    const last = store.get('g56team', '');
+    const opt = (v, label) => `<button class="btn${v === last ? ' primary' : ''}" data-team="${v}">${label}</button>`;
+    openModal(`<h2>${esc(title)}</h2>
+      <p class="sub">Which team do you want to sit on? If it is full you get a seat on the other team.</p>
+      <div class="row team-pick">${opt('0', 'Team A')}${opt('1', 'Team B')}${opt('', 'Any team')}</div>
+      <div class="row"><button class="btn ghost" data-close>Cancel</button></div>`, true);
+    $('modalBody').querySelectorAll('[data-team]').forEach((b) => (b.onclick = () => {
+      store.set('g56team', b.dataset.team);
+      closeModal();
+      send(b.dataset.team === '' ? null : Number(b.dataset.team));
+    }));
+  };
   const initialCode = new URLSearchParams(location.search).get('room');
   if (initialCode) $('codeInput').value = initialCode.toUpperCase();
 
   const needName = () => { if (myName()) return true; toast('Please type your name first.'); $('nameInput').focus(); return false; };
-  $('createBtn').onclick = () => { if (needName()) socket.emit('createRoom', { name: myName(), players: Number($('newPlayers').value) }); };
-  document.querySelectorAll('[data-fixed]').forEach((b) => (b.onclick = () => { if (needName()) socket.emit('joinRoom', { code: b.dataset.fixed, name: myName() }); }));
+  $('createBtn').onclick = () => {
+    if (!needName()) return;
+    const players = Number($('newPlayers').value);
+    pickTeam(`New ${players}-player table`, (team) => socket.emit('createRoom', { name: myName(), players, team }));
+  };
+  document.querySelectorAll('[data-fixed]').forEach((b) => (b.onclick = () => {
+    if (needName()) pickTeam(`${b.dataset.fixed === 'TABLE8' ? '8' : '6'}-player table`, (team) => socket.emit('joinRoom', { code: b.dataset.fixed, name: myName(), team }));
+  }));
   socket.on('lobby', (tables) => tables.forEach((t) => {
     const el = $(t.players === 8 ? 'info8' : 'info6'); if (!el) return;
     if (t.seated) el.innerHTML = `<span class="live">LIVE</span> ${t.seated} seated${t.watching ? `, ${t.watching} watching` : ''}${t.playing ? ', playing' : ''}`;
@@ -66,7 +87,7 @@
   $('joinBtn').onclick = () => {
     const code = $('codeInput').value.trim().toUpperCase();
     if (code.length < 5) return toast('Enter the table code.');
-    if (needName()) socket.emit('joinRoom', { code, name: myName() });
+    if (needName()) pickTeam(`Table ${code}`, (team) => socket.emit('joinRoom', { code, name: myName(), team }));
   };
   $('codeInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('joinBtn').click(); });
 
@@ -191,6 +212,13 @@
   const seatPos = () => N() === 8 ? (narrow() ? SEAT_POS8_NARROW : SEAT_POS8) : (narrow() ? SEAT_POS_NARROW : SEAT_POS);
   const trickPos = () => (N() === 8 ? TRICK_POS8 : TRICK_POS);
   // hasJack=false renders suit-first ("Hearts 30"): the caller lacks the Jack of that suit.
+  // Bid-panel button: the suit name sits next to its sign, keeping the Jack order ("31 Spade ♠" / "Spade ♠ 31").
+  const SUIT_ONE = { S: 'Spade', H: 'Heart', D: 'Diamond', C: 'Club' };
+  function suitBtnText(v, s, hasJack) {
+    if (s === 'NT') return `${v} NT`;
+    const named = `<span class="sname">${SUIT_ONE[s]}</span> ${SYM[s]}`;
+    return hasJack ? `${v} ${named}` : `${named} ${v}`;
+  }
   function bidText(v, s, hasJack = true) { return s === 'NT' ? `${v} NT` : hasJack ? `${v} ${SYM[s]}` : `${SYM[s]} ${v}`; }
   // wrap suit symbols so hearts/diamonds show red and all suits a little larger
   function colourSuits(html) { return html.replace(/[♠♣]/g, '<span class="suit black">$&</span>').replace(/[♥♦]/g, '<span class="suit red">$&</span>'); }
@@ -527,7 +555,7 @@
       const power = g.hand.filter((c) => c.suit === s && (c.rank === 'J' || c.rank === '9')).map((c) => c.rank).sort().reverse();
       const hasJ = power.includes('J');
       return `<button class="btn ${RED.has(s) ? 'red' : ''}" data-suit="${s}" ${ok ? '' : 'disabled'}
-        title="${ok ? `Bid ${bidVal} ${SUIT_NAME[s]}${hasJ ? '' : s === 'NT' ? '' : ' (suit first: you hold no Jack of it)'}` : `You hold no ${SUIT_NAME[s]}`}">${bidText(bidVal, s, s === 'NT' || hasJ)}${power.length ? `<span class="tag">${power.join(' ')}</span>` : ''}</button>`;
+        title="${ok ? `Bid ${bidVal} ${SUIT_NAME[s]}${hasJ ? '' : s === 'NT' ? '' : ' (suit first: you hold no Jack of it)'}` : `You hold no ${SUIT_NAME[s]}`}">${suitBtnText(bidVal, s, hasJ)}${power.length ? `<span class="tag">${power.join(' ')}</span>` : ''}</button>`;
     }).join('');
     $('suitBtns').querySelectorAll('[data-suit]').forEach((b) => (b.onclick = () => socket.emit('bid', { type: 'bid', value: bidVal, suit: b.dataset.suit })));
     const pm = L.plusMeaning || {};

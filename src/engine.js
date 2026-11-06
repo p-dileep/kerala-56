@@ -142,6 +142,12 @@ function plusMeaning(actions, suit) {
   return meaning();
 }
 
+// Has this seat or a partner already shown a Jack of `suit` (Jack-signal bid, or a Plus that claimed a Jack)?
+function teamShowedJack(actions, suit, seat) {
+  return actions.some((a, i) => a.suit === suit && team(a.seat) === team(seat) &&
+    ((a.type === 'bid' && a.hasJack) || (a.type === 'plus' && (plusMeaning(actions.slice(0, i), suit)[a.n] || []).includes('J'))));
+}
+
 function legalBidActions(state, seat) {
   const out = { pass: false, double: false, redouble: false, minBid: null, suits: [], plus: [], plusMeaning: {}, plusOpen: [], ns: [], keep: false, raiseLevels: [] };
   const b = state.bidding;
@@ -180,7 +186,8 @@ function legalBidActions(state, seat) {
   }
   // Plus convention: only a partner of the high bidder may say "Plus N" (raise by N in that suit).
   // Meanings are relative to the cards the auction has already revealed in that suit (see plusMeaning):
-  // Plus 1 = a lone Jack and nothing else in the suit.
+  // Plus 1 = a lone Jack and nothing else in the suit; once this player or a partner has already shown a Jack
+  // in the suit, Plus 1 = the other Jack, and the rest of the suit stays private (their choice).
   // Plus 2 = the top two remaining cards (fresh suit: both Jacks; after a Plus 1 or Jack signal: the other Jack and a Nine; ...).
   // Plus 3 = the top three remaining cards (fresh suit: both Jacks and a Nine).
   // Plus is said in the partnership's suit: the standing bid when a partner holds it, otherwise the
@@ -210,7 +217,7 @@ function legalBidActions(state, seat) {
     const room = MAX_BID - b.high.value;
     const m = plusMeaning(b.actions, suit);
     out.plusMeaning = m;
-    if (room >= 1 && m[1] && holds(m[1]) && (m[1][0] !== 'J' || inSuit.length === 1)) out.plus.push(1);
+    if (room >= 1 && m[1] && holds(m[1]) && (m[1][0] !== 'J' || inSuit.length === 1 || teamShowedJack(b.actions, suit, seat))) out.plus.push(1);
     if (room >= 2 && m[2] && holds(m[2])) out.plus.push(2);
     if (room >= 3 && m[3] && holds(m[3])) out.plus.push(3);
   }
@@ -239,7 +246,7 @@ function legalBidActions(state, seat) {
       const holds = (ranks) => RANKS.every((r) => count(r) >= ranks.filter((x) => x === r).length);
       const ok = (n) => base + n >= out.minBid && base + n <= MAX_BID;
       const m = plusMeaning(b.actions, suit);
-      if (ok(1) && m[1] && holds(m[1]) && (m[1][0] !== 'J' || inSuit.length === 1)) out.plusOpen.push({ n: 1, suit, cards: m[1] });
+      if (ok(1) && m[1] && holds(m[1]) && (m[1][0] !== 'J' || inSuit.length === 1 || teamShowedJack(b.actions, suit, seat))) out.plusOpen.push({ n: 1, suit, cards: m[1] });
       if (ok(2) && m[2] && holds(m[2])) out.plusOpen.push({ n: 2, suit, cards: m[2] });
       if (ok(3) && m[3] && holds(m[3])) out.plusOpen.push({ n: 3, suit, cards: m[3] });
     }

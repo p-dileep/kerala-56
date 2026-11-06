@@ -101,7 +101,8 @@ assert.throws(()=>E.applyBid(s, s.turn, {type:'pass'}), /Opener/);
   const p = t.turn; const h = t.hands[p];
   const inSuit = h.filter((c)=>c.suit===suit), js = inSuit.filter((c)=>c.rank==='J').length, ns9 = inSuit.filter((c)=>c.rank==='9').length;
   const plus = E.legalBidActions(t, p).plus;
-  assert.equal(plus.includes(1), inSuit.length===1 && js===1);
+  const openerJ = t.bidding.actions[0].hasJack;   // a partner's shown Jack lifts the lone-Jack rule for Plus 1
+  assert.equal(plus.includes(1), js>=1 && (inSuit.length===1 || openerJ));
   assert.equal(plus.includes(2), js===2);
   assert.equal(plus.includes(3), js===2 && ns9>=1);
   if (plus.length) { const n = plus[0]; E.applyBid(t, p, {type:'plus', n}); assert.equal(t.bidding.high.value, 28+n); assert.equal(t.bidding.high.suit, suit); assert.equal(t.bidding.high.seat, p); }
@@ -119,9 +120,9 @@ assert.throws(()=>E.applyBid(s, s.turn, {type:'pass'}), /Opener/);
   u.hands[q] = [...others.slice(0,7), J(8)];
   assert.deepEqual(E.legalBidActions(u, q).plus, [1]);
   u.hands[q] = [...others.slice(0,6), J(8), N(8)];
-  assert.deepEqual(E.legalBidActions(u, q).plus, openerHasJ ? [2] : []);
+  assert.deepEqual(E.legalBidActions(u, q).plus, openerHasJ ? [1, 2] : []);
   u.hands[q] = [...others.slice(0,6), J(8), J(9)];
-  assert.deepEqual(E.legalBidActions(u, q).plus, openerHasJ ? [] : [2]);
+  assert.deepEqual(E.legalBidActions(u, q).plus, openerHasJ ? [1] : [2]);
   assert.throws(()=>E.applyBid(u, q, {type:'plus', n:4}), /Plus/);
   // pure ladder check: after both Jacks and both Nines are shown, Plus 2 means two Aces
   const acts = [{seat:0,type:'bid',value:28,suit:'H',hasJack:false},{seat:2,type:'plus',n:2,suit:'H'},{seat:4,type:'plus',n:2,suit:'H'}];
@@ -210,6 +211,36 @@ assert.throws(()=>E.applyBid(s, s.turn, {type:'pass'}), /Opener/);
     assert.deepEqual(L.plus, [1]); assert.deepEqual(L.plusMeaning[1], ['9']);
     s.hands[op] = s.hands[op].filter((c)=>c.id!=='9H0').concat([{id:'AH0',suit:'H',rank:'A'}]);
     assert.deepEqual(E.legalBidActions(s, op).plus, []); }               // only the shown Jack left: nothing new to claim
+  // a player who already showed a Jack may say Plus 1 for the second Jack while also holding a 9 (Plus 2 stays offered)
+  { const s = E.newMatch({}, ()=>0.3); const op = s.turn;
+    s.hands[op] = [{id:'JS0',suit:'S',rank:'J'},{id:'JS1',suit:'S',rank:'J'},{id:'9S0',suit:'S',rank:'9'},{id:'JH0',suit:'H',rank:'J'},{id:'JC0',suit:'C',rank:'J'},{id:'JC1',suit:'C',rank:'J'},{id:'AD0',suit:'D',rank:'A'},{id:'10D0',suit:'D',rank:'10'}];
+    E.applyBid(s, op, { type: 'bid', value: 28, suit: 'S' });            // shows one Jack
+    while (s.turn !== op) E.applyBid(s, s.turn, s.turn === (op + 1) % 6 ? { type: 'bid', value: 29, suit: 'H' } : { type: 'pass' });
+    const L = E.legalBidActions(s, op);
+    assert.ok(L.plusOpen.some((o)=>o.suit==='S' && o.n===1 && o.cards[0]==='J'));
+    assert.ok(L.plusOpen.some((o)=>o.suit==='S' && o.n===2));
+    E.applyBid(s, op, { type: 'plus', n: 1, suit: 'S' });
+    const f = B.inferFacts(E.getView(s, (op + 1) % 6));
+    assert.ok(!f.lone[op].has('S'));                                     // second Jack, not a lone Jack
+    // without the earlier Jack signal, Plus 1 on the Jack still needs a lone Jack
+    const t = E.newMatch({}, ()=>0.3); const o2 = t.turn;
+    t.hands[o2] = s.hands[op].slice();
+    assert.ok(!E.legalBidActions(t, o2).plusOpen.some((o)=>o.suit==='S' && o.n===1));
+    // after a partner's Jack signal, Plus 1 = the other Jack even with more cards in the suit
+    const w = E.newMatch({}, ()=>0.3); const pa = w.turn;
+    w.hands[pa] = [{id:'JS0',suit:'S',rank:'J'},{id:'AS0',suit:'S',rank:'A'},{id:'KS0',suit:'S',rank:'K'},{id:'AH0',suit:'H',rank:'A'},{id:'KH0',suit:'H',rank:'K'},{id:'AC0',suit:'C',rank:'A'},{id:'KC0',suit:'C',rank:'K'},{id:'AD0',suit:'D',rank:'A'}];
+    E.applyBid(w, pa, { type: 'bid', value: 28, suit: 'S' });           // partner shows a Jack
+    E.applyBid(w, w.turn, { type: 'pass' });
+    const me = w.turn; w.hands[me] = [{id:'JS1',suit:'S',rank:'J'},{id:'9S0',suit:'S',rank:'9'},{id:'10S0',suit:'S',rank:'10'},{id:'QH0',suit:'H',rank:'Q'},{id:'QC0',suit:'C',rank:'Q'},{id:'10C0',suit:'C',rank:'10'},{id:'QD0',suit:'D',rank:'Q'},{id:'KD0',suit:'D',rank:'K'}];
+    assert.deepEqual(E.legalBidActions(w, me).plus, [1, 2]);
+    E.applyBid(w, me, { type: 'plus', n: 1 });
+    assert.ok(!B.inferFacts(E.getView(w, (me + 1) % 6)).lone[me].has('S'));
+    // an opponent's Jack does not count: Plus 1 on the Jack still needs a lone Jack
+    const x = E.newMatch({}, ()=>0.3); const op3 = x.turn;
+    x.hands[op3] = w.hands[pa].slice();
+    E.applyBid(x, op3, { type: 'bid', value: 28, suit: 'S' });
+    const opp = x.turn; x.hands[opp] = w.hands[me].slice();
+    assert.ok(!E.legalBidActions(x, opp).plusOpen.some((o)=>o.suit==='S' && o.n===1)); }
   // probe: holding one suit against a cheap opponent bid, a two-suited hand names its second suit
   { const s = E.newMatch({}, ()=>0.3); const op = s.turn;
     s.hands[op] = [{id:'JS0',suit:'S',rank:'J'},{id:'9S0',suit:'S',rank:'9'},{id:'AS0',suit:'S',rank:'A'},{id:'JH0',suit:'H',rank:'J'},{id:'9H0',suit:'H',rank:'9'},{id:'KH0',suit:'H',rank:'K'},{id:'QC0',suit:'C',rank:'Q'},{id:'KD0',suit:'D',rank:'K'}];

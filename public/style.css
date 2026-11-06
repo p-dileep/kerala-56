@@ -245,7 +245,7 @@ button, input { font: inherit; }
 .suits { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
 .suits .btn { font-size: 1.15rem; padding: .55em 0 .4em; border-radius: 12px; }
 .suits .btn.red { color: var(--kumkum); }
-.suits .sname { font-size: .78em; font-weight: 600; }
+.suits .sname, .seat .said .sname { font-size: .78em; font-weight: 600; }
 .bid-actions { display: flex; gap: 8px; }
 .bid-actions .btn { flex: 1; }
 .bid-actions .btn.warn { flex: 0 0 auto; }

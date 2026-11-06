@@ -293,7 +293,8 @@ function chooseBid(view, P = DEFAULT_PARAMS) {
 /**
  * What the auction has told everyone about each seat's cards. Only public information:
  * a suit call made with the Jack signal shows one Jack; each Plus shows the cards it claimed
- * (a Plus 1 on the Jack means the Jack is that seat's only card in the suit); NS shows a void.
+ * (a Plus 1 on the Jack means the Jack is that seat's only card in the suit, unless that seat or a
+ * partner had already shown a Jack there: then it is just the other Jack); NS shows a void.
  * Returns { must: [[rank+suit...]], lone: [Set(suit)], voids: [Set(suit)] } per seat.
  */
 function inferFacts(view) {
@@ -311,8 +312,8 @@ function inferFacts(view) {
     }
     if (a.type === 'plus') {
       const m = E.plusMeaning(acts.slice(0, i), a.suit)[a.n] || [];
+      if (a.n === 1 && m[0] === 'J' && !must.some((cards, s) => s % 2 === a.seat % 2 && cards.includes(`J${a.suit}`))) lone[a.seat].add(a.suit);
       for (const r of m) must[a.seat].push(`${r}${a.suit}`);
-      if (a.n === 1 && m[0] === 'J') lone[a.seat].add(a.suit);
     }
   });
   return { must, lone, voids };

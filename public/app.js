@@ -212,7 +212,7 @@
   const seatPos = () => N() === 8 ? (narrow() ? SEAT_POS8_NARROW : SEAT_POS8) : (narrow() ? SEAT_POS_NARROW : SEAT_POS);
   const trickPos = () => (N() === 8 ? TRICK_POS8 : TRICK_POS);
   // hasJack=false renders suit-first ("Hearts 30"): the caller lacks the Jack of that suit.
-  // Bid-panel button: the suit name sits next to its sign, keeping the Jack order ("31 Spade ♠" / "Spade ♠ 31").
+  // Bid buttons and seat bubbles: the suit name sits next to its sign, keeping the Jack order ("31 Spade ♠" / "Spade ♠ 31"). Returns HTML.
   const SUIT_ONE = { S: 'Spade', H: 'Heart', D: 'Diamond', C: 'Club' };
   function suitBtnText(v, s, hasJack) {
     if (s === 'NT') return `${v} NT`;
@@ -227,6 +227,13 @@
     if (a.type === 'plus') return `Plus ${a.n} (${bidText(a.value, a.suit, a.hasJack)})`;
     if (a.type === 'ns') return `${a.value} NS (no ${SYM[a.ns]})`;
     return { pass: 'Pass', double: 'Double', redouble: 'Redouble' }[a.type];
+  }
+  // A seat's call bubble, as HTML with suit names (actionText stays plain for the history and chat).
+  function actionNamed(a) {
+    if (a.type === 'bid') return suitBtnText(a.value, a.suit, a.hasJack);
+    if (a.type === 'plus') return `Plus ${a.n} (${suitBtnText(a.value, a.suit, a.hasJack)})`;
+    if (a.type === 'ns') return `${a.value} NS (no <span class="sname">${SUIT_ONE[a.ns]}</span> ${SYM[a.ns]})`;
+    return actionText(a);
   }
   function cardHTML(c, extra = '') {
     return `<div class="card ${RED.has(c.suit) ? 'red' : ''} ${extra}" aria-label="${c.rank} of ${SUIT_NAME[c.suit]}">
@@ -338,10 +345,10 @@
         if (a.type === 'double' || a.type === 'redouble') k.push('dbl');
         if (a.suit && a.suit !== 'NT' && RED.has(a.suit)) k.push('red');
         if (g.bidding.high && g.bidding.high.seat === s.seat && a.type !== 'pass') k.push('high');
-        said = `<div class="said ${k.join(' ')}">${esc(actionText(a))}</div>`;
+        said = `<div class="said ${k.join(' ')}">${actionNamed(a)}</div>`;
       }
       else if (g && g.contract && g.contract.seat === s.seat && g.phase === 'playing')
-        said = `<div class="said ${RED.has(g.contract.suit) ? 'red' : ''}">${esc(bidText(g.contract.value, g.contract.suit, g.contract.hasJack))}</div>`;
+        said = `<div class="said ${RED.has(g.contract.suit) ? 'red' : ''}">${suitBtnText(g.contract.value, g.contract.suit, g.contract.hasJack)}</div>`;
 
       let body;
       if (s.kind === 'empty') {

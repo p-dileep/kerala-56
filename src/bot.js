@@ -54,7 +54,12 @@ const DEFAULT_PARAMS = {
   trackBids: 1,
   // play: the bidding side draws trumps when it holds at least this many and at least as many as
   // the opponents can still have (99 = off)
-  drawMinTrumps: 3
+  drawMinTrumps: 3,
+  // play: a partner holds the trick but an opponent still to play could beat it; take it with my
+  // cheapest sure winner when the trick holds at least this many points (99 = off: duck as before)
+  coverMinPts: 99,
+  // play: a partner led trump into the Jack of trump I showed in the auction: play that Jack (1 = on)
+  answerJackLead: 1
 };
 
 // Behaviour presets: overrides on DEFAULT_PARAMS. 'medium' is the tuned default.
@@ -570,6 +575,19 @@ function choosePlay(view, P = DEFAULT_PARAMS) {
   if (following) {
     if (partnerSafe) return highestPoints(spare(legal)).id;
     const winners = legal.filter((c) => beats(c, winCard, led, trump));
+    // partner's card is not safe: cover it with a card no opponent still to play can beat
+    if (partnerWinning && !partnerSafe) {
+      // the partner led trump into the Jack I showed in the auction: that lead is meant for this Jack
+      if (P.answerJackLead && trump && led === trump && E.team(cards[0].seat) === myTeam &&
+          inferFacts(view).must[seat].includes(`J${trump}`)) {
+        const jack = legal.find((c) => c.rank === 'J' && safeWin(c));
+        if (jack) return jack.id;
+      }
+      if (trickPts >= P.coverMinPts) {
+        const sure = winners.filter(safeWin).sort((a, b) => pow(a) - pow(b));
+        if (sure.length) return sure[0].id;
+      }
+    }
     if (!partnerWinning && winners.length) {
       const sure = winners.filter(safeWin).sort((a, b) => pow(a) - pow(b));
       if (sure.length) return (last ? highestPoints(sure) : sure[0]).id;

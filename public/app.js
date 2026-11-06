@@ -451,7 +451,7 @@
       const pulse = h && hk !== lastHighKey ? ' pulse' : '';
       lastHighKey = hk;
       c.innerHTML = h
-        ? `<div class="bidval${pulse}">${colourSuits(esc(bidText(h.value, h.suit, h.hasJack)))}</div>
+        ? `<div class="bidval${pulse}">${colourSuits(suitBtnText(h.value, h.suit, h.hasJack))}</div>
            <div class="sub"><span class="who t${h.seat % 2}">${esc(nameOf(h.seat))}</span> ${dbl}</div>
            <div class="sub wait">${waiting}</div>`
         : `<div class="sub">Hand ${g.handNo}</div><div class="sub wait">${waiting}</div>`;
@@ -460,7 +460,7 @@
     if (g.phase === 'selfraise') {
       const h = g.bidding.high;
       const who = g.turn === room.mySeat ? 'You' : `<span class="who t${g.turn % 2}">${esc(nameOf(g.turn))}</span>`;
-      c.innerHTML = `<div class="bidval">${colourSuits(esc(bidText(h.value, h.suit, h.hasJack)))}</div>
+      c.innerHTML = `<div class="bidval">${colourSuits(suitBtnText(h.value, h.suit, h.hasJack))}</div>
         <div class="sub wait">${who} won the bid${g.bidding.doubled ? ' (doubled)' : ''} — ${g.turn === room.mySeat ? (g.bidding.doubled ? 'keep it, raise, or change suit' : 'keep it or raise to a higher tier') : (g.bidding.doubled ? 'deciding whether to keep, raise or change suit' : 'deciding whether to raise')}</div>`;
       return;
     }

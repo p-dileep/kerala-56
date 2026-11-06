@@ -125,6 +125,7 @@ button, input { font: inherit; }
 .mat-info { position: absolute; left: 50%; top: 13%; transform: translateX(-50%); display: flex; gap: 14px; color: var(--ink); font-size: .95rem; opacity: .8; white-space: nowrap; }
 .mat-info .suit { font-size: 1.2em; } .mat-info .suit.red { color: #c4161c; }
 .center .bidval .suit { font-size: .95em; }
+.center .bidval .sname { font-size: .45em; font-weight: 600; vertical-align: middle; }
 .center .bidval .suit.red { color: #c4161c; }
 .center .bidval .suit.black { color: #111; }
 .center .sub.wait { margin-top: 14px; }

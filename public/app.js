@@ -24,6 +24,7 @@
   let room = null;
   let bidVal = 28;
   let bidKey = '';
+  let chgVal = 29, chgKey = '';
   let lastPhaseKey = '';
   const socket = io({ transports: ['websocket', 'polling'] });
 
@@ -223,14 +224,14 @@
   // wrap suit symbols so hearts/diamonds show red and all suits a little larger
   function colourSuits(html) { return html.replace(/[♠♣]/g, '<span class="suit black">$&</span>').replace(/[♥♦]/g, '<span class="suit red">$&</span>'); }
   function actionText(a) {
-    if (a.type === 'bid') return bidText(a.value, a.suit, a.hasJack);
+    if (a.type === 'bid') return (a.change ? 'Change to ' : '') + bidText(a.value, a.suit, a.hasJack);
     if (a.type === 'plus') return `Plus ${a.n} (${bidText(a.value, a.suit, a.hasJack)})`;
     if (a.type === 'ns') return `${a.value} NS (no ${SYM[a.ns]})`;
     return { pass: 'Pass', double: 'Double', redouble: 'Redouble' }[a.type];
   }
   // A seat's call bubble, as HTML with suit names (actionText stays plain for the history and chat).
   function actionNamed(a) {
-    if (a.type === 'bid') return suitBtnText(a.value, a.suit, a.hasJack);
+    if (a.type === 'bid') return (a.change ? 'Change to ' : '') + suitBtnText(a.value, a.suit, a.hasJack);
     if (a.type === 'plus') return `Plus ${a.n} (${suitBtnText(a.value, a.suit, a.hasJack)})`;
     if (a.type === 'ns') return `${a.value} NS (no <span class="sname">${SUIT_ONE[a.ns]}</span> ${SYM[a.ns]})`;
     return actionText(a);
@@ -301,7 +302,7 @@
       $(`tables${t}`).textContent = g ? `${g.tables[t]} chips` : '12 chips';
       $(`hpts${t}`).textContent = g && g.contract ? `${g.points[t]} pts` : '';
     }
-    const c = g && g.contract;
+    const c = g && !(g.result && g.result.void) && g.contract;   // a void hand has no contract to chase
     $('contractChip').classList.toggle('hidden', !c);
     if (c) {
       const [win, lose] = c.value >= 56 ? [4, 5] : c.value >= 48 ? [3, 4] : c.value >= 40 ? [2, 3] : [1, 2];
@@ -460,7 +461,7 @@
       const h = g.bidding.high;
       const who = g.turn === room.mySeat ? 'You' : `<span class="who t${g.turn % 2}">${esc(nameOf(g.turn))}</span>`;
       c.innerHTML = `<div class="bidval">${colourSuits(esc(bidText(h.value, h.suit, h.hasJack)))}</div>
-        <div class="sub wait">${who} won the bid — ${g.turn === room.mySeat ? 'keep it or raise to a higher tier' : 'deciding whether to raise'}</div>`;
+        <div class="sub wait">${who} won the bid${g.bidding.doubled ? ' (doubled)' : ''} — ${g.turn === room.mySeat ? (g.bidding.doubled ? 'keep it, raise, or change suit' : 'keep it or raise to a higher tier') : (g.bidding.doubled ? 'deciding whether to keep, raise or change suit' : 'deciding whether to raise')}</div>`;
       return;
     }
     if (g.phase === 'playing') {
@@ -478,7 +479,7 @@
     }
     if (g.phase === 'handover') {
       const r = g.result;
-      c.innerHTML = `<div class="big">${teamName(r.contract.team)} ${r.made ? 'made' : 'went down on'} ${bidText(r.contract.value, r.contract.suit, r.contract.hasJack)}</div>
+      c.innerHTML = `<div class="big">${r.void ? `Hand void: ${teamName(r.voidTeam)} holds no ${SUIT_NAME[r.contract.suit]}` : `${teamName(r.contract.team)} ${r.made ? 'made' : 'went down on'} ${bidText(r.contract.value, r.contract.suit, r.contract.hasJack)}`}</div>
         <div class="sub">Use "Last trick", "Show the hands" and the log on the right to review the hand.</div>
         <button class="btn" id="handsBtn2">Show the initial hands</button>
         ${room.isHost ? '<button class="btn primary" id="nextBtn">Next hand</button>' : '<div class="sub">The host deals the next hand.</div>'}`;
@@ -595,11 +596,33 @@
     p.classList.toggle('hidden', !mine);
     if (!mine) return;
     const high = g.bidding.high, L = g.legal.bid;
-    $('selfRaisePrompt').innerHTML = `You won the bid at ${colourSuits(esc(bidText(high.value, high.suit, high.hasJack)))} — keep it, or convert to a higher tier.`;
+    const doubled = g.bidding.doubled === 1;
+    $('selfRaisePrompt').innerHTML = doubled
+      ? `Your ${colourSuits(esc(bidText(high.value, high.suit, high.hasJack)))} was doubled and everyone passed — keep it (chips ×2), redouble (×4)${(L.raiseLevels || []).length ? ', raise it' : ''}${(L.changeSuits || []).length ? ', or change to another suit (the double is cancelled and bidding reopens)' : ''}.`
+      : `You won the bid at ${colourSuits(esc(bidText(high.value, high.suit, high.hasJack)))} — keep it, or convert to a higher tier.`;
+    const canChange = (L.changeSuits || []).length > 0;
+    $('changeRow').classList.toggle('hidden', !canChange);
+    if (canChange) {
+      const key = `${g.handNo}:${g.bidding.actions.length}`;
+      if (key !== chgKey) { chgKey = key; chgVal = L.changeMin; }
+      chgVal = Math.min(56, Math.max(chgVal, L.changeMin));
+      $('chgValue').textContent = chgVal;
+      $('chgMinus').disabled = chgVal <= L.changeMin;
+      $('chgPlus').disabled = chgVal >= 56;
+      $('chgMinus').onclick = () => { chgVal -= 1; renderSelfRaise(); };
+      $('chgPlus').onclick = () => { chgVal += 1; renderSelfRaise(); };
+      $('chgSuits').innerHTML = L.changeSuits.map((s) => {
+        const hasJ = s === 'NT' || g.hand.some((c) => c.suit === s && c.rank === 'J');
+        return `<button class="btn ${RED.has(s) ? 'red' : ''}" data-chg="${s}" title="Change to ${chgVal} ${SUIT_NAME[s]}">${suitBtnText(chgVal, s, hasJ)}</button>`;
+      }).join('');
+      $('chgSuits').querySelectorAll('[data-chg]').forEach((b) => (b.onclick = () => socket.emit('bid', { type: 'change', value: chgVal, suit: b.dataset.chg })));
+    }
     $('raiseBtns').innerHTML = (L.raiseLevels || []).map((v) =>
       `<button class="btn" data-raise="${v}" title="Raise your contract to ${v} ${high.suit === 'NT' ? 'NT' : SUIT_NAME[high.suit]}: bigger stake, more points needed">${colourSuits(esc(bidText(v, high.suit, high.hasJack)))}</button>`).join('');
     $('raiseBtns').querySelectorAll('[data-raise]').forEach((b) => (b.onclick = () => socket.emit('bid', { type: 'raise', value: Number(b.dataset.raise) })));
     $('keepBtn').onclick = () => socket.emit('bid', { type: 'keep' });
+    $('srRedoubleBtn').classList.toggle('hidden', !L.redouble);
+    $('srRedoubleBtn').onclick = () => socket.emit('bid', { type: 'redouble' });
   }
 
   function renderRail(g) {
@@ -636,6 +659,17 @@
       return;
     }
     const r = g.result, c = r.contract;
+    if (r.void) {
+      openModal(`<h2>Hand void</h2>
+        <p>${esc(nameOf(c.seat))} bid ${bidText(c.value, c.suit, c.hasJack)}, but ${teamName(r.voidTeam)} holds no ${SUIT_NAME[c.suit]}. No chips change; the deal passes to the next player.</p>
+        ${room.isHost ? '' : '<p class="sub">The host deals the next hand.</p>'}
+        <div class="row">
+          <button class="btn" data-hands>Show the initial hands</button>
+          ${room.isHost ? '<button class="btn primary" data-next>Next hand</button>' : ''}
+          <button class="btn" data-close>Close</button>
+        </div>`, true, 'phase');
+      return;
+    }
     const bt = teamName(c.team);
     const verdict = r.made ? `${bt} made it` : `${bt} went down`;
     const flow = r.made

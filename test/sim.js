@@ -241,6 +241,63 @@ assert.throws(()=>E.applyBid(s, s.turn, {type:'pass'}), /Opener/);
     E.applyBid(x, op3, { type: 'bid', value: 28, suit: 'S' });
     const opp = x.turn; x.hands[opp] = w.hands[me].slice();
     assert.ok(!E.legalBidActions(x, opp).plusOpen.some((o)=>o.suit==='S' && o.n===1)); }
+  // doubled bid, everyone passes: the declarer may keep, raise, or change to another suit at a higher value
+  { const s = E.newMatch({}, ()=>0.3); const op = s.turn; const N = 6;
+    const H = (id, suit, rank) => ({ id, suit, rank });
+    s.hands[op] = [H('JS0','S','J'),H('9S0','S','9'),H('AS0','S','A'),H('JH0','H','J'),H('9H0','H','9'),H('KC0','C','K'),H('QC0','C','Q'),H('KD0','D','K')];
+    E.applyBid(s, op, { type: 'bid', value: 30, suit: 'S' });
+    E.applyBid(s, s.turn, { type: 'double' });                          // left opponent doubles
+    for (let k = 0; k < N - 2; k++) E.applyBid(s, s.turn, { type: 'pass' }); // everyone else passes: no pass needed from the bidder
+    assert.equal(s.phase, 'selfraise'); assert.equal(s.turn, op);
+    const L = E.legalBidActions(s, op);
+    assert.ok(L.keep); assert.ok(L.redouble); assert.deepEqual(L.raiseLevels, [40, 48, 56]); assert.equal(L.changeMin, 31);
+    assert.deepEqual(L.changeSuits, ['H', 'D', 'C', 'NT']);
+    assert.throws(() => E.applyBid(s, op, { type: 'change', value: 30, suit: 'H' }), /between/);
+    assert.throws(() => E.applyBid(s, op, { type: 'change', value: 33, suit: 'S' }), /another suit/);
+    E.applyBid(s, op, { type: 'change', value: 33, suit: 'H' });
+    assert.equal(s.phase, 'bidding'); assert.equal(s.bidding.doubled, 0);
+    assert.deepEqual(s.bidding.high, { seat: op, value: 33, suit: 'H', hasJack: true });
+    assert.equal(s.turn, (op + 1) % N);
+    assert.ok(E.legalBidActions(s, s.turn).double);                       // the new suit can be doubled again
+    // not doubled: the window offers no suit change
+    const t = E.newMatch({}, ()=>0.3); const o2 = t.turn; t.hands[o2] = s.hands[op].slice();
+    E.applyBid(t, o2, { type: 'bid', value: 30, suit: 'S' });
+    while (t.phase === 'bidding') E.applyBid(t, t.turn, { type: 'pass' });
+    assert.deepEqual(E.legalBidActions(t, o2).changeSuits, []); assert.ok(!E.legalBidActions(t, o2).redouble);
+    // redouble from the window ends the auction at x4
+    const r = E.newMatch({}, ()=>0.3); const o3 = r.turn; r.hands[o3] = s.hands[op].slice();
+    E.applyBid(r, o3, { type: 'bid', value: 30, suit: 'S' }); E.applyBid(r, r.turn, { type: 'double' });
+    while (r.phase === 'bidding') E.applyBid(r, r.turn, { type: 'pass' });
+    E.applyBid(r, o3, { type: 'redouble' });
+    assert.ok(r.phase === 'playing' || r.phase === 'handover'); assert.equal(r.contract.mult, 4);
+    // doubled by the right-hand opponent: the bidder's turn comes first; a pass there, then everyone passes -> window
+    const u = E.newMatch({}, ()=>0.3); const o4 = u.turn; u.hands[o4] = s.hands[op].slice();
+    E.applyBid(u, o4, { type: 'bid', value: 30, suit: 'S' });
+    while (u.turn !== (o4 + N - 1) % N) E.applyBid(u, u.turn, { type: 'pass' });
+    E.applyBid(u, u.turn, { type: 'double' });
+    assert.equal(u.phase, 'bidding'); assert.equal(u.turn, o4);
+    while (u.phase === 'bidding') E.applyBid(u, u.turn, { type: 'pass' });
+    assert.equal(u.phase, 'selfraise'); assert.equal(u.turn, o4); assert.ok(E.legalBidActions(u, o4).changeSuits.length); }
+  // invalid hand: the defending team holds no trump -> void, no chips move, the deal passes on
+  { const s = E.newMatch({}, ()=>0.3); const op = s.turn; const N = 6;
+    const spades = s.hands.flat().filter((c) => c.suit === 'S');
+    const rest = s.hands.flat().filter((c) => c.suit !== 'S');
+    const bidders = [0, 1, 2, 3, 4, 5].filter((x) => E.team(x) === E.team(op));
+    const defenders = [0, 1, 2, 3, 4, 5].filter((x) => E.team(x) !== E.team(op));
+    const pool = { bid: [...spades], def: [] };
+    for (const x of bidders) s.hands[x] = [];
+    for (const x of defenders) s.hands[x] = [];
+    // every spade goes to the bidding team, everything else fills the gaps
+    for (const x of bidders) while (s.hands[x].length < 8 && pool.bid.length) s.hands[x].push(pool.bid.pop());
+    for (const x of [...bidders, ...defenders]) while (s.hands[x].length < 8) s.hands[x].push(rest.pop());
+    assert.equal(pool.bid.length, 0);
+    const before = s.tables.slice(), dealer = s.dealer;
+    E.applyBid(s, op, { type: 'bid', value: 28, suit: 'S' });
+    while (s.phase === 'bidding') E.applyBid(s, s.turn, { type: 'pass' });
+    if (s.phase === 'selfraise') E.applyBid(s, op, { type: 'keep' });
+    assert.equal(s.phase, 'handover'); assert.ok(s.result.void); assert.equal(s.result.voidTeam, 1 - E.team(op));
+    assert.deepEqual(s.tables, before);
+    E.nextHand(s); assert.equal(s.dealer, (dealer + 1) % N); assert.equal(s.phase, 'bidding'); }
   // probe: holding one suit against a cheap opponent bid, a two-suited hand names its second suit
   { const s = E.newMatch({}, ()=>0.3); const op = s.turn;
     s.hands[op] = [{id:'JS0',suit:'S',rank:'J'},{id:'9S0',suit:'S',rank:'9'},{id:'AS0',suit:'S',rank:'A'},{id:'JH0',suit:'H',rank:'J'},{id:'9H0',suit:'H',rank:'9'},{id:'KH0',suit:'H',rank:'K'},{id:'QC0',suit:'C',rank:'Q'},{id:'KD0',suit:'D',rank:'K'}];

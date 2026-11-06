@@ -149,14 +149,21 @@ function teamShowedJack(actions, suit, seat) {
 }
 
 function legalBidActions(state, seat) {
-  const out = { pass: false, double: false, redouble: false, minBid: null, suits: [], plus: [], plusMeaning: {}, plusOpen: [], ns: [], keep: false, raiseLevels: [] };
+  const out = { pass: false, double: false, redouble: false, minBid: null, suits: [], plus: [], plusMeaning: {}, plusOpen: [], ns: [], keep: false, raiseLevels: [], changeMin: null, changeSuits: [] };
   const b = state.bidding;
 
   // Self-raise window: after the auction closes, the declarer alone may convert once to a higher tier.
+  // A doubled declarer may instead change to another suit (one they hold, or NT) at any higher value,
+  // which wipes the double and reopens the bidding.
   if (state.phase === 'selfraise') {
     if (state.turn === seat && b.high && seat === b.high.seat) {
       out.keep = true;
-      out.raiseLevels = LEVELS.filter((l) => l > b.high.value);
+      out.raiseLevels = b.raised ? [] : LEVELS.filter((l) => l > b.high.value);
+      out.redouble = b.doubled === 1;
+      if (b.doubled === 1 && b.high.value < MAX_BID) {
+        out.changeMin = b.high.value + 1;
+        out.changeSuits = [...SUITS.filter((s) => s !== b.high.suit && state.hands[seat].some((c) => c.suit === s)), ...(b.high.suit !== 'NT' ? ['NT'] : [])];
+      }
     }
     return out;
   }
@@ -296,7 +303,28 @@ function applyBid(state, seat, action) {
       state.turn = nextSeat(seat, seatsOf(state));
       return;
     }
-    throw new Error('Only keep or raise in the self-raise window');
+    if (type === 'redouble') {
+      if (!legal.redouble) throw new Error('Cannot redouble now');
+      b.doubled = 2;
+      b.actions.push({ seat, type: 'redouble' });
+      logCall(state, b.actions[b.actions.length - 1]);
+      return finishAuction(state);
+    }
+    if (type === 'change') {
+      const value = Number(action.value), suit = action.suit;
+      if (!legal.changeSuits.includes(suit)) throw new Error('You can change only to another suit you hold, or NT, after being doubled');
+      if (!Number.isInteger(value) || value < legal.changeMin || value > MAX_BID) throw new Error(`Bid must be between ${legal.changeMin} and ${MAX_BID}`);
+      const hasJack = state.hands[seat].some((c) => c.suit === suit && c.rank === 'J');
+      b.high = { seat, value, suit, hasJack };
+      b.doubled = 0;                            // the double is wiped and the bidding reopens
+      b.passesInRow = 0;
+      b.actions.push({ seat, type: 'bid', value, suit, hasJack, change: true });
+      logCall(state, b.actions[b.actions.length - 1]);
+      state.phase = 'bidding';
+      state.turn = nextSeat(seat, seatsOf(state));
+      return;
+    }
+    throw new Error('Only keep, raise, redouble or change suit in the self-raise window');
   }
 
   if (type === 'pass') {
@@ -356,13 +384,16 @@ function applyBid(state, seat, action) {
 
   logCall(state, b.actions[b.actions.length - 1]);
   if (b.high && b.passesInRow >= seatsOf(state) - 1) return closeBidding(state);
+  // Doubled and everyone else has passed: the turn would come back to the bidder, who goes straight to
+  // the keep / raise / redouble / change-suit window instead of having to pass first.
+  if (b.high && b.doubled === 1 && nextSeat(seat, seatsOf(state)) === b.high.seat && b.passesInRow >= seatsOf(state) - 2) return closeBidding(state);
   state.turn = nextSeat(seat, seatsOf(state));
 }
 
 const SYM = { S: '♠', H: '♥', D: '♦', C: '♣', NT: 'NT' };
 function callText(a) {
   const bid = () => a.hasJack ? `${a.value} ${SYM[a.suit]}` : `${SYM[a.suit]} ${a.value}`;
-  if (a.type === 'bid') return bid();
+  if (a.type === 'bid') return a.change ? `Change to ${bid()}` : bid();
   if (a.type === 'raise') return `Raise to ${bid()}`;
   if (a.type === 'plus') return `Plus ${a.n} (${bid()})`;
   if (a.type === 'ns') return `${a.value} NS (no ${SYM[a.ns]})`;
@@ -374,7 +405,9 @@ function logCall(state, a) { state.log.push(`Call: seat ${a.seat + 1} — ${call
 // next tier (40/48/56); if none is possible (already at 56, or already raised), finalise straight away.
 function closeBidding(state) {
   const b = state.bidding;
-  if (!b.raised && b.high && nextLevelAbove(b.high.value) !== null) {
+  const canRaise = !b.raised && b.high && nextLevelAbove(b.high.value) !== null;
+  const doubled = b.high && b.doubled === 1;     // keep (x2), redouble, or change suit
+  if (canRaise || doubled) {
     state.phase = 'selfraise';
     state.turn = b.high.seat;
     return;
@@ -390,6 +423,15 @@ function finishAuction(state) {
   state.turn = state.trick.leader;
   const sym = { S: '♠', H: '♥', D: '♦', C: '♣', NT: 'NT' }[b.high.suit];
   state.log.push(`Contract: seat ${b.high.seat + 1} — ${b.high.hasJack ? `${b.high.value} ${sym}` : `${sym} ${b.high.value}`}${mult > 1 ? ` ×${mult}` : ''}`);
+  // Invalid hand: the defending team holds no card of the trump suit. No chips move; the deal passes on.
+  const suit = b.high.suit, defenders = 1 - team(b.high.seat);
+  if (suit !== 'NT' && !state.hands.some((h, s) => team(s) === defenders && h.some((c) => c.suit === suit))) {
+    state.result = { void: true, voidTeam: defenders, contract: state.contract, made: false, points: [0, 0], amount: 0, payer: null, receiver: null };
+    state.history.push({ hand: state.handNo, ...state.result });
+    state.log.push(`Hand void: Team ${'AB'[defenders]} holds no ${{ S: 'Spades', H: 'Hearts', D: 'Diamonds', C: 'Clubs' }[suit]}. No chips change; the deal passes on.`);
+    state.phase = 'handover';
+    state.turn = null;
+  }
 }
 
 // ---------------------------------------------------------------- play

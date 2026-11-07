@@ -62,7 +62,12 @@ const DEFAULT_PARAMS = {
   // cheapest sure winner when the trick holds at least this many points (99 = off: duck as before)
   coverMinPts: 99,
   // play: a partner led trump into the Jack of trump I showed in the auction: play that Jack (1 = on)
-  answerJackLead: 1
+  answerJackLead: 1,
+  // play: once trumps have been led this hand, the bidding side leads trump again only when its side
+  // cards win after trumps are gone (masters, or a partner holds that suit's Jack from the auction);
+  // otherwise it leads a side suit so a partner can cut with the trumps a further draw would pull
+  // (1 = on, 0 = always keep drawing)
+  drawCheck: 1
 };
 
 // Behaviour presets: overrides on DEFAULT_PARAMS. 'medium' is the tuned default.
@@ -508,6 +513,21 @@ function beats(card, winningCard, ledSuit, trump) {
   return card.suit === winningCard.suit && pow(card) > pow(winningCard);
 }
 
+// The bidding side is on lead holding trumps: should it stop drawing them? Yes when trumps were already
+// led this hand, a partner may still have trumps to cut with, and some side suit of mine is not good
+// after trumps are out (neither my top card in it is the master nor a partner showed its Jack).
+function sideNeedsCut(legal, view, T, trump, partners) {
+  const side = legal.filter((c) => c.suit !== trump);
+  if (!side.length || T.trumpOutside === 0) return false;
+  if (!(view.played || []).some((p, i, a) => p.card.suit === trump && (i === 0 || a[i - 1].trick !== p.trick))) return false;
+  if (!partners.some((p) => !T.voids[p].has(trump))) return false;
+  const suits = [...new Set(side.map((c) => c.suit))];
+  return suits.some((suit) => {
+    const top = side.filter((c) => c.suit === suit).sort((a, b) => pow(b) - pow(a))[0];
+    return !isMaster(top, view) && !partners.some((p) => T.held[p].includes('J' + suit));
+  });
+}
+
 function choosePlay(view, P = DEFAULT_PARAMS) {
   const legalIds = new Set(view.legal.cards);
   const legal = view.hand.filter((c) => legalIds.has(c.id));
@@ -530,7 +550,9 @@ function choosePlay(view, P = DEFAULT_PARAMS) {
   // ---- leading
   if (cards.length === 0) {
     const trumps = legal.filter((c) => c.suit === trump);
-    if (bidding && trumps.length) {
+    // keep the partners' trumps for cutting when a further draw would not make my side cards good
+    const holdTrumps = bidding && trumps.length && P.drawCheck && T && trump && sideNeedsCut(legal, view, T, trump, partners);
+    if (bidding && trumps.length && !holdTrumps) {
       const top = trumps.slice().sort((a, b) => pow(b) - pow(a))[0];
       if (isMaster(top, view)) {
         // A partner showed the Jack of trump in the auction and still holds it: lead a low trump

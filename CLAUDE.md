@@ -53,7 +53,8 @@ Log finished hands to Supabase so human play can later tune the bots (`src/bot.j
 - [ ] Collect hands; nothing to do until a few hundred human hands exist
 
 ## Next Steps
-1. Pull the latest main on the local machine before editing there (this change was committed from the VM clone).
+1. Implement (locally) the Plus 1 correction + Concede option: design in `docs/claude-plans/2026-11-09_concede-and-plus1-rule.md` (open questions at the end need the user's answers).
+2. Pull the latest main on the local machine before editing there (this change was committed from the VM clone).
 2. After a few hundred human hands: extend `test/tune.js` to replay logged deals / bidding imitation.
 
 ## Notes

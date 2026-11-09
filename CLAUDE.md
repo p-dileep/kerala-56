@@ -49,12 +49,13 @@ Log finished hands to Supabase so human play can later tune the bots (`src/bot.j
 
 - [x] 2026-11-07 Trump drawing (user rule; hand #216 Ammini led JH, JH, 9H, all 12 hearts gone by trick 3, Chinnu 35H down 26-30): `drawCheck` / `sideNeedsCut` in bot.js. After the first trump-led trick the bidding side leads trump again only if every side suit it holds is good (top card is master, or a partner showed that suit's Jack); otherwise it falls through to side-suit leads so partners can cut. Self-play vs old: 6p +2.93 / +2.54 ± 0.4 tables/match (500), 8p +2.24 ± 0.46 (150). Logged deals 145 -> 148 made; #216 makes 36. Tried "keep drawing when a partner showed the trump Jack" (fixes #58) but it lost -0.5..-1.0 vs the plain rule: dropped. npm test passes. README updated. Pushed to main.
 
+- [x] 2026-11-09 Rule (user): Plus 1 on a Jack = singleton Jack, unless the SAME player already showed the first Jack in that suit (partner's Jack no longer counts): engine `selfShowedJack`, bot `inferFacts`, rules text, tests. Concede (user): `Concede` button during play; one other connected human on the team must agree (`concede` socket event propose/agree/decline/withdraw, request sent to that team only, bots have no say, lone human decides alone); engine `concedeHand` settles as a loss at the bid's stake, `result.conceded` = team. Headless-Chrome check of the pop-ups + socket test. Design: `docs/claude-plans/2026-11-09_concede-and-plus1-rule.md`. Pushed to main.
+
 ## In Progress
 - [ ] Collect hands; nothing to do until a few hundred human hands exist
 
 ## Next Steps
-1. Implement (locally) the Plus 1 correction + Concede option: design in `docs/claude-plans/2026-11-09_concede-and-plus1-rule.md` (open questions at the end need the user's answers).
-2. Pull the latest main on the local machine before editing there (this change was committed from the VM clone).
+1. Pull the latest main on the local machine before editing there (this change was committed from the VM clone).
 2. After a few hundred human hands: extend `test/tune.js` to replay logged deals / bidding imitation.
 
 ## Notes

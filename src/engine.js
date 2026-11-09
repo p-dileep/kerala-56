@@ -142,9 +142,9 @@ function plusMeaning(actions, suit) {
   return meaning();
 }
 
-// Has this seat or a partner already shown a Jack of `suit` (Jack-signal bid, or a Plus that claimed a Jack)?
-function teamShowedJack(actions, suit, seat) {
-  return actions.some((a, i) => a.suit === suit && team(a.seat) === team(seat) &&
+// Has this very seat already shown a Jack of `suit` (Jack-signal bid, or a Plus that claimed a Jack)? A partner's Jack does not count.
+function selfShowedJack(actions, suit, seat) {
+  return actions.some((a, i) => a.suit === suit && a.seat === seat &&
     ((a.type === 'bid' && a.hasJack) || (a.type === 'plus' && (plusMeaning(actions.slice(0, i), suit)[a.n] || []).includes('J'))));
 }
 
@@ -193,8 +193,8 @@ function legalBidActions(state, seat) {
   }
   // Plus convention: only a partner of the high bidder may say "Plus N" (raise by N in that suit).
   // Meanings are relative to the cards the auction has already revealed in that suit (see plusMeaning):
-  // Plus 1 = a lone Jack and nothing else in the suit; once this player or a partner has already shown a Jack
-  // in the suit, Plus 1 = the other Jack, and the rest of the suit stays private (their choice).
+  // Plus 1 = a lone Jack and nothing else in the suit; once this same player has already shown a Jack in the
+  // suit, Plus 1 = the other Jack, and the rest of the suit stays private (their choice). A partner's Jack does not count.
   // Plus 2 = the top two remaining cards (fresh suit: both Jacks; after a Plus 1 or Jack signal: the other Jack and a Nine; ...).
   // Plus 3 = the top three remaining cards (fresh suit: both Jacks and a Nine).
   // Plus is said in the partnership's suit: the standing bid when a partner holds it, otherwise the
@@ -224,7 +224,7 @@ function legalBidActions(state, seat) {
     const room = MAX_BID - b.high.value;
     const m = plusMeaning(b.actions, suit);
     out.plusMeaning = m;
-    if (room >= 1 && m[1] && holds(m[1]) && (m[1][0] !== 'J' || inSuit.length === 1 || teamShowedJack(b.actions, suit, seat))) out.plus.push(1);
+    if (room >= 1 && m[1] && holds(m[1]) && (m[1][0] !== 'J' || inSuit.length === 1 || selfShowedJack(b.actions, suit, seat))) out.plus.push(1);
     if (room >= 2 && m[2] && holds(m[2])) out.plus.push(2);
     if (room >= 3 && m[3] && holds(m[3])) out.plus.push(3);
   }
@@ -253,7 +253,7 @@ function legalBidActions(state, seat) {
       const holds = (ranks) => RANKS.every((r) => count(r) >= ranks.filter((x) => x === r).length);
       const ok = (n) => base + n >= out.minBid && base + n <= MAX_BID;
       const m = plusMeaning(b.actions, suit);
-      if (ok(1) && m[1] && holds(m[1]) && (m[1][0] !== 'J' || inSuit.length === 1 || teamShowedJack(b.actions, suit, seat))) out.plusOpen.push({ n: 1, suit, cards: m[1] });
+      if (ok(1) && m[1] && holds(m[1]) && (m[1][0] !== 'J' || inSuit.length === 1 || selfShowedJack(b.actions, suit, seat))) out.plusOpen.push({ n: 1, suit, cards: m[1] });
       if (ok(2) && m[2] && holds(m[2])) out.plusOpen.push({ n: 2, suit, cards: m[2] });
       if (ok(3) && m[3] && holds(m[3])) out.plusOpen.push({ n: 3, suit, cards: m[3] });
     }
@@ -510,8 +510,21 @@ function collectTrick(state) {
 
 function scoreHand(state) {
   const c = state.contract;
+  settle(state, state.points[c.team] >= c.value);
+}
+
+// A team gives up the hand during play: it counts as a loss for them, paid at the bid's normal stake
+// (declarers pay the "down" amount, defenders the "made" amount, doubles included).
+function concedeHand(state, teamIdx) {
+  if (state.phase !== 'playing') throw new Error('A hand can only be conceded during play');
+  if (teamIdx !== 0 && teamIdx !== 1) throw new Error('Bad team');
+  state.log.push(`Team ${'AB'[teamIdx]} concedes the hand.`);
+  settle(state, teamIdx !== state.contract.team, teamIdx);
+}
+
+function settle(state, made, conceded = null) {
+  const c = state.contract;
   const bidTeam = c.team, other = 1 - bidTeam;
-  const made = state.points[bidTeam] >= c.value;
   const base = bidBaseTables(c.value);
   const amount = (made ? base.win : base.lose) * c.mult;
   const payer = made ? other : bidTeam;
@@ -521,10 +534,13 @@ function scoreHand(state) {
   state.tables[receiver] += paid;
 
   state.result = { contract: c, made, points: state.points.slice(), amount, payer, receiver };
+  if (conceded !== null) state.result.conceded = conceded;
   state.history.push({ hand: state.handNo, ...state.result });
-  state.log.push(made
-    ? `Team ${'AB'[bidTeam]} made ${c.value} with ${state.points[bidTeam]} — receives ${amount} chip(s).`
-    : `Team ${'AB'[bidTeam]} fell short of ${c.value} with ${state.points[bidTeam]} — pays ${amount} chip(s).`);
+  state.log.push(conceded !== null
+    ? `Team ${'AB'[conceded]} conceded — pays ${amount} chip(s).`
+    : made
+      ? `Team ${'AB'[bidTeam]} made ${c.value} with ${state.points[bidTeam]} — receives ${amount} chip(s).`
+      : `Team ${'AB'[bidTeam]} fell short of ${c.value} with ${state.points[bidTeam]} — pays ${amount} chip(s).`);
 
   if (paid < amount || state.tables[payer] <= 0) {
     state.phase = 'matchover';
@@ -586,7 +602,7 @@ function getView(state, seat) {
 
 module.exports = {
   SUITS, RANKS, RANKS_8P, ranksFor, RANK_POWER, POINTS, LEVELS, NUM_SEATS, HAND_SIZE, MIN_BID, MAX_BID, DEFAULT_SETTINGS,
-  team, nextSeat, resetChips, plusMeaning, makeDeck, shuffle, sortHand, bidBaseTables, nextLevelAbove,
+  team, nextSeat, resetChips, concedeHand, plusMeaning, makeDeck, shuffle, sortHand, bidBaseTables, nextLevelAbove,
   newMatch, startHand, legalBidActions, applyBid, legalCards, winningIndex, playCard,
   collectTrick, scoreHand, nextHand, getView, trumpSuit
 };

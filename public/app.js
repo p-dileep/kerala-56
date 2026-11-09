@@ -269,6 +269,7 @@
   function render() {
     const g = room.game;
     $('handsBtn').classList.toggle('hidden', !(g && g.dealt));
+    $('concedeBtn').classList.toggle('hidden', !(g && g.phase === 'playing' && room.mySeat !== null && !room.concede));
     $('resetChipsBtn').classList.toggle('hidden', !(g && room.isHost));
     $('roomCode').textContent = room.fixed ? `${room.players}-player table` : room.code;
     $('codeChip').classList.toggle('fixed', !!room.fixed);
@@ -282,6 +283,7 @@
     renderSelfRaise();
     renderRail(g);
     renderPhaseModal(g);
+    renderConcedeModal(g);
     const myTurn = g && g.turn !== null && g.turn === room.mySeat;
     document.title = myTurn ? '● Your turn · 56' : '56 · Kerala card table';
   }
@@ -420,6 +422,43 @@
       <div class="row"><button class="btn primary" data-close>Close</button></div>`, true);
   }
   $('handsBtn').onclick = showDealtHands;
+  $('concedeBtn').onclick = () => {
+    const g = room.game; if (!g || g.phase !== 'playing' || room.mySeat === null) return;
+    const me = room.mySeat % 2, c = g.contract;
+    const mates = room.seats.filter((s) => s.seat !== room.mySeat && s.team === me && s.kind === 'human' && s.connected).length;
+    openModal(`<h2>Concede this hand?</h2>
+      <p>${teamName(me)} gives up and pays ${concedeStake(g, me)} to ${teamName(1 - me)}, as if ${me === c.team ? 'the bid had gone down' : 'the bid had been made'}.</p>
+      ${mates ? '<p class="sub">A teammate has to agree before the hand ends.</p>' : ''}
+      <div class="row"><button class="btn warn" id="concedeGo">Concede</button><button class="btn" data-close>Play on</button></div>`, true);
+    $('concedeGo').onclick = () => { closeModal(); socket.emit('concede', { action: 'propose' }); };
+  };
+  function concedeStake(g, team) {
+    const c = g.contract, made = team !== c.team;
+    const n = (c.value >= 56 ? (made ? 4 : 5) : c.value >= 48 ? (made ? 3 : 4) : c.value >= 40 ? (made ? 2 : 3) : (made ? 1 : 2)) * c.mult;
+    return `${n} chip${n > 1 ? 's' : ''}`;
+  }
+  // Pending concede request on my team: the proposer waits, the others answer. Opponents never get room.concede.
+  let lastConcedeKey = null;
+  function renderConcedeModal(g) {
+    const cc = room.concede;
+    const key = cc && g && g.phase === 'playing' ? `${g.handNo}:${cc.by}` : null;
+    if (key === lastConcedeKey) return;
+    lastConcedeKey = key;
+    if (!key) { if ($('modal').dataset.kind === 'concede') closeModal(); return; }
+    const team = cc.team;
+    if (cc.by === room.mySeat) {
+      openModal(`<h2>Waiting for a teammate</h2>
+        <p>Your concede request is with the rest of ${teamName(team)}. The hand ends when one of them agrees.</p>
+        <div class="row"><button class="btn" id="concedeWithdraw">Withdraw</button></div>`, false, 'concede');
+      $('concedeWithdraw').onclick = () => socket.emit('concede', { action: 'withdraw' });
+    } else {
+      openModal(`<h2>Concede the hand?</h2>
+        <p><b>${esc(nameOf(cc.by))}</b> wants ${teamName(team)} to give up this hand and pay ${concedeStake(g, team)} to ${teamName(1 - team)}.</p>
+        <div class="row"><button class="btn warn" id="concedeAgree">Agree</button><button class="btn" id="concedeDecline">Play on</button></div>`, false, 'concede');
+      $('concedeAgree').onclick = () => socket.emit('concede', { action: 'agree' });
+      $('concedeDecline').onclick = () => socket.emit('concede', { action: 'decline' });
+    }
+  }
   $('resetChipsBtn').onclick = () => openModal(`<h2>Reset chips?</h2><p>Both teams go back to 12 chips. The current hand continues.</p>
     <div class="row"><button class="btn primary" data-reset>Reset</button><button class="btn" data-close>Cancel</button></div>`, true);
 
@@ -479,7 +518,7 @@
     }
     if (g.phase === 'handover') {
       const r = g.result;
-      c.innerHTML = `<div class="big">${r.void ? `Hand void: ${teamName(r.voidTeam)} holds no ${SUIT_NAME[r.contract.suit]}` : `${teamName(r.contract.team)} ${r.made ? 'made' : 'went down on'} ${bidText(r.contract.value, r.contract.suit, r.contract.hasJack)}`}</div>
+      c.innerHTML = `<div class="big">${r.void ? `Hand void: ${teamName(r.voidTeam)} holds no ${SUIT_NAME[r.contract.suit]}` : r.conceded != null ? `${teamName(r.conceded)} conceded ${bidText(r.contract.value, r.contract.suit, r.contract.hasJack)}` : `${teamName(r.contract.team)} ${r.made ? 'made' : 'went down on'} ${bidText(r.contract.value, r.contract.suit, r.contract.hasJack)}`}</div>
         <div class="sub">Use "Last trick", "Show the hands" and the log on the right to review the hand.</div>
         <button class="btn" id="handsBtn2">Show the initial hands</button>
         ${room.isHost ? '<button class="btn primary" id="nextBtn">Next hand</button>' : '<div class="sub">The host deals the next hand.</div>'}`;
@@ -671,7 +710,8 @@
       return;
     }
     const bt = teamName(c.team);
-    const verdict = r.made ? `${bt} made it` : `${bt} went down`;
+    const conceded = r.conceded != null;
+    const verdict = conceded ? `${teamName(r.conceded)} conceded` : r.made ? `${bt} made it` : `${bt} went down`;
     const flow = r.made
       ? `${teamName(r.payer)} pays ${r.amount} chip${r.amount > 1 ? 's' : ''} to ${bt}.`
       : `${bt} pays ${r.amount} chip${r.amount > 1 ? 's' : ''} to ${teamName(r.receiver)}.`;
@@ -679,7 +719,7 @@
     const show = () => openModal(`
       <h2>${verdict}</h2>
       <p>${esc(nameOf(c.seat))} bid ${bidText(c.value, c.suit, c.hasJack)}${c.mult > 1 ? ` ×${c.mult}` : ''}. ${flow}</p>
-      ${g.trickNo < (g.handSize || 8) ? `<p class="sub">Stopped after trick ${g.trickNo}: ${r.made ? 'target reached' : 'target out of reach'}.</p>` : ''}
+      ${!conceded && g.trickNo < (g.handSize || 8) ? `<p class="sub">Stopped after trick ${g.trickNo}: ${r.made ? 'target reached' : 'target out of reach'}.</p>` : ''}
       <div class="tally">
         <span>${teamName(0)} points</span><span class="v">${r.points[0]}</span>
         <span>${teamName(1)} points</span><span class="v">${r.points[1]}</span>
@@ -695,6 +735,6 @@
       </div>`, true, 'phase');
     const chips = `${r.amount} chip${r.amount > 1 ? 's' : ''}`;
     if (over) celebrate(g.winner, true, 'wins the match', show);
-    else celebrate(r.receiver, false, r.made ? `made ${esc(bidText(c.value, c.suit, c.hasJack))} and takes ${chips}` : `set ${teamName(c.team)} and takes ${chips}`, show);
+    else celebrate(r.receiver, false, conceded ? `takes ${chips} as ${teamName(r.conceded)} concedes` : r.made ? `made ${esc(bidText(c.value, c.suit, c.hasJack))} and takes ${chips}` : `set ${teamName(c.team)} and takes ${chips}`, show);
   }
 })();

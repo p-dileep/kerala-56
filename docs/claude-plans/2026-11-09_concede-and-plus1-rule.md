@@ -1,6 +1,6 @@
 # Concede option + Plus 1 rule correction (design, 2026-11-09)
 
-Status: design only, no code changed. Implement on the local machine, then git pull here.
+Status: implemented on the VM clone and pushed to main on 2026-11-09 (sections 1 and 2 as written, decisions below). Pending request is carried in the `room` payload (`concede: {team, by}`, filtered to that team) rather than separate events; a decline reaches the proposer as a toast.
 
 ## 1. Plus 1 rule correction (user, 2026-11-09)
 

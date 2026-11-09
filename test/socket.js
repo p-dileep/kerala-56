@@ -5,26 +5,50 @@ const { io } = require('socket.io-client');
 server.listen(0, () => {
   const url = `http://localhost:${server.address().port}`;
   const s = io(url, { transports: ['websocket'] });
-  let started = false, hands = 0, guest;
+  let started = false, hands = 0, guest, mate;
+  const concede = { proposed: false, declined: false, agreed: false };
   s.on('connect', () => s.emit('hello', {}));
   s.on('token', () => s.emit('createRoom', { name: 'Tester', players: 8 }));
   s.on('lobby', (t) => { if (!s.lobbySeen) { s.lobbySeen = true; const codes = t.map((x) => x.code).sort(); if (codes.join() !== 'TABLE6,TABLE8') { console.error('lobby tables missing', codes); process.exit(1); }
     if (t.some((x) => x.seated !== 0 || x.hasGame)) { console.error('fixed tables should start empty', t); process.exit(1); } } });
-  s.on('errorMsg', (m) => { console.error('server error:', m); process.exit(1); });
+  s.on('errorMsg', (m) => {
+    if (/wants to play on/.test(m)) { concede.proposed = false; return; }   // Mate declined: ask again
+    console.error('server error:', m); process.exit(1);
+  });
   s.on('room', (r) => {
     if (!guest) {                         // a second human joins via code
       guest = io(url, { transports: ['websocket'] });
       guest.on('connect', () => guest.emit('hello', {}));
       guest.on('token', () => guest.emit('joinRoom', { code: r.code, name: 'Guest' }));
-      guest.on('room', (gr) => { if (gr.game && gr.game.turn === gr.mySeat) act(guest, gr); });
+      guest.on('room', (gr) => {
+        if (gr.concede) { console.error('an opponent must not see the concede request'); process.exit(1); }
+        if (gr.game && gr.game.turn === gr.mySeat) act(guest, gr);
+      });
+      mate = io(url, { transports: ['websocket'] });     // third human, on the host's team (even seat)
+      mate.on('connect', () => mate.emit('hello', {}));
+      mate.on('token', () => mate.emit('joinRoom', { code: r.code, name: 'Mate', team: 0 }));
+      mate.on('room', (mr) => {
+        if (mr.mySeat !== null && mr.mySeat % 2 !== 0) { console.error('Mate should sit on team A'); process.exit(1); }
+        if (mr.mySeat !== null) mate.ready = true;
+        if (mr.concede && mr.game && mr.game.phase === 'playing') {
+          if (mr.concede.by !== r.mySeat || mr.concede.team !== 0) { console.error('bad concede payload', mr.concede); process.exit(1); }
+          if (!concede.declined) { concede.declined = true; mate.emit('concede', { action: 'decline' }); }
+          else if (!concede.agreed) { concede.agreed = true; mate.emit('concede', { action: 'agree' }); }
+        }
+        if (mr.game && mr.game.turn === mr.mySeat) act(mate, mr);
+      });
     }
     if (r.players !== 8 || r.seats.length !== 8) { console.error('expected an 8-seat room'); process.exit(1); }
-    if (!started && r.seats.filter((x) => x.kind === 'human').length === 2) {
+    if (!started && r.seats.filter((x) => x.kind === 'human').length === 3) {
       if (r.botStyle !== 'aggressive') { s.emit('botStyle', { style: 'aggressive' }); return; }
       started = true; s.emit('start'); return;
     }
     const g = r.game; if (!g) return;
+    if (g.phase === 'playing' && g.handNo === 2 && mate && mate.ready && !concede.proposed) {   // host proposes a concede
+      concede.proposed = true; s.emit('concede', { action: 'propose' });
+    }
     if (g.phase === 'handover' || g.phase === 'matchover') {
+      if (g.handNo === 2 && !(g.result.conceded === 0 && concede.declined && concede.agreed)) { console.error('hand 2 should end by concede after a decline then an agree', g.result, concede); process.exit(1); }
       if (g.handNo > hands) { hands = g.handNo; console.log(`hand ${g.handNo}:`, g.log.slice(-1)[0], 'tables', g.tables); }
       if (hands >= 3) { console.log('socket e2e passed'); process.exit(0); }
       if (g.phase === 'handover') s.emit('nextHand');   // host clicks Next hand

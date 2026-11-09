@@ -101,8 +101,7 @@ assert.throws(()=>E.applyBid(s, s.turn, {type:'pass'}), /Opener/);
   const p = t.turn; const h = t.hands[p];
   const inSuit = h.filter((c)=>c.suit===suit), js = inSuit.filter((c)=>c.rank==='J').length, ns9 = inSuit.filter((c)=>c.rank==='9').length;
   const plus = E.legalBidActions(t, p).plus;
-  const openerJ = t.bidding.actions[0].hasJack;   // a partner's shown Jack lifts the lone-Jack rule for Plus 1
-  assert.equal(plus.includes(1), js>=1 && (inSuit.length===1 || openerJ));
+  assert.equal(plus.includes(1), js>=1 && inSuit.length===1);    // a partner's shown Jack does not lift the lone-Jack rule
   assert.equal(plus.includes(2), js===2);
   assert.equal(plus.includes(3), js===2 && ns9>=1);
   if (plus.length) { const n = plus[0]; E.applyBid(t, p, {type:'plus', n}); assert.equal(t.bidding.high.value, 28+n); assert.equal(t.bidding.high.suit, suit); assert.equal(t.bidding.high.seat, p); }
@@ -120,9 +119,9 @@ assert.throws(()=>E.applyBid(s, s.turn, {type:'pass'}), /Opener/);
   u.hands[q] = [...others.slice(0,7), J(8)];
   assert.deepEqual(E.legalBidActions(u, q).plus, [1]);
   u.hands[q] = [...others.slice(0,6), J(8), N(8)];
-  assert.deepEqual(E.legalBidActions(u, q).plus, openerHasJ ? [1, 2] : []);
+  assert.deepEqual(E.legalBidActions(u, q).plus, openerHasJ ? [2] : []);   // J+9: no Plus 1 (not lone, partner's Jack does not count)
   u.hands[q] = [...others.slice(0,6), J(8), J(9)];
-  assert.deepEqual(E.legalBidActions(u, q).plus, openerHasJ ? [1] : [2]);
+  assert.deepEqual(E.legalBidActions(u, q).plus, openerHasJ ? [] : [2]);
   assert.throws(()=>E.applyBid(u, q, {type:'plus', n:4}), /Plus/);
   // pure ladder check: after both Jacks and both Nines are shown, Plus 2 means two Aces
   const acts = [{seat:0,type:'bid',value:28,suit:'H',hasJack:false},{seat:2,type:'plus',n:2,suit:'H'},{seat:4,type:'plus',n:2,suit:'H'}];
@@ -226,20 +225,22 @@ assert.throws(()=>E.applyBid(s, s.turn, {type:'pass'}), /Opener/);
     const t = E.newMatch({}, ()=>0.3); const o2 = t.turn;
     t.hands[o2] = s.hands[op].slice();
     assert.ok(!E.legalBidActions(t, o2).plusOpen.some((o)=>o.suit==='S' && o.n===1));
-    // after a partner's Jack signal, Plus 1 = the other Jack even with more cards in the suit
+    // a partner's Jack signal does not count: Plus 1 on the Jack still needs a lone Jack (Plus 2 = J+9 stays)
     const w = E.newMatch({}, ()=>0.3); const pa = w.turn;
     w.hands[pa] = [{id:'JS0',suit:'S',rank:'J'},{id:'AS0',suit:'S',rank:'A'},{id:'KS0',suit:'S',rank:'K'},{id:'AH0',suit:'H',rank:'A'},{id:'KH0',suit:'H',rank:'K'},{id:'AC0',suit:'C',rank:'A'},{id:'KC0',suit:'C',rank:'K'},{id:'AD0',suit:'D',rank:'A'}];
     E.applyBid(w, pa, { type: 'bid', value: 28, suit: 'S' });           // partner shows a Jack
     E.applyBid(w, w.turn, { type: 'pass' });
     const me = w.turn; w.hands[me] = [{id:'JS1',suit:'S',rank:'J'},{id:'9S0',suit:'S',rank:'9'},{id:'10S0',suit:'S',rank:'10'},{id:'QH0',suit:'H',rank:'Q'},{id:'QC0',suit:'C',rank:'Q'},{id:'10C0',suit:'C',rank:'10'},{id:'QD0',suit:'D',rank:'Q'},{id:'KD0',suit:'D',rank:'K'}];
-    assert.deepEqual(E.legalBidActions(w, me).plus, [1, 2]);
+    assert.deepEqual(E.legalBidActions(w, me).plus, [2]);
+    w.hands[me] = w.hands[me].filter((c) => c.suit !== 'S' || c.id === 'JS1');
+    assert.deepEqual(E.legalBidActions(w, me).plus, [1]);
     E.applyBid(w, me, { type: 'plus', n: 1 });
-    assert.ok(!B.inferFacts(E.getView(w, (me + 1) % 6)).lone[me].has('S'));
+    assert.ok(B.inferFacts(E.getView(w, (me + 1) % 6)).lone[me].has('S'));
     // an opponent's Jack does not count: Plus 1 on the Jack still needs a lone Jack
     const x = E.newMatch({}, ()=>0.3); const op3 = x.turn;
     x.hands[op3] = w.hands[pa].slice();
     E.applyBid(x, op3, { type: 'bid', value: 28, suit: 'S' });
-    const opp = x.turn; x.hands[opp] = w.hands[me].slice();
+    const opp = x.turn; x.hands[opp] = [{id:'JS1',suit:'S',rank:'J'},{id:'9S0',suit:'S',rank:'9'},{id:'10S0',suit:'S',rank:'10'},{id:'QH0',suit:'H',rank:'Q'},{id:'QC0',suit:'C',rank:'Q'},{id:'10C0',suit:'C',rank:'10'},{id:'QD0',suit:'D',rank:'Q'},{id:'KD0',suit:'D',rank:'K'}];
     assert.ok(!E.legalBidActions(x, opp).plusOpen.some((o)=>o.suit==='S' && o.n===1)); }
   // doubled bid, everyone passes: the declarer may keep, raise, or change to another suit at a higher value
   { const s = E.newMatch({}, ()=>0.3); const op = s.turn; const N = 6;
@@ -339,4 +340,20 @@ assert.throws(()=>E.applyBid(s, s.turn, {type:'pass'}), /Opener/);
   assert.deepEqual(E.plusMeaning(w.bidding.actions, ws)[2], ['9','A']);
   assert.deepEqual(E.plusMeaning(w.bidding.actions, ws)[1], ['9']);
 }
+// concede: a loss for the conceding team at the bid's stake; play phase only; can end the match
+{ const toPlay = (s) => { while (s.phase !== 'playing') { const d = B.decide(B.botView(s, s.turn)); E.applyBid(s, s.turn, d.action); if (s.phase === 'handover') { E.nextHand(s); } } };
+  const s = E.newMatch({}, () => 0.3); toPlay(s);
+  const c = s.contract, base = E.bidBaseTables(c.value);
+  E.concedeHand(s, c.team);                                              // declarers give up: pay the "down" amount
+  assert.equal(s.phase, 'handover'); assert.equal(s.result.conceded, c.team); assert.equal(s.result.made, false);
+  assert.equal(s.result.amount, base.lose * c.mult); assert.equal(s.tables[c.team], 12 - base.lose * c.mult); assert.equal(s.tables[0] + s.tables[1], 24);
+  assert.ok(s.log.some((l) => /conceded — pays/.test(l)));
+  assert.throws(() => E.concedeHand(s, 0), /during play/);               // not in handover
+  E.nextHand(s); assert.throws(() => E.concedeHand(s, 0), /during play/); // not in bidding
+  toPlay(s); const c2 = s.contract, b2 = E.bidBaseTables(c2.value), before = s.tables.slice();
+  E.concedeHand(s, 1 - c2.team);                                         // defenders give up: pay the "made" amount
+  assert.equal(s.result.conceded, 1 - c2.team); assert.equal(s.result.made, true);
+  assert.equal(s.tables[c2.team], before[c2.team] + b2.win * c2.mult);
+  const t = E.newMatch({}, () => 0.3); toPlay(t); t.tables = [1, 23];
+  E.concedeHand(t, 0); assert.equal(t.phase, 'matchover'); assert.equal(t.winner, 1); }
 console.log('all tests passed');

@@ -55,7 +55,8 @@ function createRoom(hostToken, players = 6, code = null) {
     awaySince: {},
     touched: Date.now(),
     version: 0,
-    loggedHand: 0
+    loggedHand: 0,
+    concede: null           // pending concede request: { team, by } (seat index), humans of that team only
   };
   rooms.set(room.code, room);
   return room;
@@ -146,6 +147,7 @@ function logHand(room) {
 function broadcast(room) {
   room.version++;
   const g = room.game;
+  if (room.concede && (!g || g.phase !== 'playing')) room.concede = null;   // the hand ended on its own
   if (g && (g.phase === 'handover' || g.phase === 'matchover') && room.loggedHand !== g.handNo) {
     room.loggedHand = g.handNo;
     logHand(room);
@@ -168,6 +170,7 @@ function broadcast(room) {
       teamNames: room.teamNames,
       botPersonality: Bot.BOT_PERSONALITY,
       mySeat: seat >= 0 ? seat : null,
+      concede: room.concede && seat >= 0 && E.team(seat) === room.concede.team ? room.concede : null,
       seats: publicSeats(room),
       watchers: watching,
       chat: room.chat.slice(-40),
@@ -407,6 +410,42 @@ io.on('connection', (socket) => {
     const seat = seatOfToken(room, socket.data.token);
     try { E.playCard(room.game, seat, String(cardId)); } catch (e) { return fail(e.message); }
     broadcast(room);
+  });
+
+  // Concede the hand: a seated human proposes; one other connected human on the same team must agree
+  // (if there is none, the proposer's word is enough). Bots take no part. Opponents never see the request.
+  socket.on('concede', ({ action } = {}) => {
+    const room = getRoom();
+    if (!room || !room.game) return;
+    const g = room.game;
+    const seat = seatOfToken(room, socket.data.token);
+    if (seat < 0) return fail('Only seated players can concede');
+    const team = E.team(seat), name = room.seats[seat].name;
+    const doConcede = () => {
+      room.concede = null;
+      E.concedeHand(g, team);
+      sysChat(room, `${room.teamNames[team]} conceded the hand.`);
+    };
+    if (action === 'propose') {
+      if (g.phase !== 'playing') return fail('You can only concede during play');
+      if (room.concede) return fail('A concede request is already waiting');
+      const mates = room.seats.filter((s, i) => i !== seat && E.team(i) === team && s.kind === 'human' && s.connected);
+      if (mates.length) room.concede = { team, by: seat };
+      else doConcede();
+      return broadcast(room);
+    }
+    if (!room.concede || room.concede.team !== team) return;
+    const proposer = room.seats[room.concede.by];
+    if (action === 'withdraw' && room.concede.by === seat) { room.concede = null; return broadcast(room); }
+    if (action === 'agree' && room.concede.by !== seat) {
+      if (g.phase === 'playing') doConcede(); else room.concede = null;
+      return broadcast(room);
+    }
+    if (action === 'decline' && room.concede.by !== seat) {
+      room.concede = null;
+      if (proposer.socketId) io.to(proposer.socketId).emit('errorMsg', `${name} wants to play on.`);
+      return broadcast(room);
+    }
   });
 
   socket.on('chat', ({ text } = {}) => {

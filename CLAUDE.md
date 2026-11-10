@@ -51,6 +51,12 @@ Log finished hands to Supabase so human play can later tune the bots (`src/bot.j
 
 - [x] 2026-11-09 Rule (user): Plus 1 on a Jack = singleton Jack, unless the SAME player already showed the first Jack in that suit (partner's Jack no longer counts): engine `selfShowedJack`, bot `inferFacts`, rules text, tests. Concede (user): `Concede` button during play; one other connected human on the team must agree (`concede` socket event propose/agree/decline/withdraw, request sent to that team only, bots have no say, lone human decides alone); engine `concedeHand` settles as a loss at the bid's stake, `result.conceded` = team. Headless-Chrome check of the pop-ups + socket test. Design: `docs/claude-plans/2026-11-09_concede-and-plus1-rule.md`. Pushed to main.
 
+## Recent
+- 2026-11-10 (VM) Moved hosting from Render to the Cyfuture VM at https://play56.in: clone `C:\kerala-56`, NSSM services
+  `Play56` (node :3056) + `Play56Tunnel` (own cloudflared tunnel `play56`, independent of dhiedge), machine env vars for
+  Supabase + PORT, `deploy_play56.bat`. DNS CNAMEs for play56.in added by hand (origin cert is dhiedge-scoped).
+  Runbook: `docs/claude-plans/2026-11-10_play56-vm-deploy.md`. Uncommitted (commit from the laptop).
+
 ## In Progress
 - [ ] Collect hands; nothing to do until a few hundred human hands exist
 

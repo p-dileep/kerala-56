@@ -1,0 +1,9 @@
+{
+  "name": "56 · Kerala card table",
+  "short_name": "56",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0E3B43",
+  "theme_color": "#0E3B43",
+  "icons": [{ "src": "/icon.png", "sizes": "256x256", "type": "image/png" }]
+}

@@ -4,7 +4,7 @@ A real-time web version of 56 for 6 players (3 vs 3, 8 cards each) or 8 players 
 or link. Friends join from phone or desktop, and bots fill any empty seats. The server enforces every rule.
 
 ## Play online
-The game is hosted on Render at **https://kerala-56.onrender.com** (free plan: it sleeps after 15 idle minutes, so the first visit can take about a minute to wake). Open the link, type your name (required) and walk into the permanent **6-player table** or **8-player table**; everyone who opens the link sees the same two tables. The first person seated is the host (deals, picks bot style); when they leave the next player becomes host. In the lobby each table shows a LIVE badge with the number seated; an empty table still holding an old game shows a "Reset table" button, and it also resets itself after a few hours empty. You can still **Start a new table** (6 or 8 players) for a private game and share its code. Source: https://github.com/p-dileep/kerala-56. Every push to `main` redeploys automatically; a redeploy ends tables in progress.
+The game lives at **https://play56.in**. Open the link, type your name (required) and walk into the permanent **6-player table** or **8-player table**; everyone who opens the link sees the same two tables. The first person seated is the host (deals, picks bot style); when they leave the next player becomes host. In the lobby each table shows a LIVE badge with the number seated; an empty table still holding an old game shows a "Reset table" button, and it also resets itself after a few hours empty. You can still **Start a new table** (6 or 8 players) for a private game and share its code. Source: https://github.com/p-dileep/kerala-56. Deploys are manual (`git pull` + service restart on the server); a redeploy ends tables in progress.
 
 ## Run locally
 ```bash
@@ -20,8 +20,8 @@ To play with friends over the internet without any hosting, double-click `start_
 ## Variants
 `players` in the table settings is 6 or 8. 6 players use the 48-card pack; 8 players add the 8s and 7s of both packs (no points) for 64 cards. Both deal 8 cards and play 8 tricks; bids, levels and chips are unchanged. Bots scale their hand estimates to the hand size.
 
-## Deploy on Render (how the public link is set up)
-New Web Service from the GitHub repo, language Docker (the `Dockerfile` is used, no build or start command needed), branch `main`, Free instance. Render sets `PORT` itself.
+## How play56.in is hosted
+A Windows VM runs `node src/server.js` on port 3056 as a Windows service (NSSM), with `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` and `PORT` set as machine environment variables. A Cloudflare Tunnel routes `play56.in` and `www.play56.in` to `http://localhost:3056`; Cloudflare terminates TLS, no inbound port is open on the VM. Deploy: `git pull --ff-only origin main && npm ci --omit=dev`, then restart the service. The `Dockerfile` still works for Render-style hosts.
 
 ## Deploy on a VPS
 ```bash

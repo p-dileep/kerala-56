@@ -174,9 +174,14 @@ assert.throws(()=>E.applyBid(s, s.turn, {type:'pass'}), /Opener/);
   assert.deepEqual(B.paramsFor('medium'), B.DEFAULT_PARAMS);
   assert.ok(B.paramsFor('aggressive').estBase > B.paramsFor('defensive').estBase);
   assert.deepEqual(B.paramsFor('nonsense'), B.DEFAULT_PARAMS);
-  assert.deepEqual(B.paramsFor('mixed', 'Kuttan'), B.paramsFor('aggressive'));
-  assert.deepEqual(B.paramsFor('mixed', 'Ammini'), B.paramsFor('defensive'));
+  assert.deepEqual(B.paramsFor('mixed', 'Chinnu'), B.paramsFor('aggressive'));
+  assert.deepEqual(B.paramsFor('mixed', 'Kunjamma'), B.paramsFor('defensive'));
   assert.deepEqual(B.paramsFor('mixed', 'Bot 3'), B.DEFAULT_PARAMS);
+  // half of the named bots carry the human-tuned bidding numbers as shifts on top of their style
+  assert.deepEqual(B.HUMAN_TUNED_BOTS, new Set(['Kuttan', 'Ammini', 'Unni', 'Sarojini', 'Leela']));
+  assert.deepEqual(B.paramsFor('mixed', 'Unni'), { ...B.DEFAULT_PARAMS, ...B.HUMAN_TUNED });
+  assert.equal(B.paramsFor('mixed', 'Kuttan').estBase, B.paramsFor('aggressive').estBase + B.HUMAN_TUNED.estBase - B.DEFAULT_PARAMS.estBase);
+  assert.equal(B.paramsFor('mixed', 'Kuttan').cutMinPts, B.paramsFor('aggressive').cutMinPts);
   // team knowledge: the auction's Jack signal, Plus cards and NS void are read into facts and
   // every simulated layout honours them
   { const s = E.newMatch({}, ()=>0.3); const op = s.turn;

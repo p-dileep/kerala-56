@@ -87,7 +87,18 @@ const STYLES = {
 // Each named bot has its own temperament; the host's table setting 'mixed' uses these.
 const BOT_PERSONALITY = { Kuttan: 'aggressive', Ammini: 'defensive', Pappan: 'medium', Chinnu: 'aggressive', Unni: 'medium',
   Kunjamma: 'defensive', Appu: 'aggressive', Sarojini: 'medium', Mathai: 'defensive', Leela: 'medium' };
-const paramsFor = (style, name) => ({ ...DEFAULT_PARAMS, ...(STYLES[style === 'mixed' ? BOT_PERSONALITY[name] : style] || {}) });
+// Human-tuned bidding: test/imitate.js fits the bidding knobs to the humans' calls in the logged hands
+// (data/hands.jsonl). Half of the named bots always carry these numbers (as shifts on top of their style),
+// the other half keep the self-play numbers, so live play keeps comparing the two. Retune as hands accumulate;
+// keep HUMAN_TUNED_BOTS fixed so the comparison stays clean. Tuned 2026-11-10 on 261 hands / 1294 decisions.
+const HUMAN_TUNED = { estBase: 25, estLenW: 2.25, estJackW: 2, plusMaxValue: 38, nsMargin: -2, bidContestMargin: 1,
+  readJackW: 2.5, readLenW: 1.5, simMinValue: 34 };
+const HUMAN_TUNED_BOTS = new Set(['Kuttan', 'Ammini', 'Unni', 'Sarojini', 'Leela']);
+const paramsFor = (style, name) => {
+  const P = { ...DEFAULT_PARAMS, ...(STYLES[style === 'mixed' ? BOT_PERSONALITY[name] : style] || {}) };
+  if (HUMAN_TUNED_BOTS.has(name)) for (const k of Object.keys(HUMAN_TUNED)) P[k] = +(P[k] + HUMAN_TUNED[k] - DEFAULT_PARAMS[k]).toFixed(3);
+  return P;
+};
 
 // ---------------------------------------------------------------- bidding
 
@@ -680,4 +691,4 @@ function botView(state, seat) {
 }
 
 const estimate = estimateFor;
-module.exports = { decide, botView, estimate, chooseBid, choosePlay, track, inferFacts, dealUnseen, simPoints, DEFAULT_PARAMS, STYLES, BOT_PERSONALITY, paramsFor };
+module.exports = { decide, botView, estimate, chooseBid, choosePlay, track, inferFacts, dealUnseen, simPoints, DEFAULT_PARAMS, STYLES, BOT_PERSONALITY, HUMAN_TUNED, HUMAN_TUNED_BOTS, paramsFor };

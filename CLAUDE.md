@@ -1,6 +1,6 @@
 # kerala-56 (56 / Ambathiyaaru card game) — VM clone
 
-Live at https://kerala-56.onrender.com (Render, auto-deploy from GitHub `main`).
+Live at https://play56.in (Cyfuture Windows VM, NSSM services `Play56` on :3056 + `Play56Tunnel` (own cloudflared tunnel); deploy by `git pull` + service restart, see `docs/claude-plans/2026-11-10_move-to-play56-in-on-cyfuture-vm.md`). Render (kerala-56.onrender.com) kept as fallback for a week, then delete.
 Source: https://github.com/p-dileep/kerala-56. Develop locally; this VM clone is read-only (git pull only).
 
 ## Current Task
@@ -57,19 +57,22 @@ Log finished hands to Supabase so human play can later tune the bots (`src/bot.j
   Supabase + PORT, `deploy_play56.bat`. DNS CNAMEs for play56.in added by hand (origin cert is dhiedge-scoped).
   Runbook: `docs/claude-plans/2026-11-10_play56-vm-deploy.md`. Pushed as 46c7916.
 - 2026-11-10 (VM) Auto deploy: task `Play56_AutoDeploy` runs `auto_deploy.ps1` every 5 min -- static-only pushes go live at once, server changes restart Play56 in the 03:00-06:00 quiet window (waits for empty tables until 05:30). Favicon + manifest added to public/.
+- 2026-11-10 (laptop) README + lobby title/hint say play56.in; laptop-side plan `docs/claude-plans/2026-11-10_move-to-play56-in-on-cyfuture-vm.md` (this laptop is NOT the VM).
+- 2026-11-10 Bidding imitation tuning: `test/imitate.js` replays the 261 logged hands and scores the bot against 1294 human bidding decisions (baseline score 58.0, tuned 61.6; held-out +0.7). Nine knobs moved -> `HUMAN_TUNED` in bot.js, self-play A/B +3.92 tables/match vs default (150 matches). RULE (user): half of the named bots ALWAYS carry the human-tuned numbers: **Kuttan, Ammini, Unni, Sarojini, Leela** (`HUMAN_TUNED_BOTS`); Pappan, Chinnu, Kunjamma, Appu, Mathai stay self-play; never change the membership, retune only the numbers. Doc `docs/claude-plans/2026-11-10_bidding-imitation-tuning.md`.
 
 ## In Progress
+- [ ] Server-side hardening (trust proxy, helmet, Socket.IO payload caps/validation, per-socket rate limits) and Cloudflare rules (Bot Fight Mode, rate limit, Always HTTPS); delete the Render service after a week.
 - [ ] Collect hands; nothing to do until a few hundred human hands exist
 
 ## Next Steps
 1. Pull the latest main on the local machine before editing there (this change was committed from the VM clone).
-2. After a few hundred human hands: extend `test/tune.js` to replay logged deals / bidding imitation.
+2. At ~500 and ~1000 hands: `node test/fetch_hands.js > data/hands.jsonl`, `node test/imitate.js tune 5`, paste `changes:` into `HUMAN_TUNED`; compare made% of the human-tuned half vs the self-play half from the log.
 
 ## Notes
 - Seat clipping on phones fixed (keepSeatsOnScreen nudges seats via --nudge; slimmer seat buttons <=700px). Pushed to main. Still crowded: 8-player table at 360px before the deal (top/corner seats touch, left seat covers mat text).
 - No DOM test harness in the repo (no jsdom). Client click checks were done once with headless Chrome over CDP from a scratch script.
-- Pull hands: `node test/fetch_hands.js > data/hands.jsonl` (Supabase creds in `.env`, not committed). The service key was pasted in chat on 2026-11-01 and should be rotated (update `.env` here + Render env).
+- Pull hands: `node test/fetch_hands.js > data/hands.jsonl` (Supabase creds in `.env`, not committed). The service key was rotated on 2026-11-10 when moving to the VM (update `.env` here if fetch_hands fails).
 - Local test: `node src/server.js` -> http://localhost:3056 ; on localhost `window.demoWin(0)` in the console previews the trophy animation.
 - Bots are rule-based (about 45 numeric knobs + 3 style presets + Monte Carlo check); `test/tune.js` is a self-play tuner.
-- Rooms are in memory on Render; nothing is persisted today. Redeploy ends tables in progress.
+- Rooms are in memory on the server; nothing is persisted today. Redeploy / service restart ends tables in progress.
 - Supabase free project pauses after 7 idle days; weekly activity keeps it alive.

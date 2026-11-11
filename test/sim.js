@@ -247,6 +247,14 @@ assert.throws(()=>E.applyBid(s, s.turn, {type:'pass'}), /Opener/);
     E.applyBid(x, op3, { type: 'bid', value: 28, suit: 'S' });
     const opp = x.turn; x.hands[opp] = [{id:'JS1',suit:'S',rank:'J'},{id:'9S0',suit:'S',rank:'9'},{id:'10S0',suit:'S',rank:'10'},{id:'QH0',suit:'H',rank:'Q'},{id:'QC0',suit:'C',rank:'Q'},{id:'10C0',suit:'C',rank:'10'},{id:'QD0',suit:'D',rank:'Q'},{id:'KD0',suit:'D',rank:'K'}];
     assert.ok(!E.legalBidActions(x, opp).plusOpen.some((o)=>o.suit==='S' && o.n===1)); }
+  // Plus 2 on both Jacks, then a Jack-showing bid in the same suit: still two Jacks, and layouts can be dealt (hand #361)
+  { const acts = [{ seat: 4, type: 'bid', value: 28, suit: 'H', hasJack: false }, { seat: 0, type: 'plus', n: 2, suit: 'H', value: 30 },
+      { seat: 0, type: 'bid', value: 33, suit: 'H', hasJack: true }];
+    const s = E.newMatch({}, ()=>0.3); const me = 1;
+    s.hands[me] = s.hands[me].filter((c)=>!(c.suit==='H'&&c.rank==='J')).slice(0, 8);
+    const v = { ...B.botView(s, me), bidding: { ...s.bidding, actions: acts } };
+    const f = B.inferFacts(v); assert.deepEqual(f.must[0], ['JH', 'JH']);
+    const h = B.dealUnseen(v, f, Math.random); assert.ok(h && h[0].filter((c)=>c.rank==='J'&&c.suit==='H').length === 2); }
   // doubled bid, everyone passes: the declarer may keep, raise, or change to another suit at a higher value
   { const s = E.newMatch({}, ()=>0.3); const op = s.turn; const N = 6;
     const H = (id, suit, rank) => ({ id, suit, rank });

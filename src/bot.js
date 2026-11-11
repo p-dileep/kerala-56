@@ -200,7 +200,7 @@ function chooseBid(view, P = DEFAULT_PARAMS) {
         if (teamAware(firstSuit) < legal.minBid - P.backSlack) return false;
         if (P.simDeals && legal.minBid >= P.simMinValue) {
           const q = simPoints(view, firstSuit, P);
-          if (q !== null && q < legal.minBid + P.simMargin) return false;
+          if (q !== null && q < simNeed(legal.minBid, P)) return false;
         }
         return true;
       };
@@ -247,7 +247,7 @@ function chooseBid(view, P = DEFAULT_PARAMS) {
       // team really collects and go to the highest level that holds up; this also overrules the guess.
       if (P.simDeals && b.high.value < 56 && teamEst >= 40 - P.levelMargin - 4) {
         const q = simPoints(view, partnerSuit, P);
-        if (q !== null) level = [56, 48, 40].find((L) => L > b.high.value && q >= L + P.simMargin);
+        if (q !== null) level = [56, 48, 40].find((L) => L > b.high.value && q >= simNeed(L, P));
       }
       if (level && level >= legal.minBid) return { type: 'bid', value: level, suit: partnerSuit };
       // Holding the Jack of partner's suit: tell the team by raising one step (the "30 Hearts" form
@@ -315,8 +315,8 @@ function chooseBid(view, P = DEFAULT_PARAMS) {
     if (P.simDeals && P.simContest && b.high && value >= P.simMinValue) {
       const q = simPoints(view, best.suit, P);
       if (q !== null) {
-        if (q < value + P.simMargin) return legal.pass ? { type: 'pass' } : { type: 'bid', value, suit: best.suit };
-        value = [56, 48, 40].find((L) => L >= value && q >= L + P.simMargin) || value;
+        if (q < simNeed(value, P)) return legal.pass ? { type: 'pass' } : { type: 'bid', value, suit: best.suit };
+        value = [56, 48, 40].find((L) => L >= value && q >= simNeed(L, P)) || value;
       }
     }
     return { type: 'bid', value, suit: best.suit };
@@ -343,14 +343,12 @@ function inferFacts(view) {
   const must = Array.from({ length: N }, () => []);
   const lone = Array.from({ length: N }, () => new Set());
   const voids = Array.from({ length: N }, () => new Set());
-  const jackShown = new Set();
   const acts = view.bidding.actions;
   acts.forEach((a, i) => {
     if (a.type === 'ns') voids[a.seat].add(a.ns);
     if (a.suit === 'NT' || !a.suit) return;
-    if (a.type === 'bid' && a.hasJack && !jackShown.has(`${a.seat}${a.suit}`)) {
-      jackShown.add(`${a.seat}${a.suit}`); must[a.seat].push(`J${a.suit}`);
-    }
+    // a Jack-showing bid after a Plus that already showed a Jack there is the same Jack, not another one
+    if (a.type === 'bid' && a.hasJack && !must[a.seat].includes(`J${a.suit}`)) must[a.seat].push(`J${a.suit}`);
     if (a.type === 'plus') {
       const m = E.plusMeaning(acts.slice(0, i), a.suit)[a.n] || [];
       if (a.n === 1 && m[0] === 'J' && !must[a.seat].includes(`J${a.suit}`)) lone[a.seat].add(a.suit);
@@ -362,7 +360,7 @@ function inferFacts(view) {
 
 /**
  * Deal the cards I cannot see to the other seats at random, honouring the facts where possible.
- * Returns hands[] (mine included) or null when a required card is no longer available.
+ * A shown card that is not available (a false or mistaken call) is skipped. Returns hands[] (mine included).
  */
 function dealUnseen(view, facts, rng) {
   const N = view.players || 6, me = view.mySeat;
@@ -376,7 +374,7 @@ function dealUnseen(view, facts, rng) {
     if (s === me) continue;
     for (const rs of facts.must[s]) {
       const i = pool.findIndex((c) => c.rank + c.suit === rs);
-      if (i < 0 || room[s] <= 0) return null;
+      if (i < 0 || room[s] <= 0) continue;
       hands[s].push(pool.splice(i, 1)[0]); room[s]--;
     }
   }
@@ -399,6 +397,8 @@ function dealUnseen(view, facts, rng) {
  * both teams using the bot's own play. Returns my team's points at confidence `conf`
  * (the value reached in at least that share of deals), or null when no deal could be laid out.
  */
+// Points the layouts must show before bidding `value`: the margin on top, but 56 is all there is.
+const simNeed = (value, P) => Math.min(56, value + P.simMargin);
 function simPoints(view, suit, P, rng = Math.random) {
   const deals = P.simDeals | 0;
   if (!deals) return null;
@@ -671,7 +671,7 @@ function chooseSelfRaise(view, P) {
   if (!high || view.bidding.raised || !E.LEVELS.some((l) => l > high.value)) return { type: 'keep' };
   const q = P.simDeals ? simPoints(view, high.suit, P) : null;
   if (q === null) return { type: 'keep' };
-  const level = [56, 48, 40].find((L) => L > high.value && q >= L + P.simMargin);
+  const level = [56, 48, 40].find((L) => L > high.value && q >= simNeed(L, P));
   return level ? { type: 'raise', value: level } : { type: 'keep' };
 }
 

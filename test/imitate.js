@@ -52,10 +52,11 @@ function toAction(s, a) {
 const same = (x, y) => x.type === y.type && (x.type === 'pass' || x.type === 'double' ||
   (x.type === 'plus' ? x.n === y.n && (x.suit || '') === (y.suit || '') : x.value === y.value && x.suit === y.suit));
 
+const TEST_NAMES = /^tester$/i;   // the owner's own test seats: not counted as human play
 // Every human decision in the bidding phase: { hand, seat, name, human: action, view }.
 function* humanDecisions(hands) {
   for (const h of hands) {
-    const humans = new Set(h.seats.map((x, i) => x.kind === 'human' ? i : -1).filter((i) => i >= 0));
+    const humans = new Set(h.seats.map((x, i) => x.kind === 'human' && !TEST_NAMES.test(x.name) ? i : -1).filter((i) => i >= 0));
     if (!humans.size) continue;
     let s;
     try { s = rigHand(h); } catch (e) { continue; }

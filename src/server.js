@@ -15,7 +15,9 @@ const AWAY_TAKEOVER_MS = Number(process.env.AWAY_TAKEOVER_MS) || 20000; // bot p
 const ROOM_IDLE_MS = 1000 * 60 * 60 * 3;
 const SUPABASE_URL = process.env.SUPABASE_URL || '';
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || '';
-const GAME_VERSION = process.env.GAME_VERSION || process.env.RENDER_GIT_COMMIT || null;
+// "<site>@<commit>": both sites log to the same Supabase table, the prefix says which one the hand came from
+const COMMIT = process.env.GAME_VERSION || process.env.RENDER_GIT_COMMIT || null;
+const GAME_VERSION = COMMIT && `${process.env.RENDER ? 'render' : 'play56.in'}@${COMMIT}`;
 
 const BOT_NAMES = ['Kuttan', 'Ammini', 'Pappan', 'Chinnu', 'Unni', 'Kunjamma', 'Appu', 'Sarojini', 'Mathai', 'Leela'];
 

@@ -178,6 +178,60 @@
     <rect x="28" y="110" width="64" height="10" rx="3" fill="#7A2026"/>
     <path d="M34 22q6 26 20 44" stroke="#FFF6D6" stroke-width="4" stroke-linecap="round" fill="none" opacity=".75"/>
     <path d="M60 36l4 9 10 1-7 7 2 10-9-5-9 5 2-10-7-7 10-1z" fill="#7A2026" opacity=".85"/></svg>`;
+  // Kunukku: the loser's ear-drop. An ear with a coconut-leaf rib looped over it and a baby coconut dangling
+  // below the lobe; the hanging part (g.kun-drop) swings.
+  const KUNUKKU = `<svg viewBox="0 0 60 86" aria-hidden="true">
+    <defs><radialGradient id="kunG" cx=".35" cy=".3" r=".9"><stop offset="0" stop-color="#B9E36A"/><stop offset=".55" stop-color="#6FB53A"/><stop offset="1" stop-color="#3C8526"/></radialGradient></defs>
+    <path d="M12 31C9 13 25 4 38 8c12 4 15 18 10 30-4 10-9 14-12 20-4 9-19 9-22-1-2-7 0-16-2-26z" fill="#F6C59C" stroke="#7A4A22" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M20 29c0-10 9-14 17-11 7 3 8 12 4 20-3 6-7 9-9 13" fill="none" stroke="#DDA070" stroke-width="3.2" stroke-linecap="round"/>
+    <path d="M24 35c4-3 9-1 9 4 0 4-4 6-5 10-1 3-5 3-6 0" fill="#E9AE82" stroke="#C98658" stroke-width="1.2" stroke-linecap="round"/>
+    <path d="M13 21c1 12 9 15 15 22" stroke="#5E8A2E" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+    <g class="kun-drop">
+      <path d="M28 43c5 6 8 11 12 17" stroke="#5E8A2E" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+      <path d="M45 42c1 6 0 12-3 18" stroke="#8A6A32" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <path d="M31 69c0-10 21-10 21 0 0 9-4 15-10.500 15S31 78 31 69z" fill="url(#kunG)" stroke="#245E1B" stroke-width="1.4"/>
+      <path d="M32 65q3-7 9.500-7t9.500 7q-3-2-4.750 0-2.250-2.500-4.750 0-2.500-2.500-4.750 0-1.750-2-4.750 0z" fill="#A39545" stroke="#5E4A1C" stroke-width=".9" stroke-linejoin="round"/>
+      <ellipse cx="36.500" cy="71" rx="1.800" ry="4" fill="#fff" opacity=".4" transform="rotate(-14 36.500 71)"/>
+    </g></svg>`;
+  const KUNUKKU_TIP = 'Kunukku: lost the last match. Comes off when this player bids and makes a contract.';
+  // Kunukku kayaral: after the champions screen a giant kunukku drops in, then one flies to every seat of the
+  // losing team and lands there. The seats' own kunukkus stay hidden (#seats.kun-pending) until the landing.
+  function kunukkuKayaral(team, after) {
+    const old = $('kayaral'); if (old) old.remove();
+    const el = document.createElement('div');
+    el.id = 'kayaral'; el.className = 'kayaral';
+    el.innerHTML = `<div class="kay-card"><span class="kunukku huge">${KUNUKKU}</span>
+      <div class="kicker">Kunukku kayari!</div><div class="team t${team}">${teamName(team)}</div><div class="sub">wears the kunukku</div></div>`;
+    document.body.appendChild(el);
+    let done = false;
+    const land = () => { $('seats').classList.remove('kun-pending'); $('seats').classList.add('kun-landed'); setTimeout(() => $('seats').classList.remove('kun-landed'), 900); };
+    const end = () => { if (done) return; done = true; land(); el.remove(); after && after(); };
+    el.onclick = end;
+    setTimeout(() => {
+      if (done) return;
+      const from = el.querySelector('.kunukku').getBoundingClientRect();
+      el.classList.add('fly');
+      const seats = [...document.querySelectorAll(`#seats .seat.t${team}:not(.empty)`)];
+      const STEP = 220, FLY = 1150;
+      seats.forEach((seat, i) => {
+        const k = seat.querySelector('.kunukku'), sr = seat.getBoundingClientRect();
+        const to = k ? k.getBoundingClientRect() : { left: sr.right - 22, top: sr.bottom - 10, width: 46, height: 66 };
+        const f = document.createElement('span');
+        f.className = 'kunukku flyer'; f.innerHTML = KUNUKKU;
+        f.style.cssText = `left:${from.left}px;top:${from.top}px;width:${from.width}px`;
+        el.appendChild(f);
+        const dx = to.left + to.width / 2 - (from.left + from.width / 2), dy = to.top + to.height / 2 - (from.top + from.height / 2);
+        const sc = to.width / from.width, spin = i % 2 ? -360 : 360;
+        f.animate([
+          { transform: 'translate(0,0) scale(1) rotate(0deg)' },
+          { transform: `translate(${dx * .45}px,${dy * .45 - 140}px) scale(${(1 + sc) / 1.6}) rotate(${spin * .6}deg)`, offset: .55 },
+          { transform: `translate(${dx}px,${dy}px) scale(${sc}) rotate(${spin}deg)` }
+        ], { duration: FLY, delay: i * STEP, easing: 'cubic-bezier(.45,0,.3,1)', fill: 'both' });
+      });
+      setTimeout(end, FLY + Math.max(0, seats.length - 1) * STEP + 80);
+    }, 1900);
+  }
+  if (location.hostname === 'localhost') window.demoKunukku = (t = 0) => kunukkuKayaral(t);
   // matchWin: the big six-second "Champions" version; otherwise a shorter one for the hand's winner.
   function celebrate(team, matchWin, sub, after) {
     const old = $('cheer'); if (old) old.remove();
@@ -375,7 +429,7 @@
         // any seated player (or the host) may remove / replace another player
         if (s.kind === 'human' && !isMe && (host || seated))
           actions += `<button class="btn small ghost" data-kick="${s.seat}">${g ? 'Replace with bot' : 'Remove'}</button>`;
-        body = `${g ? `<span class="cnt" title="Cards in hand">${g.handCounts[s.seat]}</span>` : ''}${toks.length ? `<div class="toks">${toks.join('')}</div>` : ''}
+        body = `${s.kunukku ? `<span class="kunukku" title="${KUNUKKU_TIP}">${KUNUKKU}</span>` : ''}${g ? `<span class="cnt" title="Cards in hand">${g.handCounts[s.seat]}</span>` : ''}${toks.length ? `<div class="toks">${toks.join('')}</div>` : ''}
           <div class="nm">${esc(s.name)}${g && s.tuned ? ' <svg viewBox="0 0 16 16" width=".85em" height=".85em" fill="currentColor" style="vertical-align:-.08em"><title>Bids with numbers tuned on human play</title><circle cx="8" cy="5" r="3.2"/><path d="M2 15c0-3.6 2.7-5.6 6-5.6s6 2 6 5.6z"/></svg>' : ''}</div>${meta.length ? `<div class="meta">${meta.join(' ')}</div>` : ''}
           ${actions ? `<div class="seat-actions">${actions}</div>` : ''}`;
       }
@@ -726,7 +780,8 @@
         <span>${teamName(0)} chips</span><span class="v">${g.tables[0]}</span>
         <span>${teamName(1)} chips</span><span class="v">${g.tables[1]}</span>
       </div>
-      ${over ? `<p><b>${teamName(g.winner)} wins the match.</b></p>` : room.isHost ? '' : '<p class="sub">The host deals the next hand.</p>'}
+      ${over ? `<p><b>${teamName(g.winner)} wins the match.</b></p>
+        <p class="kun-line"><span class="kunukku big">${KUNUKKU}</span><span><b>${teamName(1 - g.winner)} wears the kunukku.</b><br>Bid and win the first hand of the next match and the whole team takes it off. After that, each player sheds their own by bidding and making a contract.</span></p>` : room.isHost ? '' : '<p class="sub">The host deals the next hand.</p>'}
       <div class="row">
         ${over && room.isHost ? '<button class="btn primary" data-start>Start a new match</button>' : ''}
         <button class="btn" data-hands>Show the initial hands</button>
@@ -734,7 +789,7 @@
         <button class="btn" data-close>Close</button>
       </div>`, true, 'phase');
     const chips = `${r.amount} chip${r.amount > 1 ? 's' : ''}`;
-    if (over) celebrate(g.winner, true, 'wins the match', show);
+    if (over) { $('seats').classList.add('kun-pending'); celebrate(g.winner, true, 'wins the match', () => kunukkuKayaral(1 - g.winner, show)); }
     else celebrate(r.receiver, false, conceded ? `takes ${chips} as ${teamName(r.conceded)} concedes` : r.made ? `made ${esc(bidText(c.value, c.suit, c.hasJack))} and takes ${chips}` : `set ${teamName(c.team)} and takes ${chips}`, show);
   }
 })();

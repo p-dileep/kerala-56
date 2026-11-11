@@ -172,6 +172,34 @@ button, input { font: inherit; }
 .seat .seat-actions { display: flex; gap: 6px; justify-content: center; margin-top: 6px; }
 .seat.empty { border-style: dashed; border-color: rgba(207,227,226,.35); background: rgba(8,42,48,.6); }
 .seat.me .nm::after { content: ' (you)'; font-weight: 400; opacity: .7; }
+/* kunukku: the loser's ear-drop (ear + leaf rib + baby coconut), hooked on the seat's lower right corner; the coconut swings */
+.kunukku { display: inline-block; width: 46px; filter: drop-shadow(0 3px 4px rgba(0,0,0,.45)); }
+.kunukku svg { display: block; width: 100%; height: auto; overflow: visible; }
+.kunukku .kun-drop { transform-box: view-box; transform-origin: 30px 45px; animation: kunswing 1.3s ease-in-out infinite alternate; }
+.seat .kunukku { position: absolute; right: -24px; bottom: -46px; z-index: 2; }
+.kunukku.big { width: 64px; flex: none; }
+.kun-line { display: flex; gap: 14px; align-items: center; text-align: left; }
+@keyframes kunswing { from { transform: rotate(-11deg); } to { transform: rotate(11deg); } }
+@media (prefers-reduced-motion: reduce) { .kunukku .kun-drop { animation: none; } }
+/* kunukku kayaral: giant kunukku drops in, then one flies to each losing seat */
+#seats.kun-pending .seat .kunukku { visibility: hidden; }
+#seats.kun-landed .seat .kunukku { animation: kunland .8s cubic-bezier(.2,1.7,.4,1); }
+@keyframes kunland { from { transform: scale(2.6) rotate(-28deg); } }
+.kayaral { position: fixed; inset: 0; z-index: 26; display: grid; place-items: center; cursor: pointer; overflow: hidden;
+  background: radial-gradient(circle at 50% 45%, rgba(86,14,26,.78), rgba(4,20,24,.94)); animation: cheerin .3s ease-out both; transition: background .5s; }
+.kayaral.fly { background: transparent; pointer-events: none; }
+.kay-card { text-align: center; animation: kunthud .45s .62s both; }
+.kayaral.fly .kay-card { opacity: 0; transition: opacity .2s; }
+.kunukku.huge { width: clamp(150px, 30vmin, 240px); animation: kundrop .75s cubic-bezier(.5,0,.8,.6) both; }
+@keyframes kundrop { from { transform: translateY(-95vh) rotate(-35deg); } }
+@keyframes kunthud { 0% { transform: translateY(0); } 20% { transform: translateY(14px) scale(1.04, .94); } 45% { transform: translateY(-8px); } 70% { transform: translateY(4px); } 100% { transform: none; } }
+.kayaral .kicker { margin-top: 12px; font-size: clamp(1.7rem, 6.5vmin, 3.2rem); font-weight: 800; letter-spacing: .03em; color: #B9E36A; text-shadow: 0 4px 0 rgba(0,0,0,.35); animation: rise .45s .75s both; }
+.kayaral .team { font-size: clamp(1.3rem, 4.5vmin, 2.2rem); font-weight: 700; animation: rise .45s .95s both; }
+.kayaral .team.t0 { color: #F3D27A; }
+.kayaral .team.t1 { color: #F5A3AD; }
+.kayaral .sub { opacity: .8; animation: rise .45s 1.1s both; }
+.kunukku.flyer { position: fixed; z-index: 27; margin: 0; }
+@media (max-width: 700px) { .kunukku { width: 34px; } .seat .kunukku { right: -16px; bottom: -34px; } }
 
 /* trick */
 .trick { position: absolute; inset: 0; pointer-events: none; }

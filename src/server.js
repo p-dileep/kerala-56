@@ -58,7 +58,9 @@ function createRoom(hostToken, players = 6, code = null) {
     touched: Date.now(),
     version: 0,
     loggedHand: 0,
-    concede: null           // pending concede request: { team, by } (seat index), humans of that team only
+    kunukku: [],                    // seat index -> true while that seat wears the loser's kunukku
+    kunukkuFresh: [false, false],   // team got it at the last match end and has not finished a hand since
+    concede: null          // pending concede request: { team, by } (seat index), humans of that team only
   };
   rooms.set(room.code, room);
   return room;
@@ -80,6 +82,7 @@ function resetFixed(room) {
   clearTimeout(room.timer);
   room.seats = Array.from({ length: room.players }, emptySeat);
   room.game = null; room.chat = []; room.hostToken = null; room.botStyle = 'mixed'; room.teamNames = ['Team A', 'Team B']; room.touched = Date.now();
+  room.kunukku = []; room.kunukkuFresh = [false, false];
 }
 
 function lobbyInfo() {
@@ -107,7 +110,8 @@ function publicSeats(room) {
   return room.seats.map((s, i) => ({
     seat: i, team: E.team(i), kind: s.kind, name: s.name,
     connected: s.kind === 'bot' ? true : s.connected,
-    tuned: s.kind === 'bot' && Bot.HUMAN_TUNED_BOTS.has(s.name)
+    tuned: s.kind === 'bot' && Bot.HUMAN_TUNED_BOTS.has(s.name),
+    kunukku: !!room.kunukku[i]
   }));
 }
 
@@ -147,12 +151,37 @@ function logHand(room) {
     .finally(() => clearTimeout(t));
 }
 
+// Kunukku: the team that loses a match wears it (every seat of that team) into the next match.
+// If that team bids and makes the first hand after getting it, the whole team takes it off; otherwise each
+// player sheds only their own, by being the bidder of a contract that is made. Void hands do not count.
+function updateKunukku(room) {
+  const g = room.game, r = g.result;
+  if (r && !r.void) {
+    const c = r.contract;
+    if (r.made && room.kunukkuFresh[c.team] && room.kunukku.some((k, i) => k && E.team(i) === c.team)) {
+      room.seats.forEach((s, i) => { if (E.team(i) === c.team) room.kunukku[i] = false; });
+      sysChat(room, `${room.teamNames[c.team]} bid and won the first hand: the kunukku comes off the whole team!`);
+    } else if (r.made && room.kunukku[c.seat]) {
+      room.kunukku[c.seat] = false;
+      sysChat(room, `${room.seats[c.seat].name} made the bid and takes off the kunukku.`);
+    }
+    room.kunukkuFresh = [false, false];
+  }
+  if (g.phase === 'matchover') {
+    const loser = 1 - g.winner;
+    room.seats.forEach((s, i) => { if (E.team(i) === loser) room.kunukku[i] = true; });
+    room.kunukkuFresh[loser] = true;
+    sysChat(room, `${room.teamNames[loser]} wears the kunukku!`);
+  }
+}
+
 function broadcast(room) {
   room.version++;
   const g = room.game;
   if (room.concede && (!g || g.phase !== 'playing')) room.concede = null;   // the hand ended on its own
   if (g && (g.phase === 'handover' || g.phase === 'matchover') && room.loggedHand !== g.handNo) {
     room.loggedHand = g.handNo;
+    updateKunukku(room);
     logHand(room);
   }
   room.touched = Date.now();
@@ -524,4 +553,4 @@ if (require.main === module) {
   server.listen(PORT, () => console.log(`56 server listening on http://localhost:${PORT}`));
 }
 
-module.exports = { server, io, rooms };
+module.exports = { server, io, rooms, updateKunukku };

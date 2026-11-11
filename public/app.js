@@ -781,7 +781,7 @@
         <span>${teamName(1)} chips</span><span class="v">${g.tables[1]}</span>
       </div>
       ${over ? `<p><b>${teamName(g.winner)} wins the match.</b></p>
-        <p class="kun-line"><span class="kunukku big">${KUNUKKU}</span><span><b>${teamName(1 - g.winner)} wears the kunukku.</b><br>Bid and win the first hand of the next match and the whole team takes it off. After that, each player sheds their own by bidding and making a contract.</span></p>` : room.isHost ? '' : '<p class="sub">The host deals the next hand.</p>'}
+        <p class="kun-line"><span class="kunukku big">${KUNUKKU}</span><span><b>${teamName(1 - g.winner)} wears the kunukku.</b><span class="how"><br>Bid and win the first hand of the next match and the whole team takes it off. After that, each player sheds their own by bidding and making a contract.</span></span></p>` : room.isHost ? '' : '<p class="sub">The host deals the next hand.</p>'}
       <div class="row">
         ${over && room.isHost ? '<button class="btn primary" data-start>Start a new match</button>' : ''}
         <button class="btn" data-hands>Show the initial hands</button>

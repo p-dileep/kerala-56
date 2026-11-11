@@ -104,7 +104,8 @@ function seatOfToken(room, token) {
 function publicSeats(room) {
   return room.seats.map((s, i) => ({
     seat: i, team: E.team(i), kind: s.kind, name: s.name,
-    connected: s.kind === 'bot' ? true : s.connected
+    connected: s.kind === 'bot' ? true : s.connected,
+    tuned: s.kind === 'bot' && Bot.HUMAN_TUNED_BOTS.has(s.name)
   }));
 }
 
@@ -227,11 +228,28 @@ function autoAct(room, seat) {
   broadcast(room);
 }
 
+// Name for a bot at `seat`. A team with a human on it gets exactly one human-tuned bot
+// (Bot.HUMAN_TUNED_BOTS); its other bots come from the self-play half. All-bot teams: any free name.
+function botName(room, seat) {
+  const used = new Set(room.seats.filter((s, i) => i !== seat).map((s) => s.name));
+  const free = BOT_NAMES.filter((n) => !used.has(n));
+  const mates = room.seats.filter((s, i) => i !== seat && i % 2 === seat % 2);
+  let pool = free;
+  if (mates.some((s) => s.kind === 'human')) {
+    const wantTuned = !mates.some((s) => s.kind === 'bot' && Bot.HUMAN_TUNED_BOTS.has(s.name));
+    const fit = free.filter((n) => Bot.HUMAN_TUNED_BOTS.has(n) === wantTuned);
+    if (fit.length) pool = fit;
+  }
+  return pool.includes(BOT_NAMES[seat]) ? BOT_NAMES[seat] : pool[0] || `Bot ${seat + 1}`;
+}
+
 function startMatch(room) {
-  const used = new Set(room.seats.map((s) => s.name));
-  const freeNames = BOT_NAMES.filter((n) => !used.has(n));
+  // every bot (pre-set by the host or filling an empty seat) is named afresh, now that the teams are known
   room.seats.forEach((s, i) => {
-    if (s.kind === 'empty') room.seats[i] = { ...emptySeat(), kind: 'bot', name: freeNames.shift() || `Bot ${i + 1}` };
+    if (s.kind !== 'human') room.seats[i] = { ...emptySeat(), kind: 'bot' };
+  });
+  room.seats.forEach((s, i) => {
+    if (s.kind === 'bot') s.name = botName(room, i);
   });
   room.game = E.newMatch({ players: room.players });
   room.loggedHand = 0;
@@ -308,10 +326,13 @@ io.on('connection', (socket) => {
     if (myName) socket.data.name = myName;
     if (cur >= 0) {
       myName = myName || room.seats[cur].name;
-      room.seats[cur] = room.game ? { ...emptySeat(), kind: 'bot', name: BOT_NAMES[cur] } : emptySeat();
-      if (room.game) sysChat(room, `${BOT_NAMES[cur]} took over ${myName}'s old seat.`);
+      room.seats[cur] = emptySeat();
     }
     room.seats[seat] = { kind: 'human', name: myName || `Player ${seat + 1}`, token: socket.data.token, socketId: socket.id, connected: true };
+    if (cur >= 0 && room.game) {
+      room.seats[cur] = { ...emptySeat(), kind: 'bot', name: botName(room, cur) };
+      sysChat(room, `${room.seats[cur].name} took over ${myName}'s old seat.`);
+    }
     if (target.kind === 'bot') sysChat(room, `${room.seats[seat].name} took over from ${target.name}.`);
     broadcast(room);
   });
@@ -335,7 +356,7 @@ io.on('connection', (socket) => {
     // any seated player (or the host) may remove another player: small friends-only tables
     if (socket.data.token !== room.hostToken && seatOfToken(room, socket.data.token) < 0) return fail('Sit down first.');
     sysChat(room, `${s.name} was replaced by a bot.`);
-    room.seats[Number(seat)] = room.game ? { ...emptySeat(), kind: 'bot', name: BOT_NAMES[Number(seat)] } : emptySeat();
+    room.seats[Number(seat)] = room.game ? { ...emptySeat(), kind: 'bot', name: botName(room, Number(seat)) } : emptySeat();
     broadcast(room);
   });
 
@@ -464,7 +485,7 @@ io.on('connection', (socket) => {
     const seat = seatOfToken(room, socket.data.token);
     if (seat >= 0) {
       const name = room.seats[seat].name;
-      room.seats[seat] = room.game ? { ...emptySeat(), kind: 'bot', name: BOT_NAMES[seat] } : emptySeat();
+      room.seats[seat] = room.game ? { ...emptySeat(), kind: 'bot', name: botName(room, seat) } : emptySeat();
       sysChat(room, `${name} left${room.game ? ' — a bot took the seat' : ''}.`);
     } else sysChat(room, `${socket.data.name || 'Guest'} stopped watching.`);
     socket.leave(room.code);

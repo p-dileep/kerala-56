@@ -2,6 +2,7 @@
 process.env.PORT = 0; process.env.BOT_DELAY_MS = 5; process.env.BOT_BID_DELAY_MS = 5; process.env.TRICK_PAUSE_MS = 5;
 const { server } = require('../src/server');
 const { io } = require('socket.io-client');
+const { HUMAN_TUNED_BOTS } = require('../src/bot');
 server.listen(0, () => {
   const url = `http://localhost:${server.address().port}`;
   const s = io(url, { transports: ['websocket'] });
@@ -44,6 +45,11 @@ server.listen(0, () => {
       started = true; s.emit('start'); return;
     }
     const g = r.game; if (!g) return;
+    for (const team of [0, 1]) {            // a team with a human has exactly one human-tuned bot
+      const bots = r.seats.filter((x, i) => i % 2 === team && x.kind === 'bot');
+      const tuned = bots.filter((x) => HUMAN_TUNED_BOTS.has(x.name)).length;
+      if (bots.length && tuned !== 1) { console.error('team', team, 'should have one human-tuned bot', bots.map((x) => x.name)); process.exit(1); }
+    }
     if (g.phase === 'playing' && g.handNo === 2 && mate && mate.ready && !concede.proposed) {   // host proposes a concede
       concede.proposed = true; s.emit('concede', { action: 'propose' });
     }

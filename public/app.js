@@ -376,7 +376,7 @@
         if (s.kind === 'human' && !isMe && (host || seated))
           actions += `<button class="btn small ghost" data-kick="${s.seat}">${g ? 'Replace with bot' : 'Remove'}</button>`;
         body = `${g ? `<span class="cnt" title="Cards in hand">${g.handCounts[s.seat]}</span>` : ''}${toks.length ? `<div class="toks">${toks.join('')}</div>` : ''}
-          <div class="nm">${esc(s.name)}${g && s.tuned ? ' <span title="Bids with numbers tuned on human play">👤</span>' : ''}</div>${meta.length ? `<div class="meta">${meta.join(' ')}</div>` : ''}
+          <div class="nm">${esc(s.name)}${g && s.tuned ? ' <svg viewBox="0 0 16 16" width=".85em" height=".85em" fill="currentColor" style="vertical-align:-.08em"><title>Bids with numbers tuned on human play</title><circle cx="8" cy="5" r="3.2"/><path d="M2 15c0-3.6 2.7-5.6 6-5.6s6 2 6 5.6z"/></svg>' : ''}</div>${meta.length ? `<div class="meta">${meta.join(' ')}</div>` : ''}
           ${actions ? `<div class="seat-actions">${actions}</div>` : ''}`;
       }
       return `<div class="${cls.join(' ')}" data-seat="${s.seat}" style="left:${x}%;top:${y}%" title="${teamName(s.team)}">${said}${body}</div>`;

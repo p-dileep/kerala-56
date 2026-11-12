@@ -12,6 +12,8 @@ const BOT_DELAY_MS = Number(process.env.BOT_DELAY_MS) || 900;
 const BOT_BID_DELAY_MS = Number(process.env.BOT_BID_DELAY_MS) || BOT_DELAY_MS + 1000; // calls read slower than card plays
 const TRICK_PAUSE_MS = Number(process.env.TRICK_PAUSE_MS) || 2200;
 const AWAY_TAKEOVER_MS = Number(process.env.AWAY_TAKEOVER_MS) || 20000; // bot plays for a disconnected human
+// Connection diary (stdout -> logs/play56.out.log): who dropped, when they came back, when a bot had to step in.
+const glog = (room, msg) => console.log(`${new Date().toISOString()} [${room ? room.code : '-'}] ${msg}`);
 const ROOM_IDLE_MS = 1000 * 60 * 60 * 3;
 const SUPABASE_URL = process.env.SUPABASE_URL || '';
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || '';
@@ -253,6 +255,8 @@ function schedule(room) {
 
 function autoAct(room, seat) {
   const g = room.game;
+  const s = room.seats[seat];
+  if (s.kind === 'human') glog(room, `bot takes over for ${s.name} seat ${seat} after ${Math.round((Date.now() - (room.awaySince[seat] || Date.now())) / 1000)}s away (${g.phase})`);
   try {
     const d = Bot.decide(Bot.botView(g, seat), Bot.paramsFor(room.botStyle, room.seats[seat].name));
     if (!d) return;
@@ -331,6 +335,7 @@ io.on('connection', (socket) => {
 
     let seat = seatOfToken(room, socket.data.token);
     if (seat >= 0) {                                   // reconnect
+      if (!room.seats[seat].connected) glog(room, `${room.seats[seat].name} seat ${seat} reconnected after ${Math.round((Date.now() - (room.awaySince[seat] || Date.now())) / 1000)}s`);
       Object.assign(room.seats[seat], { socketId: socket.id, connected: true });
       delete room.awaySince[seat];
       if (name) room.seats[seat].name = clean(name) || room.seats[seat].name;
@@ -529,13 +534,15 @@ io.on('connection', (socket) => {
     broadcast(room);
   });
 
-  socket.on('disconnect', () => {
+  socket.on('disconnect', (reason) => {
     const room = getRoom();
     if (!room) return;
     const seat = seatOfToken(room, socket.data.token);
     if (seat >= 0 && room.seats[seat].socketId === socket.id) {
       room.seats[seat].connected = false;
       room.awaySince[seat] = Date.now();
+      const g = room.game;
+      glog(room, `${room.seats[seat].name} seat ${seat} disconnected (${reason})${g ? ` phase=${g.phase} turn=${g.turn}` : ''}`);
       broadcast(room);
     } else if (seat < 0) broadcast(room);   // a watcher left: refresh the watcher list
   });

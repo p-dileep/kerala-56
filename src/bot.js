@@ -12,6 +12,11 @@ const pow = (c) => E.RANK_POWER[c.rank];
 const DEFAULT_PARAMS = {
   // hand estimate
   estBase: 24, estPtsW: 0.6, estLenW: 2.0, estJackW: 1.5, estNineW: 0.5, estNtJackW: 2.5, estNtPenalty: 3,
+  // opening lead: the seat right of the dealer leads the first trick whoever wins the bid. A team that
+  // has the lead plays to the Jacks it showed; worth about 2 points to the bidding side in self-play
+  // (test/par.js). Added to every estimate when my team leads (0 = off); taking it off when the other
+  // team leads lost chips in duplicate play, so nothing is subtracted
+  leadW: 0,
   // partner holds the bid
   plusMaxValue: 40, plus2Margin: 3, raiseMargin: 5, raiseMaxValue: 36,
   // alternative-suit offer to a partner who holds the bid
@@ -94,9 +99,13 @@ const BOT_PERSONALITY = { Kuttan: 'aggressive', Ammini: 'defensive', Pappan: 'me
 const HUMAN_TUNED = { estBase: 25, estLenW: 2.25, estJackW: 2, plusMaxValue: 38, nsMargin: -2, bidContestMargin: 1,
   readJackW: 2.5, readLenW: 1.5, simMinValue: 34 };
 const HUMAN_TUNED_BOTS = new Set(['Kuttan', 'Ammini', 'Unni', 'Sarojini', 'Leela']);
+// Self-play half (the named bots not in HUMAN_TUNED_BOTS): numbers found by duplicate self-play
+// (test/par.js). leadW 2 gained 0.030 +/- 0.009 chips per hand over 4000 deals (2026-11-12).
+const SELF_PLAY_TUNED = { leadW: 2 };
 const paramsFor = (style, name) => {
   const P = { ...DEFAULT_PARAMS, ...(STYLES[style === 'mixed' ? BOT_PERSONALITY[name] : style] || {}) };
   if (HUMAN_TUNED_BOTS.has(name)) for (const k of Object.keys(HUMAN_TUNED)) P[k] = +(P[k] + HUMAN_TUNED[k] - DEFAULT_PARAMS[k]).toFixed(3);
+  else if (name in BOT_PERSONALITY) Object.assign(P, SELF_PLAY_TUNED);
   return P;
 };
 
@@ -152,7 +161,8 @@ function chooseBid(view, P = DEFAULT_PARAMS) {
   const b = view.bidding;
   const seat = view.mySeat;
   const N = view.players || 6;
-  const estimate = (h, s, PP) => estimateFor(h, s, PP, N);
+  const leadAdj = E.team(b.opener) === E.team(seat) ? P.leadW : 0;
+  const estimate = (h, s, PP) => estimateFor(h, s, PP, N) + leadAdj;
   const read = (s) => auctionRead(view, s, P);
   // own hand plus what partners and opponents have shown in the suit
   const teamAware = (s) => { const r = read(s); return estimate(hand, s, P) + r.partner - r.opp; };
@@ -691,4 +701,4 @@ function botView(state, seat) {
 }
 
 const estimate = estimateFor;
-module.exports = { decide, botView, estimate, chooseBid, choosePlay, track, inferFacts, dealUnseen, simPoints, DEFAULT_PARAMS, STYLES, BOT_PERSONALITY, HUMAN_TUNED, HUMAN_TUNED_BOTS, paramsFor };
+module.exports = { decide, botView, estimate, chooseBid, choosePlay, track, inferFacts, dealUnseen, simPoints, DEFAULT_PARAMS, STYLES, BOT_PERSONALITY, HUMAN_TUNED, HUMAN_TUNED_BOTS, SELF_PLAY_TUNED, paramsFor };

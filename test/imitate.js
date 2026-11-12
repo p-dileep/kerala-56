@@ -118,7 +118,7 @@ const STEPS = {
   bidContestMargin: 1, jumpEst: 2, jumpGap: 2, doubleMinValue: 2, doubleMinPts: 1,
   probeMaxValue: 1, probeSlack: 1,
   readJackW: 0.5, readNineW: 0.5, readLenW: 0.5, readPassW: 0.5, readCutW: 0.5, plusSlack: 1, simMinValue: 1,
-  simConf: 0.05, simMargin: 1, backSlack: 1
+  simConf: 0.05, simMargin: 1, backSlack: 1, leadW: 0.5
 };
 const LOWER = { simConf: 0.5, showJackMargin: -3, altMargin: -3, backNtMargin: -3, nsMargin: -3 };
 const UPPER = { simConf: 0.95 };
@@ -181,4 +181,4 @@ if (require.main === module) {
   }
   console.log(`took ${((Date.now() - t0) / 1000).toFixed(1)}s`);
 }
-module.exports = { loadHands, humanDecisions, evaluate, tune };
+module.exports = { loadHands, humanDecisions, evaluate, tune, STEPS, LOWER, UPPER };

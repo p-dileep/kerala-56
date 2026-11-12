@@ -174,8 +174,8 @@ assert.throws(()=>E.applyBid(s, s.turn, {type:'pass'}), /Opener/);
   assert.deepEqual(B.paramsFor('medium'), B.DEFAULT_PARAMS);
   assert.ok(B.paramsFor('aggressive').estBase > B.paramsFor('defensive').estBase);
   assert.deepEqual(B.paramsFor('nonsense'), B.DEFAULT_PARAMS);
-  assert.deepEqual(B.paramsFor('mixed', 'Chinnu'), B.paramsFor('aggressive'));
-  assert.deepEqual(B.paramsFor('mixed', 'Kunjamma'), B.paramsFor('defensive'));
+  assert.deepEqual(B.paramsFor('mixed', 'Chinnu'), { ...B.paramsFor('aggressive'), ...B.SELF_PLAY_TUNED });
+  assert.deepEqual(B.paramsFor('mixed', 'Kunjamma'), { ...B.paramsFor('defensive'), ...B.SELF_PLAY_TUNED });
   assert.deepEqual(B.paramsFor('mixed', 'Bot 3'), B.DEFAULT_PARAMS);
   // half of the named bots carry the human-tuned bidding numbers as shifts on top of their style
   assert.deepEqual(B.HUMAN_TUNED_BOTS, new Set(['Kuttan', 'Ammini', 'Unni', 'Sarojini', 'Leela']));

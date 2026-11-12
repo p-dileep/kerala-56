@@ -79,6 +79,31 @@ bidding side takes 28.8 points when its own team has the lead and 26.9 when the 
    `leadW: 2` through `SELF_PLAY_TUNED` in `src/bot.js`. The human-tuned half and `DEFAULT_PARAMS` are unchanged.
    Moving the self-play half towards the human-tuned numbers was not done (it narrows the comparison).
 
+## Follow-up: rules for the two leaks (same day)
+
+**Leak 1, stronger team silent: compete rule (`competeEv`, `competeSlack` 4, `competeMaxValue` 36).** When
+opponents hold a bid below 36, the estimate says pass and my best other suit is within 4 of the next bid,
+the bot lays the hand out twice (their contract, my suit one step up) and bids when its own contract is
+worth more expected chips than defending.
+
+| Test (duplicate play) | Chips per hand |
+|---|---|
+| competeEv 0.05 against default, 3000 deals | +0.092 +/- 0.013 (+4.86 tables per match, 200 matches) |
+| with leadW 2, 3000 deals | +0.094 +/- 0.014 (+5.28 tables per match) |
+| margin 0.3 / 0.01 / -0.2, 1000-1500 deals | +0.070 / +0.123 / +0.120 |
+| slack 2 / 8 / no limit with max 40, 1500 deals | +0.066 / +0.081 / +0.094 |
+| on top of each style (leadW 2 both sides), 1200 deals | defensive +0.108 +/- 0.018, medium +0.061 +/- 0.020, aggressive -0.007 +/- 0.014 |
+| on top of the HUMAN_TUNED numbers, 1200 deals | +0.022 +/- 0.016 |
+| 8 players, medium, 800 deals | +0.052 +/- 0.023 |
+
+Applied to the self-play half through `SELF_PLAY_TUNED`; default 0 (off); human-tuned half unchanged.
+
+**Leak 2, stopping below 40: no rule; the leak is mostly not real.** In the 50 hands (of 500) where the
+teamwork ceiling said 40 in the suit actually played, the declarer took 35.1 points on average and reached
+40 in 18%. The declarer's own layouts gave 33 at 75% confidence, the best partner's 32. Two attempts, both
+removed: choosing 40 / 48 / 56 by expected chips instead of the 75% cut-off (-0.001 and -0.009 +/- 0.007),
+and partners always checking the layouts for a level raise (0.000 +/- 0.007).
+
 ## Limits
 
 - "Makes" means against bot defence with bot card play.

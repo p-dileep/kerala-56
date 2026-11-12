@@ -17,6 +17,10 @@ const DEFAULT_PARAMS = {
   // (test/par.js). Added to every estimate when my team leads (0 = off); taking it off when the other
   // team leads lost chips in duplicate play, so nothing is subtracted
   leadW: 0,
+  // compete by expected chips (0 = off): opponents hold a bid below competeMaxValue and the estimate
+  // says pass, but my best suit is within competeSlack of the next bid. Lay the hand out twice, once in
+  // their contract and once in my suit, and bid when mine is worth at least competeEv chips more
+  competeEv: 0, competeSlack: 4, competeMaxValue: 36,
   // partner holds the bid
   plusMaxValue: 40, plus2Margin: 3, raiseMargin: 5, raiseMaxValue: 36,
   // alternative-suit offer to a partner who holds the bid
@@ -101,7 +105,8 @@ const HUMAN_TUNED = { estBase: 25, estLenW: 2.25, estJackW: 2, plusMaxValue: 38,
 const HUMAN_TUNED_BOTS = new Set(['Kuttan', 'Ammini', 'Unni', 'Sarojini', 'Leela']);
 // Self-play half (the named bots not in HUMAN_TUNED_BOTS): numbers found by duplicate self-play
 // (test/par.js). leadW 2 gained 0.030 +/- 0.009 chips per hand over 4000 deals (2026-11-12).
-const SELF_PLAY_TUNED = { leadW: 2 };
+// competeEv 0.05 gained 0.092 +/- 0.013 over 3000 deals (defensive +0.11, medium +0.06, aggressive level).
+const SELF_PLAY_TUNED = { leadW: 2, competeEv: 0.05 };
 const paramsFor = (style, name) => {
   const P = { ...DEFAULT_PARAMS, ...(STYLES[style === 'mixed' ? BOT_PERSONALITY[name] : style] || {}) };
   if (HUMAN_TUNED_BOTS.has(name)) for (const k of Object.keys(HUMAN_TUNED)) P[k] = +(P[k] + HUMAN_TUNED[k] - DEFAULT_PARAMS[k]).toFixed(3);
@@ -332,6 +337,17 @@ function chooseBid(view, P = DEFAULT_PARAMS) {
     return { type: 'bid', value, suit: best.suit };
   }
 
+  // Compete: the estimate says pass, but letting a cheap contract through is a choice too. Compare the
+  // chips of defending their contract with the chips of declaring my suit one step up, on layouts.
+  if (P.competeEv && P.simDeals && legal.minBid && b.high && legal.minBid < P.competeMaxValue) {
+    const mine = options.find((o) => o.suit !== b.high.suit && o.est >= legal.minBid - P.competeSlack);
+    if (mine) {
+      const theirs = simRun(view, b.high.suit, P, Math.random, b.high.seat), ours = simRun(view, mine.suit, P);
+      if (theirs && ours && evAt(ours, legal.minBid) >= -evAt(theirs.map((x) => 56 - x), b.high.value) + P.competeEv)
+        return { type: 'bid', value: legal.minBid, suit: mine.suit };
+    }
+  }
+
   // Double an opponent's overreach when we're very strong in defence
   if (legal.double && b.high) {
     const myPts = hand.reduce((s, c) => s + pts(c), 0);
@@ -410,6 +426,16 @@ function dealUnseen(view, facts, rng) {
 // Points the layouts must show before bidding `value`: the margin on top, but 56 is all there is.
 const simNeed = (value, P) => Math.min(56, value + P.simMargin);
 function simPoints(view, suit, P, rng = Math.random) {
+  const results = simRun(view, suit, P, rng);
+  return results && results[Math.min(results.length - 1, Math.floor((1 - P.simConf) * results.length))];
+}
+// Expected chips for the declaring side at `value`, given its points in each layout.
+const evAt = (results, value) => {
+  const p = results.filter((x) => x >= value).length / results.length, t = E.bidBaseTables(value);
+  return p * t.win - (1 - p) * t.lose;
+};
+// My team's points in each layout (sorted), with `suit` as trump and `declSeat` as the declarer.
+function simRun(view, suit, P, rng = Math.random, declSeat = view.mySeat) {
   const deals = P.simDeals | 0;
   if (!deals) return null;
   const N = view.players || 6, me = E.team(view.mySeat), hs = view.handSize || 8;
@@ -422,7 +448,7 @@ function simPoints(view, suit, P, rng = Math.random) {
     const st = {
       settings: view.settings, phase: 'playing', handNo: view.handNo, dealer: view.dealer, tables: [99, 99],
       hands: hands.map((h) => E.sortHand(h)), bidding: view.bidding, history: [], winner: null, log: [], result: null,
-      contract: { seat: view.mySeat, team: me, value: 56, suit, hasJack: false, mult: 1 },
+      contract: { seat: declSeat, team: E.team(declSeat), value: 56, suit, hasJack: false, mult: 1 },
       trick: { leader: view.bidding.opener, cards: [], complete: false, winner: null }, turn: view.bidding.opener,
       tricksTaken: [0, 0], points: [0, 0], played: [], trickNo: 0, lastTrick: null
     };
@@ -438,8 +464,7 @@ function simPoints(view, suit, P, rng = Math.random) {
     results.push(st.points[me]);
   }
   if (!results.length) return null;
-  results.sort((a, b) => a - b);
-  return results[Math.min(results.length - 1, Math.floor((1 - P.simConf) * results.length))];
+  return results.sort((a, b) => a - b);
 }
 
 // ---------------------------------------------------------------- play helpers

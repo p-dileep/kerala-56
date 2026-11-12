@@ -69,6 +69,11 @@ function createRoom(hostToken, players = 6, code = null) {
 // Two permanent tables everyone can walk into from the lobby.
 const FIXED = [{ code: 'TABLE6', players: 6 }, { code: 'TABLE8', players: 8 }];
 FIXED.forEach((t) => createRoom(null, t.players, t.code));
+// Reserved tables: permanent like the two above but not shown in the lobby; whoever knows the code
+// walks in by link (?room=CODE) or by typing it. RESERVED_TABLES="CODE:6,OTHER:8" (5-6 letters or digits).
+(process.env.RESERVED_TABLES || '').split(',').map((x) => x.trim().toUpperCase().split(':')).forEach(([code, n]) => {
+  if (/^[A-Z0-9]{5,6}$/.test(code || '') && !rooms.has(code)) createRoom(null, Number(n) === 8 ? 8 : 6, code).reserved = true;
+});
 
 // The host is the first connected human; when they leave, the next one takes over.
 function ensureHost(room) {
@@ -186,7 +191,7 @@ function broadcast(room) {
   }
   room.touched = Date.now();
   ensureHost(room);
-  if (room.fixed) io.emit('lobby', lobbyInfo());
+  if (room.fixed && !room.reserved) io.emit('lobby', lobbyInfo());
   const sockets = io.sockets.adapter.rooms.get(room.code) || new Set();
   const watching = watchers(room);
   for (const sid of sockets) {
@@ -196,7 +201,7 @@ function broadcast(room) {
     sock.emit('room', {
       code: room.code,
       players: room.players,
-      fixed: room.fixed,
+      fixed: room.fixed && !room.reserved,   // a reserved table shows its code like a private one
       isHost: sock.data.token === room.hostToken,
       botStyle: room.botStyle,
       teamNames: room.teamNames,

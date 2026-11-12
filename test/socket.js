@@ -1,4 +1,5 @@
 // End-to-end: one human socket + 5 bots plays a full hand through the real server.
+process.env.RESERVED_TABLES = 'HIDE6:6, hide8:8, bad';
 process.env.PORT = 0; process.env.BOT_DELAY_MS = 5; process.env.BOT_BID_DELAY_MS = 5; process.env.TRICK_PAUSE_MS = 5;
 const { server } = require('../src/server');
 const { io } = require('socket.io-client');
@@ -24,6 +25,14 @@ server.listen(0, () => {
   const s = io(url, { transports: ['websocket'] });
   let started = false, hands = 0, guest, mate;
   const concede = { proposed: false, declined: false, agreed: false };
+  { // reserved tables: joinable by code, absent from the lobby list (checked below), shown with their code
+    const h = io(url, { transports: ['websocket'] });
+    h.on('connect', () => h.emit('hello', {}));
+    h.on('token', () => h.emit('joinRoom', { code: 'hide8', name: 'Hidden' }));
+    h.on('errorMsg', (m) => { console.error('reserved table join failed', m); process.exit(1); });
+    h.on('room', (r) => { if (r.code !== 'HIDE8' || r.players !== 8 || r.fixed) { console.error('reserved table wrong', r.code, r.players, r.fixed); process.exit(1); }
+      if (!h.done) { h.done = true; console.log('reserved table passed'); h.disconnect(); } });
+  }
   s.on('connect', () => s.emit('hello', {}));
   s.on('token', () => s.emit('createRoom', { name: 'Tester', players: 8 }));
   s.on('lobby', (t) => { if (!s.lobbySeen) { s.lobbySeen = true; const codes = t.map((x) => x.code).sort(); if (codes.join() !== 'TABLE6,TABLE8') { console.error('lobby tables missing', codes); process.exit(1); }

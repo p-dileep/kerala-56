@@ -6,17 +6,6 @@ or link. Friends join from phone or desktop, and bots fill any empty seats. The 
 ## Play online
 The game lives at **https://play56.in**. Open the link, type your name (required) and walk into the permanent **6-player table** or **8-player table**; everyone who opens the link sees the same two tables. The first person seated is the host (deals, picks bot style); when they leave the next player becomes host. In the lobby each table shows a LIVE badge with the number seated; an empty table still holding an old game shows a "Reset table" button, and it also resets itself after a few hours empty. You can still **Start a new table** (6 or 8 players) for a private game and share its code. Source: https://github.com/p-dileep/kerala-56. Deploys are manual (`git pull` + service restart on the server); a redeploy ends tables in progress.
 
-## Run locally
-```bash
-npm install
-npm start            # http://localhost:3056
-npm test             # rules sim (200 bot matches) + socket end-to-end test
-```
-
-Or on Windows just double-click `start_game.bat`: it installs Node.js (via winget) if missing, runs `npm install` on first use, starts the server and opens the browser.
-
-To play with friends over the internet without any hosting, double-click `start_online.bat` instead. It does everything `start_game.bat` does, downloads the portable `cloudflared.exe` into `tools/` on first use (no Cloudflare account needed), opens a quick tunnel, prints and copies the public `https://....trycloudflare.com` address, and opens the browser there. Create the table at that address and click the table code to copy the invite link. The address changes every time the tunnel is restarted.
-
 ## Variants
 `players` in the table settings is 6 or 8. 6 players use the 48-card pack; 8 players add the 8s and 7s of both packs (no points) for 64 cards. Both deal 8 cards and play 8 tricks; bids, levels and chips are unchanged. Bots scale their hand estimates to the hand size.
 

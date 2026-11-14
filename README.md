@@ -21,7 +21,7 @@ To play with friends over the internet without any hosting, double-click `start_
 `players` in the table settings is 6 or 8. 6 players use the 48-card pack; 8 players add the 8s and 7s of both packs (no points) for 64 cards. Both deal 8 cards and play 8 tricks; bids, levels and chips are unchanged. Bots scale their hand estimates to the hand size.
 
 ## How play56.in is hosted
-A Windows VM runs `node src/server.js` on port 3056 as a Windows service (NSSM), with `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` and `PORT` set as machine environment variables. A Cloudflare Tunnel routes `play56.in` and `www.play56.in` to `http://localhost:3056`; Cloudflare terminates TLS, no inbound port is open on the VM. Deploy: `git pull --ff-only origin main && npm ci --omit=dev`, then restart the service. The `Dockerfile` still works for Render-style hosts.
+`node src/server.js` runs behind a reverse proxy that terminates TLS. Configuration comes from environment variables (`PORT`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `RESERVED_TABLES`). Hosting details are not kept in this repository. The `Dockerfile` still works for container hosts.
 
 ## Deploy on a VPS
 ```bash

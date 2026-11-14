@@ -1,13 +1,13 @@
 # kerala-56 (56 / Ambathiyaaru card game) — VM clone
 
-Live at https://play56.in (Cyfuture Windows VM, NSSM services `Play56` on :3056 + `Play56Tunnel` (own cloudflared tunnel); deploy by `git pull` + service restart, see `docs/claude-plans/2026-11-10_move-to-play56-in-on-cyfuture-vm.md`). Render (kerala-56.onrender.com) kept as fallback for a week, then delete.
+Live at https://play56.in; it deploys itself from `main` (`auto_deploy.ps1`: static files at once, server changes in the night window). This repo is PUBLIC: hosting details (provider, addresses, service and tunnel setup, runbooks) stay out of it, in the git-ignored `docs/private/`.
 Source: https://github.com/p-dileep/kerala-56. Develop locally; this VM clone is read-only (git pull only).
 
 ## Current Task
 Log finished hands to Supabase so human play can later tune the bots (`src/bot.js` DEFAULT_PARAMS).
 
 ## Done
-- [x] 2026-11-01 Design decided: Supabase free tier as the hand store (not the dhiedge VM backend).
+- [x] 2026-11-01 Design decided: Supabase free tier as the hand store (not our own server).
 - [x] 2026-11-01 Plan with SQL, server snippet, fetch script: `docs/claude-plans/2026-11-01_supabase-hand-logging.md`
 
 - [x] 2026-11-01 Supabase project created, SUPABASE_URL + SUPABASE_SERVICE_KEY set on Render
@@ -75,5 +75,6 @@ Log finished hands to Supabase so human play can later tune the bots (`src/bot.j
 - Human names in the log: "Tester" / "TEster" are the owner's test seats and are skipped by `test/imitate.js` (`TEST_NAMES`); "Claude" is a real player. The current `HUMAN_TUNED` numbers were fitted before this exclusion.
 - Local test: `node src/server.js` -> http://localhost:3056 ; on localhost `window.demoWin(0)` in the console previews the trophy animation.
 - Bots are rule-based (about 45 numeric knobs + 3 style presets + Monte Carlo check); `test/tune.js` is a self-play tuner.
+- PUBLIC REPO (user, 2026-11-14): never write hosting details, addresses, table codes or keys into tracked files; put runbooks in `docs/private/` (git-ignored). The two 2026-11-10 hosting docs were moved there; they are still in the git history until it is rewritten.
 - Rooms are in memory on the server; nothing is persisted today. Redeploy / service restart ends tables in progress.
 - Supabase free project pauses after 7 idle days; weekly activity keeps it alive.

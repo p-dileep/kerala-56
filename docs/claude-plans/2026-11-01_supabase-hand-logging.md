@@ -1,8 +1,7 @@
 # Supabase hand logging for kerala-56 (training data for the bots)
 
 Decision (2026-11-01): log every finished hand from the Render server to a free Supabase project.
-The game stays on Render; the dhiedge.com VM is not involved (no Cloudflare Access bypass, no shared
-process with the trading backend). Data is later pulled down to extend `test/tune.js`.
+The game stays on Render; no other server is involved. Data is later pulled down to extend `test/tune.js`.
 
 Code changes below go into the local clone of https://github.com/p-dileep/kerala-56 and ship via push
 to `main` (Render auto-deploys). Do not edit on the VM.

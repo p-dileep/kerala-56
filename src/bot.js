@@ -68,8 +68,8 @@ const DEFAULT_PARAMS = {
   // partner's NS suit, team-aware estimate within backSlack of the value, Monte Carlo from simMinValue
   backCheck: 1, backSlack: 2,
   // play: a partner holds the trick but an opponent still to play could beat it; take it with my
-  // cheapest sure winner when the trick holds at least this many points (99 = off: duck as before)
-  coverMinPts: 99,
+  // cheapest sure winner when the trick holds at least this many points (0 = always, 99 = off: duck)
+  coverMinPts: 0,
   // play: a partner led trump into the Jack of trump I showed in the auction: play that Jack (1 = on)
   answerJackLead: 1,
   // play: once trumps have been led this hand, the bidding side leads trump again only when its side

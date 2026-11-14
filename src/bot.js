@@ -76,7 +76,11 @@ const DEFAULT_PARAMS = {
   // cards win after trumps are gone (masters, or a partner holds that suit's Jack from the auction);
   // otherwise it leads a side suit so a partner can cut with the trumps a further draw would pull
   // (1 = on, 0 = always keep drawing)
-  drawCheck: 1
+  drawCheck: 1,
+  // play, void in the led suit: a partner holds the trick but an opponent behind me could take it, and
+  // my cheapest discard carries at least this many points: cut with a trump no one behind me can beat
+  // (0 = off: discard as before). A low singleton (at most voidDiscardMaxPts points) is still discarded, to make a void.
+  saveDiscardCut: 2, voidDiscardMaxPts: 1
 };
 
 // Behaviour presets: overrides on DEFAULT_PARAMS. 'medium' is the tuned default.
@@ -686,16 +690,25 @@ function choosePlay(view, P = DEFAULT_PARAMS) {
 
   // ---- void in led suit
   const trumps = legal.filter((c) => c.suit === trump);
+  const nonTrump = legal.filter((c) => c.suit !== trump);
+  const pool = nonTrump.length ? nonTrump : legal;
   if (!partnerSafe && trumps.length) {
     const winningTrumps = trumps.filter((c) => beats(c, winCard, led, trump)).sort((a, b) => pow(a) - pow(b));
+    // A partner holds the trick but an opponent still to play may take it (hand #548, Kuttan threw J♥
+    // and Chinnu cut). Do not feed it points: take it with a trump no one behind me can beat. A free
+    // discard (no points) still goes in, and so does a low singleton (it leaves me void to cut later).
+    if (P.saveDiscardCut && T && partnerWinning && nonTrump.length) {
+      // only with trumps to spare: the cut must leave me a higher trump (never my top one)
+      const sure = winningTrumps.filter((c) => safeWin(c) && trumps.some((x) => pow(x) > pow(c)));
+      const single = nonTrump.filter((c) => pts(c) <= P.voidDiscardMaxPts && view.hand.filter((x) => x.suit === c.suit).length === 1);
+      if (sure.length && pts(lowest(nonTrump)) >= P.saveDiscardCut) return single.length ? lowest(single).id : sure[0].id;
+    }
     if (winningTrumps.length && (trickPts >= P.cutMinPts || last || !partnerWinning)) {
       const cut = winningTrumps[0];
       // partner is winning: do not spend the master trump to protect a small trick
       if (!partnerWinning || !isMaster(cut, view) || trickPts >= P.cutOverPartnerMasterPts || last) return cut.id;
     }
   }
-  const nonTrump = legal.filter((c) => c.suit !== trump);
-  const pool = nonTrump.length ? nonTrump : legal;
   return (partnerSafe ? highestPoints(spare(pool)) : lowest(pool)).id;
 }
 

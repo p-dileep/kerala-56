@@ -255,6 +255,33 @@ assert.throws(()=>E.applyBid(s, s.turn, {type:'pass'}), /Opener/);
     const v = { ...B.botView(s, me), bidding: { ...s.bidding, actions: acts } };
     const f = B.inferFacts(v); assert.deepEqual(f.must[0], ['JH', 'JH']);
     const h = B.dealUnseen(v, f, Math.random); assert.ok(h && h[0].filter((c)=>c.rank==='J'&&c.suit==='H').length === 2); }
+  // void in the led suit, partner's trick not safe (Chinnu behind could cut), only discard is J♥: cut with
+  // the 9♣ no one behind can beat instead of feeding the Jack (hand #548, trick 4); a low singleton still goes
+  { const deal = [['10S0','9H0','KH1','QH0','QC1','AD0','10D0','10D1'],['JS1','9S1','KS0','QS0','QS1','QH1','10C1','JD1'],
+      ['JS0','AS1','JH1','JC0','9C0','9C1','AC1','KC1'],['9S0','10S1','10H1','AC0','10C0','KC0','QD1','QD0'],
+      ['AS0','AH1','JC1','JD0','9D0','9D1','AD1','KD1'],['KS1','JH0','9H1','AH0','10H0','KH0','QC0','KD0']];
+    const auction = ['28D','-','29C','-','+1C','31H','-','32S','+1C','-','34D','35H','-','-','40C','-','-','-','-','-'];
+    const played = ['QC1','10C1','AC1','KC0','JC1','QC0','JD0','KD0','AD0','JD1','AS1','QD1','9D0','KS1','10D0','QS0','JS0','QD0',
+      'KD1','KH0','10D1','QS1'];
+    const s = E.newMatch({}, () => 0); s.dealer = 5; s.handNo = 0; E.startHand(s, () => 0);
+    const dk = new Map(E.makeDeck().map((c) => [c.id, c]));
+    s.hands = deal.map((ids) => E.sortHand(ids.map((id) => dk.get(id)))); s.dealt = s.hands.map((x) => x.slice());
+    for (const a of auction) {
+      const seat = s.turn, l = E.legalBidActions(s, seat);
+      const act = a === '-' ? { type: 'pass' } : a[0] === '+' ? (l.plusSuit === a[2] && l.plus.includes(+a[1]) ? { type: 'plus', n: +a[1] } : { type: 'plus', n: +a[1], suit: a[2] })
+        : { type: 'bid', value: +a.slice(0, 2), suit: a[2] };
+      E.applyBid(s, seat, act);
+    }
+    if (s.phase === 'selfraise') E.applyBid(s, s.turn, { type: 'keep' });
+    for (const id of played) { if (s.trick.complete) E.collectTrick(s); E.playCard(s, s.turn, id); }
+    assert.equal(s.turn, 2);
+    const on = { ...B.DEFAULT_PARAMS, saveDiscardCut: 1 }, off = { ...B.DEFAULT_PARAMS, saveDiscardCut: 0 };
+    assert.equal(B.decide(B.botView(s, 2), on).cardId, '9C0');
+    assert.equal(B.decide(B.botView(s, 2), off).cardId, 'JH1');
+    s.hands[2] = s.hands[2].map((c) => (c.id === 'JH1' ? { id: 'QH1', suit: 'H', rank: 'Q' } : c));   // free discard
+    assert.equal(B.decide(B.botView(s, 2), on).cardId, 'QH1');
+    s.hands[2] = s.hands[2].map((c) => (c.id === 'QH1' ? { id: 'AH0', suit: 'H', rank: 'A' } : c));   // low singleton
+    assert.equal(B.decide(B.botView(s, 2), on).cardId, 'AH0'); }
   // doubled bid, everyone passes: the declarer may keep, raise, or change to another suit at a higher value
   { const s = E.newMatch({}, ()=>0.3); const op = s.turn; const N = 6;
     const H = (id, suit, rank) => ({ id, suit, rank });

@@ -297,6 +297,11 @@ button, input { font: inherit; }
 .log li b { color: var(--ivory); font-weight: 700; }
 .log li .n { display: inline-block; min-width: 1.6em; opacity: .6; }
 .log .suit.red { color: #F5A3AD; }
+/* four-colour deck (body.four, the player's own switch): diamonds blue, clubs green */
+body.four .su-D { color: #1556B0 !important; }
+body.four .su-C { color: #1B7A3A !important; }
+body.four .log .su-D { color: #9CC4FF !important; }
+body.four .log .su-C { color: #8FD9A8 !important; }
 .chat li b { color: var(--ivory); }
 .chat li.sys { opacity: .65; font-style: italic; }
 .chat-form { display: flex; gap: 6px; padding: 10px; }

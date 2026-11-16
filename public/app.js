@@ -5,6 +5,8 @@
   const SYM = { S: '♠', H: '♥', D: '♦', C: '♣', NT: 'NT' };
   const SUIT_NAME = { S: 'Spades', H: 'Hearts', D: 'Diamonds', C: 'Clubs', NT: 'No trump' };
   const RED = new Set(['H', 'D']);
+  // suit classes: 'red' for the two-colour deck, 'su-X' for the four-colour option (body.four in style.css)
+  const sc = (s) => `${RED.has(s) ? 'red ' : ''}su-${s}`;
   const POINTS = { J: 3, 9: 2, A: 1, 10: 1, K: 0, Q: 0, 8: 0, 7: 0 };
   const TEAM_DEFAULT = ['Team A', 'Team B'];
   const SEAT_POS = [[50, 93], [93, 69], [93, 27], [50, 7], [7, 27], [7, 69]];
@@ -125,6 +127,10 @@
       else await (fsEl.requestFullscreen || fsEl.webkitRequestFullscreen).call(fsEl, { navigationUI: 'hide' });
     } catch { toast('Full screen is not available in this browser.'); }
   };
+  // four-colour deck: a per-player option, remembered in the browser
+  const setDeck = (on) => { document.body.classList.toggle('four', on); $('deckBtn').textContent = on ? '2-colour deck' : '4-colour deck'; };
+  setDeck(store.get('g56deck', '') === '4');
+  $('deckBtn').onclick = () => { const on = !document.body.classList.contains('four'); store.set('g56deck', on ? '4' : '2'); setDeck(on); };
   $('leaveBtn').onclick = () => {
     socket.emit('leave');
     room = null;
@@ -276,7 +282,8 @@
   }
   function bidText(v, s, hasJack = true) { return s === 'NT' ? `${v} NT` : hasJack ? `${v} ${SYM[s]}` : `${SYM[s]} ${v}`; }
   // wrap suit symbols so hearts/diamonds show red and all suits a little larger
-  function colourSuits(html) { return html.replace(/[♠♣]/g, '<span class="suit black">$&</span>').replace(/[♥♦]/g, '<span class="suit red">$&</span>'); }
+  const SYM_SUIT = { '♠': 'S', '♥': 'H', '♦': 'D', '♣': 'C' };
+  function colourSuits(html) { return html.replace(/[♠♣♥♦]/g, (m) => `<span class="suit ${RED.has(SYM_SUIT[m]) ? 'red' : 'black'} su-${SYM_SUIT[m]}">${m}</span>`); }
   function actionText(a) {
     if (a.type === 'bid') return (a.change ? 'Change to ' : '') + bidText(a.value, a.suit, a.hasJack);
     if (a.type === 'plus') return `Plus ${a.n} (${bidText(a.value, a.suit, a.hasJack)})`;
@@ -291,7 +298,7 @@
     return actionText(a);
   }
   function cardHTML(c, extra = '') {
-    return `<div class="card ${RED.has(c.suit) ? 'red' : ''} ${extra}" aria-label="${c.rank} of ${SUIT_NAME[c.suit]}">
+    return `<div class="card ${sc(c.suit)} ${extra}" aria-label="${c.rank} of ${SUIT_NAME[c.suit]}">
       <span class="r">${c.rank}</span><span class="s1">${SYM[c.suit]}</span>
       ${POINTS[c.rank] ? `<span class="pt">${POINTS[c.rank]}</span>` : ''}<span class="s2">${SYM[c.suit]}</span>
       <span class="r r2">${c.rank}</span><span class="s1 s3">${SYM[c.suit]}</span></div>`;
@@ -400,12 +407,12 @@
         const k = [];
         if (a.type === 'pass') k.push('quiet');
         if (a.type === 'double' || a.type === 'redouble') k.push('dbl');
-        if (a.suit && a.suit !== 'NT' && RED.has(a.suit)) k.push('red');
+        if (a.suit && a.suit !== 'NT') k.push(sc(a.suit));
         if (g.bidding.high && g.bidding.high.seat === s.seat && a.type !== 'pass') k.push('high');
         said = `<div class="said ${k.join(' ')}">${actionNamed(a)}</div>`;
       }
       else if (g && g.contract && g.contract.seat === s.seat && g.phase === 'playing')
-        said = `<div class="said ${RED.has(g.contract.suit) ? 'red' : ''}">${suitBtnText(g.contract.value, g.contract.suit, g.contract.hasJack)}</div>`;
+        said = `<div class="said ${sc(g.contract.suit)}">${suitBtnText(g.contract.value, g.contract.suit, g.contract.hasJack)}</div>`;
 
       let body;
       if (s.kind === 'empty') {
@@ -655,7 +662,7 @@
       // the power cards you hold in the suit, so the call's meaning is visible as you make it
       const power = g.hand.filter((c) => c.suit === s && (c.rank === 'J' || c.rank === '9')).map((c) => c.rank).sort().reverse();
       const hasJ = power.includes('J');
-      return `<button class="btn ${RED.has(s) ? 'red' : ''}" data-suit="${s}" ${ok ? '' : 'disabled'}
+      return `<button class="btn ${sc(s)}" data-suit="${s}" ${ok ? '' : 'disabled'}
         title="${ok ? `Bid ${bidVal} ${SUIT_NAME[s]}${hasJ ? '' : s === 'NT' ? '' : ' (suit first: you hold no Jack of it)'}` : `You hold no ${SUIT_NAME[s]}`}">${suitBtnText(bidVal, s, hasJ)}${power.length ? `<span class="tag">${power.join(' ')}</span>` : ''}</button>`;
     }).join('');
     $('suitBtns').querySelectorAll('[data-suit]').forEach((b) => (b.onclick = () => socket.emit('bid', { type: 'bid', value: bidVal, suit: b.dataset.suit })));
@@ -663,16 +670,16 @@
     // Build the whole Plus row first, then wire it: appending with innerHTML += would rebuild the
     // partner Plus buttons and drop their click handlers.
     let plusHtml = (L.plus || []).map((n) => `<button class="btn small" data-plus="${n}"
-      title="${L.plusSuit ? `Bid ${(g.bidding.high ? g.bidding.high.value : 28) + n} ${SUIT_NAME[L.plusSuit]}: ` : ''}I hold ${(pm[n] || []).join(' and ')} of ${L.plusSuit ? SUIT_NAME[L.plusSuit] : 'this suit'}${n === 1 && (pm[n] || [])[0] === 'J' ? ' and nothing else in it' : ''}">Plus ${n}${L.plusSuit ? ` <span class="${RED.has(L.plusSuit) ? 'red' : ''}">${SYM[L.plusSuit]}</span>` : ''} · ${(pm[n] || []).join('+')}</button>`).join('');
+      title="${L.plusSuit ? `Bid ${(g.bidding.high ? g.bidding.high.value : 28) + n} ${SUIT_NAME[L.plusSuit]}: ` : ''}I hold ${(pm[n] || []).join(' and ')} of ${L.plusSuit ? SUIT_NAME[L.plusSuit] : 'this suit'}${n === 1 && (pm[n] || [])[0] === 'J' ? ' and nothing else in it' : ''}">Plus ${n}${L.plusSuit ? ` <span class="${sc(L.plusSuit)}">${SYM[L.plusSuit]}</span>` : ''} · ${(pm[n] || []).join('+')}</button>`).join('');
     if (L.plusOpen && L.plusOpen.length) {
       const base = g.bidding.high ? g.bidding.high.value : 27;   // opening Plus N = 27 + N
-      plusHtml += L.plusOpen.map((o) => { const cards = o.cards || []; return `<button class="btn small ${RED.has(o.suit) ? 'red' : ''}" data-popen="${o.n}" data-suit="${o.suit}"
+      plusHtml += L.plusOpen.map((o) => { const cards = o.cards || []; return `<button class="btn small ${sc(o.suit)}" data-popen="${o.n}" data-suit="${o.suit}"
         title="${g.bidding.high ? 'Bid' : 'Open'} ${base + o.n} ${SUIT_NAME[o.suit]}: I hold ${cards.join(' and ')} of ${SUIT_NAME[o.suit]}${o.n === 1 && cards[0] === 'J' ? ' and nothing else in it' : ''}">Plus ${o.n} ${SYM[o.suit]} · ${cards.join('+')}</button>`; }).join('');
     }
     $('plusBtns').innerHTML = plusHtml;
     $('plusBtns').querySelectorAll('[data-plus]').forEach((b) => (b.onclick = () => socket.emit('bid', { type: 'plus', n: Number(b.dataset.plus) })));
     $('plusBtns').querySelectorAll('[data-popen]').forEach((b) => (b.onclick = () => socket.emit('bid', { type: 'plus', n: Number(b.dataset.popen), suit: b.dataset.suit })));
-    $('nsBtns').innerHTML = (L.ns || []).map((o) => `<button class="btn small ${RED.has(o.suit) ? 'red' : ''}" data-ns="${o.value}"
+    $('nsBtns').innerHTML = (L.ns || []).map((o) => `<button class="btn small ${sc(o.suit)}" data-ns="${o.value}"
       title="No trump; tells the table you hold no ${SUIT_NAME[o.suit]}">${o.value} NS · no ${SYM[o.suit]}</button>`).join('');
     $('nsBtns').querySelectorAll('[data-ns]').forEach((b) => (b.onclick = () => socket.emit('bid', { type: 'ns', value: Number(b.dataset.ns) })));
     $('passBtn').disabled = !L.pass;
@@ -706,7 +713,7 @@
       $('chgPlus').onclick = () => { chgVal += 1; renderSelfRaise(); };
       $('chgSuits').innerHTML = L.changeSuits.map((s) => {
         const hasJ = s === 'NT' || g.hand.some((c) => c.suit === s && c.rank === 'J');
-        return `<button class="btn ${RED.has(s) ? 'red' : ''}" data-chg="${s}" title="Change to ${chgVal} ${SUIT_NAME[s]}">${suitBtnText(chgVal, s, hasJ)}</button>`;
+        return `<button class="btn ${sc(s)}" data-chg="${s}" title="Change to ${chgVal} ${SUIT_NAME[s]}">${suitBtnText(chgVal, s, hasJ)}</button>`;
       }).join('');
       $('chgSuits').querySelectorAll('[data-chg]').forEach((b) => (b.onclick = () => socket.emit('bid', { type: 'change', value: chgVal, suit: b.dataset.chg })));
     }

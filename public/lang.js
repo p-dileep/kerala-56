@@ -79,7 +79,7 @@
     // ---- suits and calls
     'Spade': 'സ്പേഡ്', 'Heart': 'ആഡ്യൻ', 'Diamond': 'ഡയമണ്ട്', 'Club': 'ക്ലാവർ',
     'Spades': 'സ്പേഡ്', 'Hearts': 'ആഡ്യൻ', 'Diamonds': 'ഡയമണ്ട്', 'Clubs': 'ക്ലാവർ',
-    'No trump': 'തുറുപ്പില്ല',
+    'No trump': 'നോ ട്രംപ്',
     'Pass': 'പാസ്',
     'Double': 'ഡബിൾ',
     'Redouble': 'റീഡബിൾ',
@@ -98,7 +98,7 @@
     'Current bid {0} by {1}': 'ഇപ്പോഴത്തെ വിളി {0} · {1}',
     'You open the bidding': 'നിങ്ങളാണ് ആദ്യം വിളിക്കേണ്ടത്',
     'Bid {0} {1}': '{0} {1} വിളിക്കൂ',
-    ' (suit first: you hold no Jack of it)': ' (ചിഹ്നം ആദ്യം: ഇതിന്റെ ഗുലാൻ നിങ്ങളുടെ കൈയിലില്ല)',
+    ' (suit first: you hold no Jack of it)': ' (ചിഹ്നം ആദ്യം: ഇതിന്റെ ജാക്ക് നിങ്ങളുടെ കൈയിലില്ല)',
     'Your own suit needs {0} or more': 'സ്വന്തം ചിഹ്നത്തിൽ {0} എങ്കിലും വിളിക്കണം',
     'You already raised this suit': 'ഈ ചിഹ്നം നിങ്ങൾ ഒരിക്കൽ ഉയർത്തിക്കഴിഞ്ഞു',
     'You hold no {0}': 'നിങ്ങളുടെ കൈയിൽ {0} ഇല്ല',
@@ -109,7 +109,7 @@
     ' and ': ', ',
     ' and nothing else in it': ' (അതിൽ വേറെ ചീട്ടില്ല)',
     '{0} NS · no {1}': '{0} നോസ് · {1} ഇല്ല',
-    'No trump; tells the table you hold no {0}': 'തുറുപ്പില്ല; നിങ്ങളുടെ കൈയിൽ {0} ഇല്ലെന്ന് അറിയിക്കുന്നു',
+    'No trump; tells the table you hold no {0}': 'നോ ട്രംപ്; നിങ്ങളുടെ കൈയിൽ {0} ഇല്ലെന്ന് അറിയിക്കുന്നു',
     'The first bidder must open with 28 or more': 'കൈവിളിക്കാരൻ 28 എങ്കിലും വിളിക്കണം',
     // ---- keep / raise / change window
     'Raise the bid': 'വിളി ഉയർത്തൂ',

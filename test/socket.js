@@ -4,20 +4,22 @@ process.env.PORT = 0; process.env.BOT_DELAY_MS = 5; process.env.BOT_BID_DELAY_MS
 const { server } = require('../src/server');
 const { io } = require('socket.io-client');
 const { HUMAN_TUNED_BOTS } = require('../src/bot');
-{ // kunukku: loser of a match wears it; a bidder who makes a contract sheds their own; off for the team only on winning the next match
+{ // kunukku: loser of a match wears it; off for the team if it bids and makes the first hand after that (or wins the match); else a bidder who makes a contract sheds their own
   const { updateKunukku } = require('../src/server');
   const assert = require('assert');
-  const room = { seats: [0, 1, 2, 3, 4, 5].map((i) => ({ name: 'P' + i })), teamNames: ['A', 'B'], chat: [], kunukku: [] };
+  const room = { seats: [0, 1, 2, 3, 4, 5].map((i) => ({ name: 'P' + i })), teamNames: ['A', 'B'], chat: [], kunukku: [], kunukkuFresh: [false, false] };
   const hand = (phase, seat, made, extra = {}) => { room.game = { phase, winner: extra.winner, result: { made, contract: { seat, team: seat % 2 }, ...extra } }; updateKunukku(room); };
   const worn = () => room.kunukku.map((k, i) => (k ? i : '')).join('');
   hand('matchover', 0, true, { winner: 0 }); assert.equal(worn(), '135');           // team B lost the match
   hand('handover', 1, true, { void: true }); assert.equal(worn(), '135');            // a void hand does not count
-  hand('handover', 1, true); assert.equal(worn(), '35');                             // B bids and wins the first hand: only the bidder sheds
-  hand('handover', 0, false); assert.equal(worn(), '35');                            // A bids and goes down: B's stay on
+  hand('handover', 0, false); assert.equal(worn(), '135');                           // the first hand is A's bid (down): B's chance for the whole team is gone
+  hand('handover', 1, true); assert.equal(worn(), '35');                             // B bids and makes a later hand: only the bidder sheds
   hand('handover', 3, false); assert.equal(worn(), '35');                            // a failed bid sheds nothing
   hand('matchover', 5, false, { winner: 0 }); assert.equal(worn(), '135');           // B loses the next match too: everyone wears it again
-  hand('matchover', 0, false, { winner: 1 }); assert.equal(worn(), '024');           // B wins the match (A went down): all off B, A now wears it
-  hand('matchover', 2, true, { winner: 0 }); assert.equal(worn(), '135');            // A wins the next match on its own bid: all off A, B wears it
+  hand('handover', 3, true); assert.equal(worn(), '');                               // B bids and makes the first hand: off the whole team
+  hand('matchover', 0, false, { winner: 1 }); assert.equal(worn(), '024');           // A loses a match: A wears it
+  hand('handover', 2, false); assert.equal(worn(), '024');                           // A bids the first hand and goes down: stays on
+  hand('matchover', 2, true, { winner: 0 }); assert.equal(worn(), '135');            // A wins that match on its own bid: all off A, B wears it
   console.log('kunukku rules passed');
 }
 server.listen(0, () => {
@@ -56,7 +58,11 @@ server.listen(0, () => {
       mate.on('room', (mr) => {
         if (mr.mySeat !== null && mr.mySeat % 2 !== 0) { console.error('Mate should sit on team A'); process.exit(1); }
         if (mr.mySeat !== null) mate.ready = true;
-        if (mr.concede && mr.game && mr.game.phase === 'playing') {
+        // one answer per request: the bots keep playing, so the same request arrives in several room updates
+        // before the server has handled the answer (a second answer used to burn the "agree" on the first request)
+        if (!mr.concede) mate.answered = false;
+        else if (mr.game && mr.game.phase === 'playing' && !mate.answered) {
+          mate.answered = true;
           if (mr.concede.by !== r.mySeat || mr.concede.team !== 0) { console.error('bad concede payload', mr.concede); process.exit(1); }
           if (!concede.declined) { concede.declined = true; mate.emit('concede', { action: 'decline' }); }
           else if (!concede.agreed) { concede.agreed = true; mate.emit('concede', { action: 'agree' }); }
@@ -88,6 +94,10 @@ server.listen(0, () => {
   });
   function act(sock, r) {
     const g = r.game;
+    // act once per position: other updates (a concede request, a chat line) repeat the same turn
+    const at = [g.handNo, g.phase, g.bidding && g.bidding.actions.length, g.trickNo, g.trick && g.trick.cards.length].join(':');
+    if (sock.actedAt === at) return;
+    sock.actedAt = at;
     if (g.phase === 'bidding') {
       const L = g.legal.bid;
       sock.emit('bid', L.pass ? { type: 'pass' } : { type: 'bid', value: L.minBid, suit: L.suits[0] });

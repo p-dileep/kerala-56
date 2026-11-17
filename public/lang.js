@@ -232,8 +232,8 @@
     'Stopped after trick {0}: target out of reach.': 'പിടി {0} കഴിഞ്ഞ് നിർത്തി: ലക്ഷ്യം ഇനി എത്തില്ല.',
     '{0} wins the match.': '{0} മത്സരം ജയിച്ചു.',
     '{0} wears the kunukku.': '{0} കുണുക്ക് അണിയുന്നു.',
-    'Each player sheds their own by bidding and making a contract. Win the next match and the whole team takes it off.':
-      'ഓരോരുത്തരും സ്വയം വിളിച്ച് ജയിച്ച് സ്വന്തം കുണുക്ക് ഊരണം. അടുത്ത മത്സരം ജയിച്ചാൽ ടീം മുഴുവൻ കുണുക്ക് ഊരാം.',
+    'Bid and win the first hand of the next match and the whole team takes it off. After that, each player sheds their own by bidding and making a contract.':
+      'അടുത്ത മത്സരത്തിലെ ആദ്യ കളി വിളിച്ച് ജയിച്ചാൽ ടീം മുഴുവൻ കുണുക്ക് ഊരാം. അതു കഴിഞ്ഞാൽ ഓരോരുത്തരും സ്വയം വിളിച്ച് ജയിച്ച് സ്വന്തം കുണുക്ക് ഊരണം.',
     // ---- trophy and kunukku screens
     'Kunukku kayari!': 'കുണുക്ക് കയറി!',
     'wears the kunukku': 'കുണുക്ക് അണിയുന്നു',

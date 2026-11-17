@@ -966,7 +966,7 @@
         <span>${T('{0} chips', teamName(1))}</span><span class="v">${g.tables[1]}</span>
       </div>
       ${over ? `<p><b>${T('{0} wins the match.', teamName(g.winner))}</b></p>
-        <p class="kun-line"><span class="kunukku big">${KUNUKKU}</span><span><b>${T('{0} wears the kunukku.', teamName(1 - g.winner))}</b><span class="how"><br>${T('Each player sheds their own by bidding and making a contract. Win the next match and the whole team takes it off.')}</span></span></p>` : room.isHost ? '' : `<p class="sub">${T('The host deals the next hand.')}</p>`}
+        <p class="kun-line"><span class="kunukku big">${KUNUKKU}</span><span><b>${T('{0} wears the kunukku.', teamName(1 - g.winner))}</b><span class="how"><br>${T('Bid and win the first hand of the next match and the whole team takes it off. After that, each player sheds their own by bidding and making a contract.')}</span></span></p>` : room.isHost ? '' : `<p class="sub">${T('The host deals the next hand.')}</p>`}
       <div class="row">
         ${over && room.isHost ? `<button class="btn primary" data-start>${T('Start a new match')}</button>` : ''}
         <button class="btn" data-hands>${T('Show the initial hands')}</button>

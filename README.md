@@ -61,7 +61,7 @@ Run a **single** process. Rooms are held in memory. A restart ends the tables in
 - Trump is the suit named in the winning bid and is open to everyone. Follow suit if able; trumping is optional.
   Identical cards: the first one played wins.
 - Chips (tables / kuttu): each team starts with 12. Bids of 28–39 win 1 or lose 2, 40–47 win 2 or lose 3, 48–55 win 3 or lose 4, 56 wins 4 or loses 5.
-  Doubling ×2, redoubling ×4. A team that runs out of chips loses and wears the kunukku (shown on each seat) into the next match: each player sheds their own by bidding and making a contract, and it comes off the whole team only if they win that match. A kunukku that comes off flies to the middle of the table and breaks into pieces.
+  Doubling ×2, redoubling ×4. A team that runs out of chips loses and wears the kunukku (shown on each seat) into the next match: it comes off the whole team if they bid and win the first hand, otherwise each player sheds their own by bidding and making a contract (winning that match also takes it off the whole team). A kunukku that comes off flies to the middle of the table and breaks into pieces.
 
 House-rule knobs are in `DEFAULT_SETTINGS` (`startingTables`, `redoubleMultiplier`, `selfRaiseNextLevel`).
 

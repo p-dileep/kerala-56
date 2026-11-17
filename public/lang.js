@@ -143,7 +143,7 @@
     'Replace with bot': 'പകരം ബോട്ട്',
     'Cards in hand': 'കൈയിലെ ചീട്ടുകൾ',
     'Bids with numbers tuned on human play': 'മനുഷ്യരുടെ കളി നോക്കി ക്രമീകരിച്ച വിളി',
-    'Kunukku: lost the last match. Comes off when this player bids and makes a contract.': 'കുണുക്ക്: കഴിഞ്ഞ മത്സരം തോറ്റു. ഈ കളിക്കാരൻ വിളിച്ച് ജയിച്ചാൽ ഊരാം.',
+    'Kunukku: lost the last match. Comes off when this player bids and makes a contract, or when the team wins the match.': 'കുണുക്ക്: കഴിഞ്ഞ മത്സരം തോറ്റു. ഈ കളിക്കാരൻ വിളിച്ച് ജയിച്ചാലോ ടീം മത്സരം ജയിച്ചാലോ ഊരാം.',
     // ---- scores and the mat
     '{0} chips': '{0} മേശ',
     '{0} chip': '{0} മേശ',
@@ -218,14 +218,19 @@
     'Stopped after trick {0}: target out of reach.': 'പിടി {0} കഴിഞ്ഞ് നിർത്തി: ലക്ഷ്യം ഇനി എത്തില്ല.',
     '{0} wins the match.': '{0} മത്സരം ജയിച്ചു.',
     '{0} wears the kunukku.': '{0} കുണുക്ക് അണിയുന്നു.',
-    'Bid and win the first hand of the next match and the whole team takes it off. After that, each player sheds their own by bidding and making a contract.':
-      'അടുത്ത മത്സരത്തിലെ ആദ്യ കളി വിളിച്ച് ജയിച്ചാൽ ടീം മുഴുവൻ കുണുക്ക് ഊരാം. അതു കഴിഞ്ഞാൽ ഓരോരുത്തരും സ്വയം വിളിച്ച് ജയിച്ച് സ്വന്തം കുണുക്ക് ഊരണം.',
+    'Each player sheds their own by bidding and making a contract. Win the next match and the whole team takes it off.':
+      'ഓരോരുത്തരും സ്വയം വിളിച്ച് ജയിച്ച് സ്വന്തം കുണുക്ക് ഊരണം. അടുത്ത മത്സരം ജയിച്ചാൽ ടീം മുഴുവൻ കുണുക്ക് ഊരാം.',
     // ---- trophy and kunukku screens
     'Kunukku kayari!': 'കുണുക്ക് കയറി!',
     'wears the kunukku': 'കുണുക്ക് അണിയുന്നു',
     'Champions': 'ചാമ്പ്യന്മാർ',
     'Hand won': 'കളി ജയിച്ചു',
     'tap to continue': 'തുടരാൻ തൊടൂ',
+    'Clean sweep!': 'തൂത്തുവാരി!',
+    'All 56 points!': '56 പോയിന്റും സ്വന്തം!',
+    '{0} did not get a single point': '{0}-ന് ഒരു പോയിന്റ് പോലും കിട്ടിയില്ല',
+    'Team captain. The team chips are kept here': 'ടീം ക്യാപ്റ്റൻ. ടീമിന്റെ മേശ ഇവിടെ',
+    'captain seat': 'ക്യാപ്റ്റൻ സീറ്റ്',
     'wins the match': 'മത്സരം ജയിച്ചു',
     'takes {0} as {1} concedes': '{1} വിട്ടുകൊടുത്തു; {0} കിട്ടി',
     'made {0} and takes {1}': '{0} ജയിച്ചു; {1} കിട്ടി',
@@ -276,6 +281,7 @@
     // system chat
     [/^(.+) is now the host\.$/, 'ഇനി ഹോസ്റ്റ്: $1.'],
     [/^(.+) bid and won the first hand: the kunukku comes off the whole team!$/, '$1 ആദ്യ കളി വിളിച്ച് ജയിച്ചു: ടീം മുഴുവൻ കുണുക്ക് ഊരി!'],
+    [/^(.+) won the match: the kunukku comes off the whole team!$/, '$1 മത്സരം ജയിച്ചു: ടീം മുഴുവൻ കുണുക്ക് ഊരി!'],
     [/^(.+) made the bid and takes off the kunukku\.$/, '$1 വിളിച്ച് ജയിച്ചു; കുണുക്ക് ഊരി.'],
     [/^(.+) wears the kunukku!$/, '$1 കുണുക്ക് അണിയുന്നു!'],
     [/^(.+) created the table\.$/, '$1 ടേബിൾ തുടങ്ങി.'],

@@ -31,6 +31,10 @@
   let bidKey = '';
   let chgVal = 29, chgKey = '';
   let lastPhaseKey = '';
+  let chipHold = null;          // chip counts shown while the chips of a settled hand are still flying (see chipsFly)
+  const chipsNow = (g, t) => (g ? (chipHold ? chipHold[t] : g.tables[t]) : 12);
+  const shedding = new Set();   // seats whose kunukku has just come off (see kunukkuSmash)
+  let smashQueued = false;      // the hand-result screens will run the smash when they are done
   const socket = io({ transports: ['websocket', 'polling'] });
 
   // ------------------------------------------------------------ connection
@@ -42,10 +46,14 @@
   });
   socket.on('errorMsg', (m) => toast(Lang.fromServer(m)));
   socket.on('room', (r) => {
+    const prev = room;
     room = r;
+    // seats that wore the kunukku a moment ago and no longer do: it stays drawn until the smash animation takes it
+    if (prev && prev.code === r.code && r.game) r.seats.forEach((s, i) => { if (prev.seats[i] && prev.seats[i].kunukku && !s.kunukku) shedding.add(i); });
     if (location.search !== `?room=${r.code}`) history.replaceState(null, '', `?room=${r.code}`);
     show('table');
     render();
+    if (shedding.size && !smashQueued) kunukkuSmash();
   });
   socket.on('disconnect', () => toast(T('Connection lost. Reconnecting…')));
 
@@ -215,7 +223,7 @@
       <path d="M32 65q3-7 9.500-7t9.500 7q-3-2-4.750 0-2.250-2.500-4.750 0-2.500-2.500-4.750 0-1.750-2-4.750 0z" fill="#A39545" stroke="#5E4A1C" stroke-width=".9" stroke-linejoin="round"/>
       <ellipse cx="36.500" cy="71" rx="1.800" ry="4" fill="#fff" opacity=".4" transform="rotate(-14 36.500 71)"/>
     </g></svg>`;
-  const KUNUKKU_TIP = 'Kunukku: lost the last match. Comes off when this player bids and makes a contract.';
+  const KUNUKKU_TIP = 'Kunukku: lost the last match. Comes off when this player bids and makes a contract, or when the team wins the match.';
   // Kunukku kayaral: after the champions screen a giant kunukku drops in, then one flies to every seat of the
   // losing team and lands there. The seats' own kunukkus stay hidden (#seats.kun-pending) until the landing.
   function kunukkuKayaral(team, after) {
@@ -254,7 +262,117 @@
     }, 1900);
   }
   if (location.hostname === 'localhost') window.demoKunukku = (t = 0) => kunukkuKayaral(t);
+  // Kunukku comes off: it is plucked from each seat in `shedding`, flies to the middle of the table and
+  // breaks into pieces there.
+  function kunukkuSmash(after) {
+    smashQueued = false;
+    const els = [...shedding].map((i) => document.querySelector(`#seats .seat[data-seat="${i}"] .kunukku`)).filter(Boolean);
+    shedding.clear();
+    if (!els.length) { after && after(); return; }
+    const m = $('mat').getBoundingClientRect(), cx = m.left + m.width / 2, cy = m.top + m.height / 2;
+    const u = Math.min(m.width, m.height) / 4;
+    const layer = document.createElement('div');
+    layer.className = 'kun-smash';
+    document.body.appendChild(layer);
+    const STEP = 320, FLY = 1000, rnd = (a, b) => a + Math.random() * (b - a);
+    const COLS = ['#6FB53A', '#3C8526', '#B9E36A', '#F4EFD8', '#F4EFD8', '#A39545', '#F6C59C'];
+    const burst = () => {
+      const ring = document.createElement('i');
+      ring.className = 'kun-ring'; ring.style.cssText = `left:${cx}px;top:${cy}px`;
+      layer.appendChild(ring);
+      ring.animate([{ transform: 'scale(.2)', opacity: .95 }, { transform: `scale(${(u / 22).toFixed(2)})`, opacity: 0 }], { duration: 480, easing: 'ease-out', fill: 'forwards' });
+      for (let n = 0; n < 22; n++) {
+        const p = document.createElement('i'), w = rnd(.16, .4) * u, a = rnd(0, Math.PI * 2), d = rnd(.5, 1.5) * u;
+        const tx = Math.cos(a) * d, ty = Math.sin(a) * d, rot = rnd(-540, 540);
+        p.className = 'kun-shard';
+        p.style.cssText = `left:${cx - w / 2}px;top:${cy - w / 2}px;width:${w}px;height:${w * rnd(.6, 1.1)}px;background:${COLS[n % COLS.length]};`
+          + `clip-path:polygon(${rnd(0, 30)}% ${rnd(0, 30)}%, ${rnd(70, 100)}% ${rnd(0, 40)}%, ${rnd(55, 100)}% ${rnd(65, 100)}%, ${rnd(0, 35)}% ${rnd(70, 100)}%)`;
+        layer.appendChild(p);
+        p.animate([
+          { transform: 'translate(0,0) rotate(0deg)', opacity: 1 },
+          { transform: `translate(${tx * .75}px,${ty * .75 - u * .35}px) rotate(${rot * .6}deg)`, opacity: 1, offset: .5 },
+          { transform: `translate(${tx}px,${ty + u * .6}px) rotate(${rot}deg)`, opacity: 0 }
+        ], { duration: rnd(800, 1200), easing: 'cubic-bezier(.2,.6,.5,1)', fill: 'forwards' });
+      }
+    };
+    els.forEach((k, n) => {
+      const from = k.getBoundingClientRect();
+      const f = document.createElement('span');
+      f.className = 'kunukku flyer'; f.innerHTML = KUNUKKU;
+      f.style.cssText = `left:${from.left}px;top:${from.top}px;width:${from.width}px`;
+      layer.appendChild(f);
+      const dx = cx - (from.left + from.width / 2), dy = cy - (from.top + from.height / 2);
+      const sc = Math.max(1.5, Math.min(3, u * .8 / from.width)), spin = n % 2 ? -540 : 540;
+      f.animate([
+        { transform: 'translate(0,0) scale(1) rotate(0deg)' },
+        { transform: 'translate(0,-10px) scale(1.3) rotate(-16deg)', offset: .14 },
+        { transform: 'translate(0,-16px) scale(1.3) rotate(14deg)', offset: .26 },
+        { transform: `translate(${dx * .5}px,${dy * .5 - u}px) scale(${sc}) rotate(${spin * .55}deg)`, offset: .68, easing: 'cubic-bezier(.6,0,.9,.4)' },
+        { transform: `translate(${dx}px,${dy}px) scale(${sc * .85}) rotate(${spin}deg)` }
+      ], { duration: FLY, delay: n * STEP, fill: 'both' });
+      setTimeout(() => { f.remove(); burst(); }, FLY + n * STEP);
+    });
+    renderSeats(room.game);   // the flyers stand in for the seats' own from here
+    setTimeout(() => { layer.remove(); after && after(); }, FLY + (els.length - 1) * STEP + 1150);
+  }
+  if (location.hostname === 'localhost') window.demoSmash = (...seats) => { seats.forEach((i) => shedding.add(i)); renderSeats(room.game); kunukkuSmash(); };
   // matchWin: the big six-second "Champions" version; otherwise a shorter one for the hand's winner.
+  // Clean sweep: the losing team did not take a single point. A burst of suit signs and the score slammed in.
+  function sweep(team, loser, score, all56, after) {
+    const old = $('sweep'); if (old) old.remove();
+    const el = document.createElement('div');
+    el.id = 'sweep'; el.className = `sweep t${team}${all56 ? ' all' : ''}`;
+    const signs = ['♠', '♥', '♣', '♦'];
+    const bits = Array.from({ length: all56 ? 56 : 32 }, (_, i) => `<i class="${i % 2 ? 'red' : ''}" style="--a:${Math.round(Math.random() * 360)}deg;--d:${Math.round(34 + Math.random() * 46)}vmin;--t:${(Math.random() * (all56 ? 1.6 : .7)).toFixed(2)}s">${signs[i % 4]}</i>`).join('');
+    el.innerHTML = `<div class="burst">${bits}</div>
+      <div class="sweep-card"><div class="score">${score}</div>
+        <div class="kicker">${all56 ? T('All 56 points!') : T('Clean sweep!')}</div><div class="team">${teamName(team)}</div>
+        <div class="sub">${T('{0} did not get a single point', teamName(loser))}</div></div>`;
+    document.body.appendChild(el);
+    $('table').classList.add('shake'); setTimeout(() => $('table').classList.remove('shake'), 900);
+    let done = false;
+    const finish = () => { if (done) return; done = true; el.classList.add('out'); setTimeout(() => { el.remove(); after && after(); }, 380); };
+    el.onclick = finish;
+    setTimeout(finish, all56 ? 4600 : 3200);
+  }
+  // The chips of a settled hand fly from the paying team's stack (beside its captain) to the receiving team's,
+  // and both counts change as each one lands. The server has already moved them, so the old counts are held meanwhile.
+  function chipsFly(payer, receiver, amount, tables, after) {
+    const stackOf = (t) => document.querySelector(`#seats .seat[data-seat="${t}"] .stack`);
+    const from = stackOf(payer), to = stackOf(receiver);
+    if (!from || !to || !(amount > 0) || payer === receiver) return after && after();
+    chipHold = []; chipHold[payer] = tables[payer] + amount; chipHold[receiver] = tables[receiver] - amount;
+    const paint = () => [0, 1].forEach((t) => { const b = stackOf(t); if (b) b.querySelector('b').textContent = chipHold[t]; $(`tables${t}`).textContent = T('{0} chips', chipHold[t]); });
+    paint();
+    const a = from.getBoundingClientRect(), b = to.getBoundingClientRect();
+    const dx = b.left + b.width / 2 - (a.left + a.width / 2), dy = b.top + b.height / 2 - (a.top + a.height / 2);
+    const n = Math.min(amount, 8), each = Math.floor(amount / n), FLY = 800, STEP = 240, WAIT = 450;
+    for (let i = 0; i < n; i++) {
+      const c = document.createElement('i');
+      c.className = `chipfly t${payer}`;
+      c.style.cssText = `left:${a.left + a.width / 2 - 12}px;top:${a.top + a.height / 2 - 12}px`;
+      document.body.appendChild(c);
+      c.animate([
+        { transform: 'translate(0,0) scale(.6)', opacity: 0 },
+        { transform: 'translate(0,0) scale(1)', opacity: 1, offset: .08 },
+        { transform: `translate(${dx * .5}px,${dy * .5 - 90}px) scale(1.7)`, opacity: 1, offset: .5 },
+        { transform: `translate(${dx}px,${dy}px) scale(1)`, opacity: 1 }
+      ], { duration: FLY, delay: WAIT + i * STEP, easing: 'ease-in-out', fill: 'both' });
+      setTimeout(() => {
+        c.remove();
+        const k = i === n - 1 ? amount - each * (n - 1) : each;
+        if (!chipHold) return;
+        chipHold[payer] -= k; chipHold[receiver] += k; paint();
+        const s = stackOf(receiver); if (s) { s.classList.remove('bump'); void s.offsetWidth; s.classList.add('bump'); }
+        if (i === n - 1) setTimeout(() => { chipHold = null; if (room && room.game) { renderScores(room.game); renderSeats(room.game); } after && after(); }, 500);
+      }, WAIT + i * STEP + FLY);
+    }
+  }
+  if (location.hostname === 'localhost') {
+    window.demoSweep = (t = 0, all = false) => sweep(t, 1 - t, all ? '56 – 0' : '40 – 0', all);
+    window.demoChips = (payer = 0, n = 3) => chipsFly(payer, 1 - payer, n, room.game ? room.game.tables : [12 - n, 12 + n]);
+  }
+
   function celebrate(team, matchWin, sub, after) {
     const old = $('cheer'); if (old) old.remove();
     const el = document.createElement('div');
@@ -379,7 +497,7 @@
   function renderScores(g) {
     for (const t of [0, 1]) {
       $(`tname${t}`).textContent = rawTeam(t);
-      $(`tables${t}`).textContent = T('{0} chips', g ? g.tables[t] : 12);
+      $(`tables${t}`).textContent = T('{0} chips', chipsNow(g, t));
       $(`hpts${t}`).textContent = g && g.contract ? T('{0} pts', g.points[t]) : '';
     }
     const c = g && !(g.result && g.result.void) && g.contract;   // a void hand has no contract to chase
@@ -408,6 +526,10 @@
       const isMe = s.seat === room.mySeat;
       const cls = ['seat', `t${s.team}`];
       if (s.kind === 'empty') cls.push('empty');
+      // seats 1 and 2 are the captains' seats (one per team): a marker only, the team's chips are kept beside them
+      const cap = s.seat < 2;
+      if (cap) cls.push('cap');
+      const stack = cap ? `<span class="stack" title="${T('Team captain. The team chips are kept here')}"><i></i><i></i><i></i><b>${chipsNow(g, s.team)}</b></span>` : '';
       if (isMe) cls.push('me');
       if (g) cls.push('ingame');
       if (openSeat === s.seat) cls.push('open');
@@ -433,7 +555,7 @@
 
       let body;
       if (s.kind === 'empty') {
-        body = `<div class="nm">${T('Open seat')}</div><div class="meta">${teamName(s.team)}</div>
+        body = `<div class="nm">${T('Open seat')}</div><div class="meta">${teamName(s.team)}${cap ? ' · ' + T('captain seat') : ''}</div>
           <div class="seat-actions">
             <button class="btn small" data-sit="${s.seat}">${T('Sit here')}</button>
             ${host ? `<button class="btn small ghost" data-bot="${s.seat}">${T('Add bot')}</button>` : ''}
@@ -443,6 +565,7 @@
         if (s.kind === 'bot') meta.push(T('bot'));
         if (s.kind === 'human' && !s.connected) meta.push(T('away'));
         const toks = [];
+        if (cap) toks.push(`<span class="tok capt" title="${T('Team captain. The team chips are kept here')}">★</span>`);
         if (g && g.dealer === s.seat) toks.push(`<span class="tok" title="${T('Dealt this hand')}">${T('deals')}</span>`);
         if (g && g.phase !== 'handover' && g.phase !== 'matchover' && (g.dealer + 1) % N() === s.seat) toks.push(`<span class="tok" title="${T('Opens the bidding and leads the first trick')}">${T('opens')}</span>`);
         let actions = '';
@@ -453,11 +576,11 @@
         // any seated player (or the host) may remove / replace another player
         if (s.kind === 'human' && !isMe && (host || seated))
           actions += `<button class="btn small ghost" data-kick="${s.seat}">${g ? T('Replace with bot') : T('Remove')}</button>`;
-        body = `${s.kunukku ? `<span class="kunukku" title="${T(KUNUKKU_TIP)}">${KUNUKKU}</span>` : ''}${g ? `<span class="cnt" title="${T('Cards in hand')}">${g.handCounts[s.seat]}</span>` : ''}${toks.length ? `<div class="toks">${toks.join('')}</div>` : ''}
+        body = `${s.kunukku || shedding.has(s.seat) ? `<span class="kunukku" title="${T(KUNUKKU_TIP)}">${KUNUKKU}</span>` : ''}${g ? `<span class="cnt" title="${T('Cards in hand')}">${g.handCounts[s.seat]}</span>` : ''}${toks.length ? `<div class="toks">${toks.join('')}</div>` : ''}
           <div class="nm">${esc(nameOf(s.seat))}${g && s.tuned ? ` <svg viewBox="0 0 16 16" width=".85em" height=".85em" fill="currentColor" style="vertical-align:-.08em"><title>${T('Bids with numbers tuned on human play')}</title><circle cx="8" cy="5" r="3.2"/><path d="M2 15c0-3.6 2.7-5.6 6-5.6s6 2 6 5.6z"/></svg>` : ''}</div>${meta.length ? `<div class="meta">${meta.join(' ')}</div>` : ''}
           ${actions ? `<div class="seat-actions">${actions}</div>` : ''}`;
       }
-      return `<div class="${cls.join(' ')}" data-seat="${s.seat}" style="left:${x}%;top:${y}%" title="${teamName(s.team)}">${said}${body}</div>`;
+      return `<div class="${cls.join(' ')}" data-seat="${s.seat}" style="left:${x}%;top:${y}%" title="${teamName(s.team)}">${said}${stack}${body}</div>`;
     }).join('');
     $('seats').querySelectorAll('[data-sit]').forEach((b) => (b.onclick = () => socket.emit('sit', { seat: b.dataset.sit, name: myName() })));
     $('seats').querySelectorAll('[data-bot]').forEach((b) => (b.onclick = () => socket.emit('setBot', { seat: b.dataset.bot, on: true })));
@@ -818,14 +941,19 @@
         <span>${T('{0} chips', teamName(1))}</span><span class="v">${g.tables[1]}</span>
       </div>
       ${over ? `<p><b>${T('{0} wins the match.', teamName(g.winner))}</b></p>
-        <p class="kun-line"><span class="kunukku big">${KUNUKKU}</span><span><b>${T('{0} wears the kunukku.', teamName(1 - g.winner))}</b><span class="how"><br>${T('Bid and win the first hand of the next match and the whole team takes it off. After that, each player sheds their own by bidding and making a contract.')}</span></span></p>` : room.isHost ? '' : `<p class="sub">${T('The host deals the next hand.')}</p>`}
+        <p class="kun-line"><span class="kunukku big">${KUNUKKU}</span><span><b>${T('{0} wears the kunukku.', teamName(1 - g.winner))}</b><span class="how"><br>${T('Each player sheds their own by bidding and making a contract. Win the next match and the whole team takes it off.')}</span></span></p>` : room.isHost ? '' : `<p class="sub">${T('The host deals the next hand.')}</p>`}
       <div class="row">
         ${over && room.isHost ? `<button class="btn primary" data-start>${T('Start a new match')}</button>` : ''}
         <button class="btn" data-hands>${T('Show the initial hands')}</button>
         ${!over && room.isHost ? `<button class="btn primary" data-next>${T('Next hand')}</button>` : ''}
         <button class="btn" data-close>${T('Close')}</button>
       </div>`, true, 'phase');
-    if (over) { $('seats').classList.add('kun-pending'); celebrate(g.winner, true, T('wins the match'), () => kunukkuKayaral(1 - g.winner, show)); }
-    else celebrate(r.receiver, false, conceded ? T('takes {0} as {1} concedes', chips, teamName(r.conceded)) : r.made ? T('made {0} and takes {1}', esc(bidText(c.value, c.suit, c.hasJack)), chips) : T('set {0} and takes {1}', teamName(c.team), chips), show);
+    smashQueued = true;
+    // first the surprise when the losers took no point at all, then the chips change hands, then the trophy
+    const swept = !conceded && r.points[r.payer] === 0 && r.points[r.receiver] > 0;
+    const pay = (next) => chipsFly(r.payer, r.receiver, r.amount, g.tables, next);
+    const first = (next) => (swept ? sweep(r.receiver, r.payer, `${r.points[r.receiver]} – 0`, c.value === 56 && r.made, () => pay(next)) : pay(next));
+    if (over) { $('seats').classList.add('kun-pending'); first(() => celebrate(g.winner, true, T('wins the match'), () => kunukkuSmash(() => kunukkuKayaral(1 - g.winner, show)))); }
+    else first(() => celebrate(r.receiver, false, conceded ? T('takes {0} as {1} concedes', chips, teamName(r.conceded)) : r.made ? T('made {0} and takes {1}', esc(bidText(c.value, c.suit, c.hasJack)), chips) : T('set {0} and takes {1}', teamName(c.team), chips), () => kunukkuSmash(show)));
   }
 })();

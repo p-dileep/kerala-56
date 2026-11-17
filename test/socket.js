@@ -4,20 +4,20 @@ process.env.PORT = 0; process.env.BOT_DELAY_MS = 5; process.env.BOT_BID_DELAY_MS
 const { server } = require('../src/server');
 const { io } = require('socket.io-client');
 const { HUMAN_TUNED_BOTS } = require('../src/bot');
-{ // kunukku: loser of a match wears it; off for the team on a first-hand win, else per bidder
+{ // kunukku: loser of a match wears it; a bidder who makes a contract sheds their own; off for the team only on winning the next match
   const { updateKunukku } = require('../src/server');
   const assert = require('assert');
-  const room = { seats: [0, 1, 2, 3, 4, 5].map((i) => ({ name: 'P' + i })), teamNames: ['A', 'B'], chat: [], kunukku: [], kunukkuFresh: [false, false] };
+  const room = { seats: [0, 1, 2, 3, 4, 5].map((i) => ({ name: 'P' + i })), teamNames: ['A', 'B'], chat: [], kunukku: [] };
   const hand = (phase, seat, made, extra = {}) => { room.game = { phase, winner: extra.winner, result: { made, contract: { seat, team: seat % 2 }, ...extra } }; updateKunukku(room); };
   const worn = () => room.kunukku.map((k, i) => (k ? i : '')).join('');
   hand('matchover', 0, true, { winner: 0 }); assert.equal(worn(), '135');           // team B lost the match
   hand('handover', 1, true, { void: true }); assert.equal(worn(), '135');            // a void hand does not count
-  hand('handover', 1, true); assert.equal(worn(), '');                               // B bids and wins the first hand: all off
-  hand('matchover', 0, true, { winner: 0 }); hand('handover', 0, true); assert.equal(worn(), '135');   // first hand went to A
-  hand('handover', 3, false); assert.equal(worn(), '135');                           // a failed bid sheds nothing
-  hand('handover', 3, true); assert.equal(worn(), '15');                             // only the bidder sheds
-  hand('matchover', 5, false, { winner: 0 }); assert.equal(worn(), '135');           // lost again: everyone wears it
-  hand('matchover', 1, true, { winner: 1 }); assert.equal(worn(), '024');            // B bids and wins its first hand (all off); A now wears it
+  hand('handover', 1, true); assert.equal(worn(), '35');                             // B bids and wins the first hand: only the bidder sheds
+  hand('handover', 0, false); assert.equal(worn(), '35');                            // A bids and goes down: B's stay on
+  hand('handover', 3, false); assert.equal(worn(), '35');                            // a failed bid sheds nothing
+  hand('matchover', 5, false, { winner: 0 }); assert.equal(worn(), '135');           // B loses the next match too: everyone wears it again
+  hand('matchover', 0, false, { winner: 1 }); assert.equal(worn(), '024');           // B wins the match (A went down): all off B, A now wears it
+  hand('matchover', 2, true, { winner: 0 }); assert.equal(worn(), '135');            // A wins the next match on its own bid: all off A, B wears it
   console.log('kunukku rules passed');
 }
 server.listen(0, () => {

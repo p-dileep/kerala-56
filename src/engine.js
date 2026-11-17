@@ -151,6 +151,11 @@ function selfShowedJack(actions, suit, seat) {
 function legalBidActions(state, seat) {
   const out = { pass: false, double: false, redouble: false, minBid: null, suits: [], plus: [], plusMeaning: {}, plusOpen: [], ns: [], keep: false, raiseLevels: [], changeMin: null, changeSuits: [] };
   const b = state.bidding;
+  const offerChange = () => {
+    if (b.doubled !== 1 || b.high.value >= MAX_BID) return;
+    out.changeMin = b.high.value + 1;
+    out.changeSuits = [...SUITS.filter((s) => s !== b.high.suit && state.hands[seat].some((c) => c.suit === s)), ...(b.high.suit !== 'NT' ? ['NT'] : [])];
+  };
 
   // Self-raise window: after the auction closes, the declarer alone may convert once to a higher tier.
   // A doubled declarer may instead change to another suit (one they hold, or NT) at any higher value,
@@ -160,16 +165,17 @@ function legalBidActions(state, seat) {
       out.keep = true;
       out.raiseLevels = b.raised ? [] : LEVELS.filter((l) => l > b.high.value);
       out.redouble = b.doubled === 1;
-      if (b.doubled === 1 && b.high.value < MAX_BID) {
-        out.changeMin = b.high.value + 1;
-        out.changeSuits = [...SUITS.filter((s) => s !== b.high.suit && state.hands[seat].some((c) => c.suit === s)), ...(b.high.suit !== 'NT' ? ['NT'] : [])];
-      }
+      offerChange();
     }
     return out;
   }
 
   if (state.phase !== 'bidding' || state.turn !== seat) return out;
   const hand = state.hands[seat];
+  // The same change is open as soon as the turn reaches a doubled bidder (e.g. doubled by the player
+  // on their right), without waiting for everyone to pass. Kept apart from minBid / suits, which stay
+  // the ordinary "own bid needs the next level" rule.
+  if (b.high && b.high.seat === seat) offerChange();
 
   // After a self-raise nobody can bid higher: only Pass / Double / Redouble remain.
   if (b.raised) {
@@ -317,6 +323,7 @@ function applyBid(state, seat, action) {
       const hasJack = state.hands[seat].some((c) => c.suit === suit && c.rank === 'J');
       b.high = { seat, value, suit, hasJack };
       b.doubled = 0;                            // the double is wiped and the bidding reopens
+      b.raised = false;                         // a new suit is a new bid: others may bid over it again
       b.passesInRow = 0;
       b.actions.push({ seat, type: 'bid', value, suit, hasJack, change: true });
       logCall(state, b.actions[b.actions.length - 1]);
@@ -334,16 +341,21 @@ function applyBid(state, seat, action) {
   } else if (type === 'bid') {
     const value = Number(action.value);
     const suit = action.suit;
-    if (legal.minBid === null) throw new Error('No higher bid possible');
-    if (!Number.isInteger(value) || value < legal.minBid || value > MAX_BID)
-      throw new Error(`Bid must be between ${legal.minBid} and ${MAX_BID}`);
-    if (!legal.suits.includes(suit)) throw new Error('You cannot bid a suit you do not hold');
+    // a doubled bidder changing suit on their own turn: any higher value, the double is wiped
+    const change = legal.changeSuits.includes(suit) && Number.isInteger(value) && value >= legal.changeMin && value <= MAX_BID;
+    if (!change) {
+      if (legal.minBid === null) throw new Error('No higher bid possible');
+      if (!Number.isInteger(value) || value < legal.minBid || value > MAX_BID)
+        throw new Error(`Bid must be between ${legal.minBid} and ${MAX_BID}`);
+      if (!legal.suits.includes(suit)) throw new Error('You cannot bid a suit you do not hold');
+    }
     // Convention: "30 Hearts" = caller holds the Jack of the suit; "Hearts 30" = caller does not.
     const hasJack = state.hands[seat].some((c) => c.suit === suit && c.rank === 'J');
     b.high = { seat, value, suit, hasJack };
     b.doubled = 0;
     b.passesInRow = 0;
-    b.actions.push({ seat, type: 'bid', value, suit, hasJack });
+    if (change) b.raised = false;
+    b.actions.push(change ? { seat, type: 'bid', value, suit, hasJack, change: true } : { seat, type: 'bid', value, suit, hasJack });
   } else if (type === 'plus') {
     const n = Number(action.n);
     let value, suit;

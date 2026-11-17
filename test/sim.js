@@ -317,6 +317,26 @@ assert.throws(()=>E.applyBid(s, s.turn, {type:'pass'}), /Opener/);
     while (u.turn !== (o4 + N - 1) % N) E.applyBid(u, u.turn, { type: 'pass' });
     E.applyBid(u, u.turn, { type: 'double' });
     assert.equal(u.phase, 'bidding'); assert.equal(u.turn, o4);
+    // ... and on that turn the bidder may already change suit at one more; the own suit still needs the next level
+    const v = JSON.parse(JSON.stringify(u));
+    const Lv = E.legalBidActions(v, o4);
+    assert.equal(Lv.minBid, 40); assert.equal(Lv.changeMin, 31); assert.deepEqual(Lv.changeSuits, ['H', 'D', 'C', 'NT']);
+    assert.throws(() => E.applyBid(v, o4, { type: 'bid', value: 31, suit: 'S' }), /between/);
+    E.applyBid(v, o4, { type: 'bid', value: 31, suit: 'H' });
+    assert.equal(v.phase, 'bidding'); assert.equal(v.bidding.doubled, 0); assert.equal(v.turn, (o4 + 1) % N);
+    assert.deepEqual(v.bidding.high, { seat: o4, value: 31, suit: 'H', hasJack: true });
+    assert.ok(v.bidding.actions[v.bidding.actions.length - 1].change);
+    assert.equal(E.legalBidActions(v, v.turn).minBid, 32);                // bids go on
+    // a self-raised bid that is doubled can be changed too, and the bidding is open again
+    const w = E.newMatch({}, ()=>0.3); const o5 = w.turn; w.hands[o5] = s.hands[op].slice();
+    E.applyBid(w, o5, { type: 'bid', value: 30, suit: 'S' });
+    while (w.phase === 'bidding') E.applyBid(w, w.turn, { type: 'pass' });
+    E.applyBid(w, o5, { type: 'raise', value: 40 });
+    while (w.turn !== (o5 + N - 1) % N) E.applyBid(w, w.turn, { type: 'pass' });
+    E.applyBid(w, w.turn, { type: 'double' });
+    assert.equal(E.legalBidActions(w, o5).minBid, null); assert.equal(E.legalBidActions(w, o5).changeMin, 41);
+    E.applyBid(w, o5, { type: 'bid', value: 41, suit: 'H' });
+    assert.equal(w.bidding.raised, false); assert.equal(E.legalBidActions(w, w.turn).minBid, 42);
     while (u.phase === 'bidding') E.applyBid(u, u.turn, { type: 'pass' });
     assert.equal(u.phase, 'selfraise'); assert.equal(u.turn, o4); assert.ok(E.legalBidActions(u, o4).changeSuits.length); }
   // invalid hand: the defending team holds no trump -> void, no chips move, the deal passes on

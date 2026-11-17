@@ -19,35 +19,35 @@
 <!-- Lobby -->
 <main id="lobby" class="screen">
   <div class="lobby-card">
-    <h1 class="wordmark"><span class="num">56</span><span class="ml">അമ്പത്തിയാറ്</span></h1>
-    <p class="lede">Two teams, two packs, 56 points. Type your name, walk into the 6-player or 8-player table, and pick a seat. Bots fill any empty seats.</p>
+    <h1 class="wordmark"><span class="num">56</span><span class="ml">അമ്പത്തിയാറ്</span><button type="button" class="btn small ghost lang-btn" lang="ml">മലയാളം</button></h1>
+    <p class="lede" data-t>Two teams, two packs, 56 points. Type your name, walk into the 6-player or 8-player table, and pick a seat. Bots fill any empty seats.</p>
     <label class="field">
-      <span>Your name <em class="req">(required)</em></span>
-      <input id="nameInput" maxlength="18" autocomplete="nickname" placeholder="e.g. BGK" required>
+      <span><span data-t>Your name</span> <em class="req" data-t>(required)</em></span>
+      <input id="nameInput" maxlength="18" autocomplete="nickname" placeholder="e.g. BGK" data-t="placeholder" required>
     </label>
-    <p class="hint">Want to try 56 first? Start a private table and play against the bots, or bring your own friends: send them play56.in and the table code.</p>
+    <p class="hint" data-t>Want to try 56 first? Start a private table and play against the bots, or bring your own friends: send them play56.in and the table code.</p>
     <div class="join-row">
       <label class="field grow">
-        <span>Start a private table</span>
-        <select id="newPlayers"><option value="6">6 players</option><option value="8">8 players</option></select>
+        <span data-t>Start a private table</span>
+        <select id="newPlayers"><option value="6" data-t>6 players</option><option value="8" data-t>8 players</option></select>
       </label>
-      <button id="createBtn" class="btn">Start a new table</button>
+      <button id="createBtn" class="btn" data-t>Start a new table</button>
     </div>
     <div class="join-row">
       <label class="field grow">
-        <span>Have a code?</span>
+        <span data-t>Have a code?</span>
         <input id="codeInput" maxlength="6" placeholder="ABCDE" autocapitalize="characters">
       </label>
-      <button id="joinBtn" class="btn">Join table</button>
+      <button id="joinBtn" class="btn" data-t>Join table</button>
     </div>
-    <div class="group-label"><span>Public tables</span><em>Open to everyone. Walk in and pick a seat.</em></div>
+    <div class="group-label"><span data-t>Public tables</span><em data-t>Open to everyone. Walk in and pick a seat.</em></div>
     <div class="fixed-tables">
-      <div class="fixed-col"><button class="btn primary big-btn" data-fixed="TABLE6"><b>6-player table</b><span class="sub">3 vs 3 · 8 cards each</span><span id="info6" class="status"></span></button><button class="btn small ghost hidden" data-reset-table="TABLE6">Reset table for a new game</button></div>
-      <div class="fixed-col"><button class="btn primary big-btn" data-fixed="TABLE8"><b>8-player table</b><span class="sub">4 vs 4 · 8 cards each, with 7s and 8s</span><span id="info8" class="status"></span></button><button class="btn small ghost hidden" data-reset-table="TABLE8">Reset table for a new game</button></div>
+      <div class="fixed-col"><button class="btn primary big-btn" data-fixed="TABLE6"><b data-t>6-player table</b><span class="sub" data-t>3 vs 3 · 8 cards each</span><span id="info6" class="status"></span></button><button class="btn small ghost hidden" data-reset-table="TABLE6" data-t>Reset table for a new game</button></div>
+      <div class="fixed-col"><button class="btn primary big-btn" data-fixed="TABLE8"><b data-t>8-player table</b><span class="sub" data-t>4 vs 4 · 8 cards each, with 7s and 8s</span><span id="info8" class="status"></span></button><button class="btn small ghost hidden" data-reset-table="TABLE8" data-t>Reset table for a new game</button></div>
     </div>
     <details class="rules">
-      <summary>How 56 is played here</summary>
-      <ul>
+      <summary data-t>How 56 is played here</summary>
+      <ul class="en-only">
         <li>Cards rank J, 9, A, 10, K, Q. Points: J 3, 9 2, A 1, 10 1, so the 48 cards hold 56 points. Six players get 8 cards each (3 vs 3). Eight players add the 8s and 7s of both packs, which rank below the Queen and score nothing, and also get 8 cards each (4 vs 4, 64 cards). Bids, levels and chips are the same at both sizes.</li>
         <li>Bidding goes round from the dealer's right. Bids run 28–56 with a trump suit or no-trump. The first bidder must open with at least 28.</li>
         <li>You cannot name a suit you hold none of. To raise your own standing bid you must jump to the next level (40, 48 or 56).</li>
@@ -56,11 +56,26 @@
         <li>Plus: the opener may open with <b>Plus N</b> in a suit, which counts as 27+N (Plus 1 opens at 28, Plus 2 at 29, Plus 3 at 30); otherwise only a partner of the high bidder may say <b>Plus N</b>, raising by N in the same suit. Meanings follow the power ladder J J 9 9 A A 10 10 K K Q Q minus the cards already shown by earlier calls in that suit. Plus 1 = the top remaining card of the ladder; while that is a Jack it must be your only card in the suit, unless you yourself already showed the first Jack in that suit (then Plus 1 = the other Jack, and you need not show your 9); a partner's Jack does not count. Plus can also be said over an opponent's bid, in the suit your partner last called. Plus 2 = the top two remaining cards (fresh suit: both Jacks; after a Plus 1: the other Jack and a Nine; once all Jacks and Nines are shown: both Aces). Plus 3 = the top three remaining cards (fresh suit: both Jacks and a Nine). The buttons show what each Plus means right now.</li>
         <li>NS: a no-trump call that says you hold none of a suit already called. One step above the current bid points at the most recent suit, two steps at the suit before that, and so on. Example: after 30 ♣ and 31 ♥, <b>32 NS</b> means no hearts and <b>33 NS</b> means no clubs.</li>
         <li>Seats can change any time: take over a bot, move to a bot's seat, or replace another player with a bot. The hand continues.</li>
-        <li>Opponents may double, and the bidding team may then redouble, which ends the auction. A double only changes the chips; bidding carries on. If everyone passes a doubled bid, the bidder may keep it (chips ×2), raise it, or change to another suit at any higher value, which cancels the double and reopens the bidding.</li>
+        <li>Opponents may double, and the bidding team may then redouble, which ends the auction. A double only changes the chips; bidding carries on. A doubled bidder may change to another suit at any higher value on their next turn (40 ♦ doubled, then 41 ♠): the double is cancelled and the bidding goes on. If everyone passes a doubled bid, the bidder may keep it (chips ×2), raise it, or make that change.</li>
         <li>If the defending team holds no card of the trump suit when the bidding closes, the hand is void: no chips change and the deal passes on.</li>
         <li>Concede: during play a team may give up the hand with the <b>Concede</b> button. One other human on the same team has to agree (bots have no say; a lone human decides alone). The conceding team pays the bid's stake as a loss: the declaring side pays what going down costs, the defending side pays what the bid would have won. The other team never sees the request.</li>
         <li>Follow suit if you can. The highest trump wins, otherwise the highest card of the suit led. When two identical cards fall, the first one played wins.</li>
         <li>Each team starts with 12 chips. Bids of 28–39 win 1 or lose 2, 40–47 win 2 or lose 3, 48–55 win 3 or lose 4, and 56 wins 4 or loses 5. Doubling multiplies by 2, redoubling by 4. A team out of chips loses the match and wears the kunukku (a baby-coconut ear-drop) into the next one: if that team bids and wins the first hand, the whole team takes it off; otherwise each player sheds their own by bidding and making a contract. The host can reset the chips at any time.</li>
+      </ul>
+      <ul class="ml-only" lang="ml">
+        <li>ചീട്ടുകളുടെ വലിപ്പക്രമം J, 9, A, 10, K, Q. പോയിന്റ്: J 3, 9 2, A 1, 10 1; അങ്ങനെ 48 ചീട്ടിൽ ആകെ 56 പോയിന്റ്. ആറു പേർ കളിക്കുമ്പോൾ ഓരോരുത്തർക്കും 8 ചീട്ട് (3 × 3). എട്ടു പേരാണെങ്കിൽ രണ്ടു പെട്ടിയിലെയും 8-ഉം 7-ഉം കൂടി ചേർക്കും; അവ റാണിക്കു താഴെയാണ്, പോയിന്റില്ല; അപ്പോഴും ഓരോരുത്തർക്കും 8 ചീട്ട് (4 × 4, 64 ചീട്ട്). വിളിയും നിലകളും മേശയും രണ്ടിലും ഒരുപോലെ.</li>
+        <li>ചീട്ട് വിളമ്പിയ ആളുടെ വലതുവശത്തുനിന്ന് വിളി തുടങ്ങി ചുറ്റും പോകും. 28 മുതൽ 56 വരെ വിളിക്കാം, ഒരു തുറുപ്പ് ചിഹ്നത്തിലോ തുറുപ്പില്ലാതെയോ (NT). കൈവിളിക്കാരൻ 28 എങ്കിലും വിളിക്കണം.</li>
+        <li>കൈയിൽ ഒരു ചീട്ടുപോലും ഇല്ലാത്ത ചിഹ്നം വിളിക്കാൻ പറ്റില്ല. സ്വന്തം വിളി തന്നെ കൂട്ടണമെങ്കിൽ അടുത്ത നിലയിലേക്ക് (40, 48, 56) ചാടണം.</li>
+        <li>ഗുലാൻ സൂചന: വിളിച്ചയാളുടെ കൈയിൽ ആ ചിഹ്നത്തിന്റെ ഗുലാൻ (J) ഉണ്ടെങ്കിൽ വിളി <b>30 ♥</b> എന്നും, ഇല്ലെങ്കിൽ <b>♥ 30</b> എന്നും കാണിക്കും.</li>
+        <li>വിളിച്ച ടീം ലക്ഷ്യം എത്തിയാലോ, ഇനി എത്താൻ പറ്റില്ലെന്ന് ഉറപ്പായാലോ കളി അവിടെ നിർത്തും.</li>
+        <li>പ്ലസ്: കൈവിളിക്കാരന് ഒരു ചിഹ്നത്തിൽ <b>പ്ലസ് N</b> എന്നു പറഞ്ഞ് തുടങ്ങാം; അത് 27+N ആയി കണക്കാക്കും (പ്ലസ് 1 = 28, പ്ലസ് 2 = 29, പ്ലസ് 3 = 30). അല്ലാത്തപ്പോൾ ഏറ്റവും ഉയർന്ന വിളിക്കാരന്റെ പങ്കാളിക്കു മാത്രമേ <b>പ്ലസ് N</b> പറയാൻ പറ്റൂ; അതേ ചിഹ്നത്തിൽ വിളി N കൂടും. അർഥം J J 9 9 A A 10 10 K K Q Q എന്ന ക്രമം അനുസരിച്ചാണ്, ആ ചിഹ്നത്തിൽ മുൻ വിളികൾ കാണിച്ചുകഴിഞ്ഞ ചീട്ടുകൾ ഒഴിവാക്കി. പ്ലസ് 1 = ക്രമത്തിൽ ബാക്കിയുള്ള ഏറ്റവും മുകളിലെ ചീട്ട്; അത് ഗുലാൻ ആണെങ്കിൽ ആ ചിഹ്നത്തിൽ നിങ്ങളുടെ ഏക ചീട്ട് അതായിരിക്കണം. എന്നാൽ ആദ്യ ഗുലാൻ നിങ്ങൾ തന്നെ മുമ്പ് കാണിച്ചിട്ടുണ്ടെങ്കിൽ പ്ലസ് 1 = രണ്ടാമത്തെ ഗുലാൻ (9 കാണിക്കേണ്ടതില്ല); പങ്കാളി കാണിച്ച ഗുലാൻ ഇതിനു കണക്കാക്കില്ല. എതിരാളിയുടെ വിളിക്കു മുകളിലും പ്ലസ് പറയാം, പങ്കാളി അവസാനം വിളിച്ച ചിഹ്നത്തിൽ. പ്ലസ് 2 = ബാക്കിയുള്ള മുകളിലെ രണ്ടു ചീട്ട് (പുതിയ ചിഹ്നം: രണ്ടു ഗുലാനും; ഒരു പ്ലസ് 1-നു ശേഷം: മറ്റേ ഗുലാനും ഒരു 9-ഉം; ഗുലാനും 9-ഉം എല്ലാം കാണിച്ചുകഴിഞ്ഞാൽ: രണ്ട് ഏയ്സ്). പ്ലസ് 3 = ബാക്കിയുള്ള മുകളിലെ മൂന്നു ചീട്ട് (പുതിയ ചിഹ്നം: രണ്ടു ഗുലാനും ഒരു 9-ഉം). ഓരോ പ്ലസിന്റെയും അപ്പോഴത്തെ അർഥം ബട്ടണിൽ കാണാം.</li>
+        <li>നോസ് (NS): മുമ്പ് വിളിച്ച ഒരു ചിഹ്നം കൈയിൽ ഇല്ലെന്ന് അറിയിക്കുന്ന തുറുപ്പില്ലാത്ത വിളി. ഇപ്പോഴത്തെ വിളിയെക്കാൾ ഒന്നു കൂട്ടിയാൽ അവസാനം വിളിച്ച ചിഹ്നം, രണ്ടു കൂട്ടിയാൽ അതിനു മുമ്പത്തേത്, അങ്ങനെ. ഉദാഹരണം: 30 ♣, 31 ♥ കഴിഞ്ഞ് <b>32 NS</b> = ആഡ്യൻ ഇല്ല, <b>33 NS</b> = ക്ലാവർ ഇല്ല.</li>
+        <li>സീറ്റ് എപ്പോൾ വേണമെങ്കിലും മാറാം: ബോട്ടിന്റെ സീറ്റ് എടുക്കാം, ബോട്ടിന്റെ സീറ്റിലേക്ക് മാറാം, മറ്റൊരു കളിക്കാരനു പകരം ബോട്ടിനെ ഇരുത്താം. കളി തുടരും.</li>
+        <li>എതിരാളികൾക്ക് ഡബിൾ പറയാം; അതിനു മേൽ വിളിച്ച ടീമിന് റീഡബിൾ പറയാം, അതോടെ വിളി തീരും. ഡബിൾ മേശ മാത്രമേ മാറ്റൂ; വിളി തുടരും. ഡബിൾ കിട്ടിയ വിളിക്കാരന് തന്റെ അടുത്ത ഊഴത്തിൽ മറ്റൊരു ചിഹ്നത്തിലേക്ക്, ഏതു കൂടിയ വിലയിലും, മാറ്റി വിളിക്കാം (40 ♦ ഡബിൾ, പിന്നെ 41 ♠): ഡബിൾ റദ്ദാകും, വിളി തുടരും. ഡബിൾ ആയ വിളി എല്ലാവരും പാസ് ചെയ്താൽ വിളിച്ചയാൾക്ക് അത് വയ്ക്കാം (മേശ ×2), ഉയർത്താം, അല്ലെങ്കിൽ ഇങ്ങനെ ചിഹ്നം മാറ്റാം.</li>
+        <li>വിളി തീരുമ്പോൾ എതിർ ടീമിന്റെ കൈയിൽ തുറുപ്പ് ചിഹ്നത്തിലെ ഒരു ചീട്ടുപോലും ഇല്ലെങ്കിൽ കളി അസാധു: മേശ മാറില്ല, അടുത്തയാൾ ചീട്ട് വിളമ്പും.</li>
+        <li>വിട്ടുകൊടുക്കൽ: കളിക്കിടയിൽ <b>വിട്ടുകൊടുക്കൂ</b> ബട്ടൺ അമർത്തി ഒരു ടീമിന് ആ കളി വിട്ടുകൊടുക്കാം. അതേ ടീമിലെ മറ്റൊരു മനുഷ്യൻ സമ്മതിക്കണം (ബോട്ടുകൾക്ക് അഭിപ്രായമില്ല; ടീമിൽ ഒരാൾ മാത്രമാണെങ്കിൽ സ്വയം തീരുമാനിക്കാം). വിട്ടുകൊടുക്കുന്ന ടീം തോറ്റതുപോലെ മേശ കൊടുക്കണം: വിളിച്ച ടീമാണെങ്കിൽ വിളി തോറ്റാൽ കൊടുക്കേണ്ടത്, എതിർ ടീമാണെങ്കിൽ വിളി ജയിച്ചാൽ കൊടുക്കേണ്ടത്. മറ്റേ ടീം ഈ അപേക്ഷ കാണില്ല.</li>
+        <li>കഴിയുമെങ്കിൽ ഇറക്കിയ ചിഹ്നം തന്നെ ഇടണം. ഏറ്റവും വലിയ തുറുപ്പ് പിടി ജയിക്കും; തുറുപ്പ് വീണില്ലെങ്കിൽ ഇറക്കിയ ചിഹ്നത്തിലെ ഏറ്റവും വലിയ ചീട്ട്. ഒരേപോലുള്ള രണ്ടു ചീട്ട് വീണാൽ ആദ്യം ഇട്ടത് ജയിക്കും.</li>
+        <li>ഓരോ ടീമിനും തുടക്കത്തിൽ 12 മേശ. 28–39 വിളി: ജയിച്ചാൽ 1, തോറ്റാൽ 2; 40–47: ജയിച്ചാൽ 2, തോറ്റാൽ 3; 48–55: ജയിച്ചാൽ 3, തോറ്റാൽ 4; 56: ജയിച്ചാൽ 4, തോറ്റാൽ 5. ഡബിൾ ×2, റീഡബിൾ ×4. മേശ തീർന്ന ടീം മത്സരം തോൽക്കും, അടുത്ത മത്സരത്തിൽ കുണുക്ക് (ചെവിയിൽ തൂക്കുന്ന മച്ചിങ്ങ) അണിയണം: ആ ടീം ആദ്യ കളി വിളിച്ച് ജയിച്ചാൽ ടീം മുഴുവൻ ഊരാം; അല്ലെങ്കിൽ ഓരോരുത്തരും സ്വയം വിളിച്ച് ജയിച്ച് സ്വന്തം കുണുക്ക് ഊരണം. ഹോസ്റ്റിന് എപ്പോൾ വേണമെങ്കിലും മേശ റീസെറ്റ് ചെയ്യാം.</li>
       </ul>
     </details>
   </div>
@@ -69,16 +84,16 @@
 <!-- Table -->
 <main id="table" class="screen hidden">
   <header class="topbar">
-    <button id="codeChip" class="chip code" title="Copy invite link"><span class="pre">Table </span><b id="roomCode"></b></button>
+    <button id="codeChip" class="chip code" title="Copy invite link" data-t="title"><span class="pre" data-t>Table </span><b id="roomCode"></b></button>
     <div id="contractChip" class="chip contract hidden"></div>
     <div class="scores">
       <div class="team-score t0"><span class="tname" id="tname0">Team A</span><span class="tables" id="tables0"></span><span class="hpts" id="hpts0"></span></div>
       <div class="team-score t1"><span class="tname" id="tname1">Team B</span><span class="tables" id="tables1"></span><span class="hpts" id="hpts1"></span></div>
-      <button id="teamNamesBtn" class="chip pen" title="Rename the teams" aria-label="Rename the teams">✎</button>
+      <button id="teamNamesBtn" class="chip pen" title="Rename the teams" aria-label="Rename the teams" data-t="title aria">✎</button>
     </div>
     <button id="watchChip" class="chip watch hidden" title="Watching"></button>
     <button id="fullBtn" class="chip full hidden" aria-label="Full screen" title="Full screen">⛶</button>
-    <button id="railToggle" class="chip icon" aria-label="Show chat and log">Chat</button>
+    <button id="railToggle" class="chip icon" aria-label="Show chat and log" data-t="text aria">Chat</button>
   </header>
 
   <section class="arena">
@@ -90,63 +105,64 @@
     <div id="seats"></div>
   </section>
 
-  <section id="bidPanel" class="bid-panel hidden" aria-label="Your bid">
+  <section id="bidPanel" class="bid-panel hidden" aria-label="Your bid" data-t="aria">
     <div class="bid-head"><span id="bidPrompt">Your bid</span></div>
     <div id="suitBtns" class="suits"></div>
     <div id="convRow" class="conv"><div id="plusBtns" class="levels"></div><div id="nsBtns" class="levels"></div></div>
     <div class="raise">
-      <span class="raise-label">Bid higher</span>
+      <span class="raise-label" data-t>Bid higher</span>
       <div class="stepper">
-        <button id="bidMinus" class="btn small" aria-label="Lower bid">−</button>
+        <button id="bidMinus" class="btn small" aria-label="Lower bid" data-t="aria">−</button>
         <output id="bidValue">28</output>
-        <button id="bidPlus" class="btn small" aria-label="Raise bid">+</button>
+        <button id="bidPlus" class="btn small" aria-label="Raise bid" data-t="aria">+</button>
       </div>
       <div id="levelJumps" class="levels"></div>
     </div>
     <div class="bid-actions">
-      <button id="passBtn" class="btn">Pass</button>
-      <button id="doubleBtn" class="btn warn">Double</button>
-      <button id="redoubleBtn" class="btn warn">Redouble</button>
+      <button id="passBtn" class="btn" data-t>Pass</button>
+      <button id="doubleBtn" class="btn warn" data-t>Double</button>
+      <button id="redoubleBtn" class="btn warn" data-t>Redouble</button>
     </div>
   </section>
 
-  <section id="selfRaisePanel" class="bid-panel hidden" aria-label="Raise the bid">
+  <section id="selfRaisePanel" class="bid-panel hidden" aria-label="Raise the bid" data-t="aria">
     <div class="bid-head"><span id="selfRaisePrompt">Raise the bid?</span></div>
     <div class="bid-actions">
-      <button id="keepBtn" class="btn primary">Keep it</button>
+      <button id="keepBtn" class="btn primary" data-t>Keep it</button>
       <div id="raiseBtns" class="levels"></div>
-      <button id="srRedoubleBtn" class="btn warn hidden">Redouble</button>
+      <button id="srRedoubleBtn" class="btn warn hidden" data-t>Redouble</button>
     </div>
     <div id="changeRow" class="hidden">
       <div class="raise">
-        <span class="raise-label">Or change suit at</span>
+        <span class="raise-label" data-t>Or change suit at</span>
         <div class="stepper">
-          <button id="chgMinus" class="btn small" aria-label="Lower bid">−</button>
+          <button id="chgMinus" class="btn small" aria-label="Lower bid" data-t="aria">−</button>
           <output id="chgValue">29</output>
-          <button id="chgPlus" class="btn small" aria-label="Raise bid">+</button>
+          <button id="chgPlus" class="btn small" aria-label="Raise bid" data-t="aria">+</button>
         </div>
       </div>
       <div id="chgSuits" class="suits"></div>
     </div>
   </section>
 
-  <section id="hand" class="hand" aria-label="Your cards"></section>
+  <section id="hand" class="hand" aria-label="Your cards" data-t="aria"></section>
 
   <aside id="rail" class="rail">
     <div class="rail-head">
-      <button id="railClose" class="btn small rail-close" aria-label="Close chat">✕ Close</button>
-      <button id="lastTrickBtn" class="btn small">Last trick</button>
-      <button id="resetChipsBtn" class="btn small ghost hidden" title="Host only: both teams back to 12 chips">Reset chips</button>
-      <button id="handsBtn" class="btn small hidden" title="Everyone's cards as dealt (after the hand)">Show the hands</button>
-      <button id="concedeBtn" class="btn small ghost hidden" title="Give up this hand: your team pays the chips as a loss">Concede</button>
-      <button id="deckBtn" class="btn small ghost" title="Switch between the two-colour and four-colour deck (diamonds blue, clubs green)">4-colour deck</button>
-      <button id="leaveBtn" class="btn small ghost">Leave table</button>
+      <button id="railClose" class="btn small rail-close" aria-label="Close chat" data-t="text aria">✕ Close</button>
+      <button id="lastTrickBtn" class="btn small" data-t>Last trick</button>
+      <button id="resetChipsBtn" class="btn small ghost hidden" title="Host only: both teams back to 12 chips" data-t="text title">Reset chips</button>
+      <button id="handsBtn" class="btn small hidden" title="Everyone's cards as dealt (after the hand)" data-t="text title">Show the hands</button>
+      <button id="concedeBtn" class="btn small ghost hidden" title="Give up this hand: your team pays the chips as a loss" data-t="text title">Concede</button>
+      <button id="deckBtn" class="btn small ghost" title="Switch between the two-colour and four-colour deck (diamonds blue, clubs green)" data-t="title">4-colour deck</button>
+      <button type="button" class="btn small ghost lang-btn" lang="ml">മലയാളം</button>
+      <button id="leaveBtn" class="btn small ghost" data-t>Leave table</button>
     </div>
     <ol id="log" class="log"></ol>
     <ol id="chat" class="chat"></ol>
     <form id="chatForm" class="chat-form">
-      <input id="chatInput" maxlength="200" placeholder="Say something" autocomplete="off">
-      <button class="btn small">Send</button>
+      <input id="chatInput" maxlength="200" placeholder="Say something" data-t="placeholder" autocomplete="off">
+      <button class="btn small" data-t>Send</button>
     </form>
   </aside>
 
@@ -156,6 +172,7 @@
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
 <script src="/socket.io/socket.io.js"></script>
+<script src="/lang.js"></script>
 <script src="/app.js"></script>
 </body>
 </html>

@@ -466,3 +466,13 @@ body.four .log .su-C { color: #8FD9A8 !important; }
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }
 }
+
+/* Language switch (lang.js): body.lang-ml while Malayalam is on. Malayalam letters join up, so no
+   letter-spacing there; lines get a little more height for the taller script. */
+.wordmark .lang-btn { margin-left: auto; align-self: center; font-size: .9rem; line-height: 1.3; }
+body:not(.lang-ml) .ml-only, body.lang-ml .en-only { display: none; }
+body.lang-ml, body.lang-ml * { letter-spacing: 0 !important; }
+body.lang-ml .btn { padding-top: .6em; padding-bottom: .6em; line-height: 1.35; }
+body.lang-ml .center .big, body.lang-ml .cheer .team, body.lang-ml .modal-card h2 { line-height: 1.35; }
+body.lang-ml .seat.me .nm::after { content: ' (ഞാൻ)'; }
+body.lang-ml .deal-row.bidder .who::after { content: ' (വിളി)'; }

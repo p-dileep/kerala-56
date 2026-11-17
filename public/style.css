@@ -513,3 +513,14 @@ body.lang-ml .deal-row.bidder .who::after { content: ' (വിളി)'; }
 @keyframes burst { 0% { transform: rotate(var(--a)) translateY(0) scale(.2); opacity: 0; } 12% { opacity: 1; } 100% { transform: rotate(var(--a)) translateY(calc(-1 * var(--d))) scale(1.3); opacity: 0; } }
 #table.shake { animation: shake .5s .2s; }
 @keyframes shake { 20% { transform: translate(-7px, 3px); } 40% { transform: translate(6px, -4px); } 60% { transform: translate(-4px, 2px); } 80% { transform: translate(3px, -1px); } }
+
+/* the ten bots with their character: a list to read, or buttons to pick from */
+.bot-list { display: grid; gap: 6px; margin: 10px 0; max-width: 62ch; }
+.bot-card { display: grid; grid-template-columns: auto auto 1fr; column-gap: 8px; row-gap: 1px; align-items: center; text-align: left; padding: 7px 10px 6px; border-radius: 10px; border: 1px solid rgba(30,26,20,.2); background: rgba(255,255,255,.55); color: inherit; font: inherit; }
+button.bot-card { cursor: pointer; width: 100%; }
+button.bot-card:hover:not([disabled]) { border-color: var(--kasavu); box-shadow: 0 0 0 2px var(--kasavu); }
+button.bot-card[disabled] { opacity: .38; cursor: default; }
+.bot-card .chr { justify-self: start; font-size: .7rem; font-weight: 700; border-radius: 999px; padding: 2px 8px 1px; color: #fff; line-height: 1.3; }
+.chr.aggressive { background: #C2394A; } .chr.medium { background: #8A6D1E; } .chr.defensive { background: #2F7A6B; }
+.bot-card .what { grid-column: 1 / -1; font-size: .8rem; opacity: .8; line-height: 1.35; }
+.rules .bot-card { background: rgba(255,255,255,.06); border-color: rgba(207,227,226,.22); }

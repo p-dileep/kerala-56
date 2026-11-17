@@ -6,6 +6,27 @@
   // Text: T('English', args...) gives the player's language (lang.js); English is the source everywhere.
   const T = window.T, Lang = window.Lang;
   const named = (o) => new Proxy(o, { get: (t, k) => T(t[k]) });   // a table of words, read in the player's language
+  // each bot's temperament and which ones bid with the human-tuned numbers (keep in step with BOT_PERSONALITY and HUMAN_TUNED_BOTS in src/bot.js)
+  const BOT_CHAR = { Kuttan: 'aggressive', Ammini: 'defensive', Pappan: 'medium', Chinnu: 'aggressive', Unni: 'medium', Kunjamma: 'defensive', Appu: 'aggressive', Sarojini: 'medium', Mathai: 'defensive', Leela: 'medium' };
+  const BOT_TUNED = ['Kuttan', 'Ammini', 'Unni', 'Sarojini', 'Leela'];
+  const CHAR_NAME = named({ aggressive: 'Bold', medium: 'Steady', defensive: 'Careful' });
+  const CHAR_TEXT = named({ aggressive: 'Bids often, fights for the contract and jumps to 40 when strong.', medium: 'Bids what the hand is worth and jumps only when it is sure.', defensive: 'Bids rarely and stays low, but usually makes what it bids.' });
+  // the ten bots with their character: a list to read (lobby, table panel) or buttons to pick from (host, before the first deal)
+  function botCards(pick, used = []) {
+    return `<div class="bot-list">${Object.keys(BOT_CHAR).map((n) => {
+      const c = BOT_CHAR[n];
+      const inner = `<b>${esc(Lang.botName(n))}</b><span class="chr ${c}">${CHAR_NAME[c]}</span><span class="what">${CHAR_TEXT[c]}${BOT_TUNED.includes(n) ? ' ' + T('Bidding learned from human play.') : ''}</span>`;
+      return pick ? `<button class="bot-card" data-pick="${n}" ${used.includes(n) ? 'disabled' : ''}>${inner}</button>` : `<div class="bot-card">${inner}</div>`;
+    }).join('')}</div>`;
+  }
+  function pickBot(seat) {
+    const used = room.seats.filter((s) => s.seat !== seat && s.kind === 'bot' && s.picked).map((s) => s.name);
+    openModal(`<h2>${T('Choose a bot for this seat')}</h2>
+      ${room.botStyle && room.botStyle !== 'mixed' ? `<p class="sub">${T('The table is set to {0}: every bot plays that way, whatever its own character.', T(room.botStyle))}</p>` : ''}
+      ${botCards(true, used)}
+      <div class="row"><button class="btn" data-pick="">${T('Any bot')}</button><button class="btn ghost" data-close>${T('Cancel')}</button></div>`, true);
+    $('modalBody').querySelectorAll('[data-pick]').forEach((b) => (b.onclick = () => { closeModal(); socket.emit('setBot', { seat, on: true, name: b.dataset.pick || undefined }); }));
+  }
   const SUIT_NAME = named({ S: 'Spades', H: 'Hearts', D: 'Diamonds', C: 'Clubs', NT: 'No trump' });
   const RED = new Set(['H', 'D']);
   // suit classes: 'red' for the two-colour deck, 'su-X' for the four-colour option (body.four in style.css)
@@ -93,6 +114,7 @@
   }));
   let lobbyTables = [];   // kept so the lines can be redrawn when the language changes
   function renderLobby() {
+    $('botGuide').innerHTML = botCards(false);
     lobbyTables.forEach((t) => {
       const el = $(t.players === 8 ? 'info8' : 'info6'); if (!el) return;
       if (t.seated) el.innerHTML = `<span class="live">${T('LIVE')}</span> ${T('{0} seated', t.seated)}${t.watching ? T(', {0} watching', t.watching) : ''}${t.playing ? T(', playing') : ''}`;
@@ -145,6 +167,7 @@
   // four-colour deck: a per-player option, remembered in the browser
   const setDeck = (on) => { document.body.classList.toggle('four', on); $('deckBtn').textContent = on ? T('2-colour deck') : T('4-colour deck'); };
   setDeck(store.get('g56deck', '') === '4');
+  $('botsBtn').onclick = () => openModal(`<h2>${T('Meet the bots')}</h2>${botCards(false)}<div class="row"><button class="btn" data-close>${T('Close')}</button></div>`, true);
   $('deckBtn').onclick = () => { const on = !document.body.classList.contains('four'); store.set('g56deck', on ? '4' : '2'); setDeck(on); };
   // language: English or Malayalam, a per-player option (lang.js); everything on screen is redrawn
   document.querySelectorAll('.lang-btn').forEach((b) => (b.onclick = () => {
@@ -562,7 +585,8 @@
           </div>`;
       } else {
         const meta = [];
-        if (s.kind === 'bot') meta.push(T('bot'));
+        const anyBot = !g && s.kind === 'bot' && !s.picked;   // named only when the match starts
+        if (s.kind === 'bot') meta.push(anyBot ? T('chosen at the deal') : T('bot') + (!g && BOT_CHAR[s.name] && room.botStyle === 'mixed' ? ' · ' + CHAR_NAME[BOT_CHAR[s.name]] : ''));
         if (s.kind === 'human' && !s.connected) meta.push(T('away'));
         const toks = [];
         if (cap) toks.push(`<span class="tok capt" title="${T('Team captain. The team chips are kept here')}">★</span>`);
@@ -572,18 +596,19 @@
         const seated = room.mySeat !== null;
         if (s.kind === 'bot' && !isMe)
           actions += `<button class="btn small" data-sit="${s.seat}" title="${seated && g ? T('Move here; a bot takes your current seat') : T('Play this seat')}">${seated && g ? T('Move here') : T('Take seat')}</button>`;
+        if (host && !g && s.kind === 'bot') actions += `<button class="btn small ghost" data-bot="${s.seat}">${T('Change')}</button>`;
         if (host && !g && s.kind === 'bot') actions += `<button class="btn small ghost" data-unbot="${s.seat}">${T('Remove')}</button>`;
         // any seated player (or the host) may remove / replace another player
         if (s.kind === 'human' && !isMe && (host || seated))
           actions += `<button class="btn small ghost" data-kick="${s.seat}">${g ? T('Replace with bot') : T('Remove')}</button>`;
         body = `${s.kunukku || shedding.has(s.seat) ? `<span class="kunukku" title="${T(KUNUKKU_TIP)}">${KUNUKKU}</span>` : ''}${g ? `<span class="cnt" title="${T('Cards in hand')}">${g.handCounts[s.seat]}</span>` : ''}${toks.length ? `<div class="toks">${toks.join('')}</div>` : ''}
-          <div class="nm">${esc(nameOf(s.seat))}${g && s.tuned ? ` <svg viewBox="0 0 16 16" width=".85em" height=".85em" fill="currentColor" style="vertical-align:-.08em"><title>${T('Bids with numbers tuned on human play')}</title><circle cx="8" cy="5" r="3.2"/><path d="M2 15c0-3.6 2.7-5.6 6-5.6s6 2 6 5.6z"/></svg>` : ''}</div>${meta.length ? `<div class="meta">${meta.join(' ')}</div>` : ''}
+          <div class="nm">${anyBot ? T('Any bot') : esc(nameOf(s.seat))}${g && s.tuned ? ` <svg viewBox="0 0 16 16" width=".85em" height=".85em" fill="currentColor" style="vertical-align:-.08em"><title>${T('Bids with numbers tuned on human play')}</title><circle cx="8" cy="5" r="3.2"/><path d="M2 15c0-3.6 2.7-5.6 6-5.6s6 2 6 5.6z"/></svg>` : ''}</div>${meta.length ? `<div class="meta">${meta.join(' ')}</div>` : ''}
           ${actions ? `<div class="seat-actions">${actions}</div>` : ''}`;
       }
       return `<div class="${cls.join(' ')}" data-seat="${s.seat}" style="left:${x}%;top:${y}%" title="${teamName(s.team)}">${said}${stack}${body}</div>`;
     }).join('');
     $('seats').querySelectorAll('[data-sit]').forEach((b) => (b.onclick = () => socket.emit('sit', { seat: b.dataset.sit, name: myName() })));
-    $('seats').querySelectorAll('[data-bot]').forEach((b) => (b.onclick = () => socket.emit('setBot', { seat: b.dataset.bot, on: true })));
+    $('seats').querySelectorAll('[data-bot]').forEach((b) => (b.onclick = () => pickBot(Number(b.dataset.bot))));
     $('seats').querySelectorAll('[data-unbot]').forEach((b) => (b.onclick = () => socket.emit('setBot', { seat: b.dataset.unbot, on: false })));
     $('seats').querySelectorAll('[data-kick]').forEach((b) => (b.onclick = () => socket.emit('kick', { seat: b.dataset.kick })));
     keepSeatsOnScreen();

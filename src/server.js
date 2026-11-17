@@ -117,6 +117,7 @@ function publicSeats(room) {
     seat: i, team: E.team(i), kind: s.kind, name: s.name,
     connected: s.kind === 'bot' ? true : s.connected,
     tuned: s.kind === 'bot' && Bot.HUMAN_TUNED_BOTS.has(s.name),
+    picked: s.kind === 'bot' && !!s.picked,
     kunukku: !!room.kunukku[i]
   }));
 }
@@ -279,12 +280,13 @@ function botName(room, seat) {
 }
 
 function startMatch(room) {
-  // every bot (pre-set by the host or filling an empty seat) is named afresh, now that the teams are known
+  // A bot the host picked by name keeps it (the one-human-tuned-bot rule does not apply to picked bots).
+  // Every other bot (added without a name, or filling an empty seat) is named afresh, now that the teams are known.
   room.seats.forEach((s, i) => {
-    if (s.kind !== 'human') room.seats[i] = { ...emptySeat(), kind: 'bot' };
+    if (s.kind !== 'human' && !s.picked) room.seats[i] = { ...emptySeat(), kind: 'bot' };
   });
   room.seats.forEach((s, i) => {
-    if (s.kind === 'bot') s.name = botName(room, i);
+    if (s.kind === 'bot' && !s.picked) s.name = botName(room, i);
   });
   room.game = E.newMatch({ players: room.players });
   room.loggedHand = 0;
@@ -373,13 +375,16 @@ io.on('connection', (socket) => {
     broadcast(room);
   });
 
-  socket.on('setBot', ({ seat, on } = {}) => {
+  socket.on('setBot', ({ seat, on, name } = {}) => {
     const room = getRoom();
     if (!room || socket.data.token !== room.hostToken || room.game) return;
     seat = Number(seat);
     const s = room.seats[seat];
     if (!s) return;
-    if (on && s.kind === 'empty') room.seats[seat] = { ...emptySeat(), kind: 'bot', name: BOT_NAMES[seat] };
+    // with a name: that bot sits here and stays (picked); without: any bot, named when the match starts
+    if (on && s.kind !== 'human' && BOT_NAMES.includes(name) && !room.seats.some((x, i) => i !== seat && x.picked && x.name === name))
+      room.seats[seat] = { ...emptySeat(), kind: 'bot', name, picked: true };
+    else if (on && !name && s.kind !== 'human') room.seats[seat] = { ...emptySeat(), kind: 'bot', name: BOT_NAMES[seat] };
     if (!on && s.kind === 'bot') room.seats[seat] = emptySeat();
     broadcast(room);
   });

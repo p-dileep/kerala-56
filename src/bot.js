@@ -46,6 +46,10 @@ const DEFAULT_PARAMS = {
   // Monte Carlo check before a level bid (40/48/56) or a contested bid at 36+: deals laid out
   // from what the auction revealed (0 = heuristics only), confidence required, slack below the target
   simDeals: 24, simConf: 0.75, simMargin: 1, simContest: 1,
+  // a jump to 40/48/56 that the check allows is checked again on this many layouts (0 = no second check).
+  // Medium style only: same-deal self-play (3000 deals) was level for medium and aggressive, and lost
+  // 0.005 +/- 0.002 chips per hand for defensive, so the other two styles switch it off.
+  levelSimDeals: 96,
   // probe: holding one suit, name a second one cheaply so partner can choose (back to the first / NT)
   probeMaxValue: 31, probeMinLen: 3, probeSlack: 2,
   // reading the other seats' calls (auctionRead): a shown Jack / Nine of the suit, each call in the
@@ -87,7 +91,7 @@ const DEFAULT_PARAMS = {
 const STYLES = {
   defensive: { estBase: 22, bidContestMargin: 4, raiseMargin: 7, plus2Margin: 5, levelMargin: 99, jumpEst: 99,
     showJackMargin: 2, altMargin: 2, doubleMinPts: 17, raiseMaxValue: 32, plusMaxValue: 36, backMaxValue: 36,
-    simConf: 0.85, simMargin: 2, probeMaxValue: 29 },
+    simConf: 0.85, simMargin: 2, probeMaxValue: 29, levelSimDeals: 0 },
   medium: {},
   aggressive: { estBase: 26, bidContestMargin: 0, raiseMargin: 3, plus2Margin: 1, levelMargin: 2, jumpEst: 38, jumpGap: 6,
     showJackMargin: -1, altMargin: -1, doubleMinPts: 13, raiseMaxValue: 44, plusMaxValue: 48, backMaxValue: 48,
@@ -95,7 +99,7 @@ const STYLES = {
     // a 40 pays 2 / costs 3, so jumping over a safe lower contract needs ~75% to pay. At 0.6 with
     // no margin on 24 noisy layouts, aggressive bots made 63% of their 40+ contracts in self-play;
     // this (with 48 layouts) makes 80% and gains ~5 tables/match on all-aggressive tables.
-    simConf: 0.75, simMargin: 1, simDeals: 48, probeMaxValue: 33 }
+    simConf: 0.75, simMargin: 1, simDeals: 48, probeMaxValue: 33, levelSimDeals: 0 }
 };
 // Each named bot has its own temperament; the host's table setting 'mixed' uses these.
 const BOT_PERSONALITY = { Kuttan: 'aggressive', Ammini: 'defensive', Pappan: 'medium', Chinnu: 'aggressive', Unni: 'medium',
@@ -266,7 +270,7 @@ function chooseBid(view, P = DEFAULT_PARAMS) {
       // team really collects and go to the highest level that holds up; this also overrules the guess.
       if (P.simDeals && b.high.value < 56 && teamEst >= 40 - P.levelMargin - 4) {
         const q = simPoints(view, partnerSuit, P);
-        if (q !== null) level = [56, 48, 40].find((L) => L > b.high.value && q >= simNeed(L, P));
+        if (q !== null) level = simLevel(view, partnerSuit, P, b.high.value, q);
       }
       if (level && level >= legal.minBid) return { type: 'bid', value: level, suit: partnerSuit };
       // Holding the Jack of partner's suit: tell the team by raising one step (the "30 Hearts" form
@@ -335,7 +339,7 @@ function chooseBid(view, P = DEFAULT_PARAMS) {
       const q = simPoints(view, best.suit, P);
       if (q !== null) {
         if (q < simNeed(value, P)) return legal.pass ? { type: 'pass' } : { type: 'bid', value, suit: best.suit };
-        value = [56, 48, 40].find((L) => L >= value && q >= simNeed(L, P)) || value;
+        value = simLevel(view, best.suit, P, value - 1, q) || Math.min(value, legal.minBid);
       }
     }
     return { type: 'bid', value, suit: best.suit };
@@ -432,6 +436,16 @@ const simNeed = (value, P) => Math.min(56, value + P.simMargin);
 function simPoints(view, suit, P, rng = Math.random) {
   const results = simRun(view, suit, P, rng);
   return results && results[Math.min(results.length - 1, Math.floor((1 - P.simConf) * results.length))];
+}
+// Highest level above `floor` that the layout value `q` allows. The value of a small sample swings by
+// several points from run to run, and a bot is asked again every time its turn comes, so one lucky
+// sample used to send it to 40 (hands 643, 789): a jump must also hold on a second, larger sample.
+function simLevel(view, suit, P, floor, q) {
+  const pick = (x) => [56, 48, 40].find((L) => L > floor && x >= simNeed(L, P));
+  const level = pick(q);
+  if (!level || !(P.levelSimDeals > P.simDeals)) return level;
+  const q2 = simPoints(view, suit, { ...P, simDeals: P.levelSimDeals });
+  return q2 === null ? level : pick(q2);
 }
 // Expected chips for the declaring side at `value`, given its points in each layout.
 const evAt = (results, value) => {
@@ -719,7 +733,7 @@ function chooseSelfRaise(view, P) {
   if (!high || view.bidding.raised || !E.LEVELS.some((l) => l > high.value)) return { type: 'keep' };
   const q = P.simDeals ? simPoints(view, high.suit, P) : null;
   if (q === null) return { type: 'keep' };
-  const level = [56, 48, 40].find((L) => L > high.value && q >= simNeed(L, P));
+  const level = simLevel(view, high.suit, P, high.value, q);
   return level ? { type: 'raise', value: level } : { type: 'keep' };
 }
 

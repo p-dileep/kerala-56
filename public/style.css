@@ -483,16 +483,34 @@ body.lang-ml .deal-row.bidder .who::after { content: ' (വിളി)'; }
 
 /* captain seats: badge and the team's chip stack */
 .seat .tok.capt { background: var(--kasavu); padding: 1px 6px 0; }
-.seat .stack { position: absolute; left: -16px; bottom: -15px; z-index: 2; display: flex; align-items: center; gap: 5px; background: rgba(8,42,48,.96); border: 1px solid rgba(251,246,233,.4); border-radius: 999px; padding: 3px 9px 2px 7px; font-size: .8rem; line-height: 1; box-shadow: 0 3px 8px rgba(0,0,0,.35); }
-.seat .stack i { width: 13px; height: 13px; border-radius: 50%; margin-left: -9px; background: var(--teamA); border: 2px dashed rgba(255,255,255,.8); box-sizing: border-box; }
-.seat .stack i:first-child { margin-left: 0; }
-.seat.t1 .stack i { background: var(--teamB); }
-.seat .stack b { color: var(--ivory); min-width: 1.2em; text-align: left; }
+/* the pile stands at the seat's lower left corner and grows upward: count on top, one striped disc per chip */
+.seat .stack { position: absolute; left: -20px; bottom: -8px; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 3px; transform-origin: 50% 100%; --chip: var(--teamA); }
+.seat.t1 .stack { --chip: var(--teamB); }
+.seat .stack b { background: rgba(8,42,48,.96); border: 1px solid rgba(251,246,233,.4); border-radius: 999px; padding: 2px 7px 1px; font-size: .78rem; line-height: 1; color: var(--ivory); box-shadow: 0 3px 8px rgba(0,0,0,.35); min-width: 1.2em; text-align: center; transition: color .2s; }
+.seat .stack .tower { display: flex; flex-direction: column; align-items: center; filter: drop-shadow(0 3px 3px rgba(0,0,0,.5)); }
+.seat .stack .tower i { display: block; width: 24px; height: 5px; margin-top: -2px; border-radius: 3px; box-sizing: border-box; border: 1px solid rgba(0,0,0,.35);
+  background: repeating-linear-gradient(90deg, var(--chip) 0 4px, rgba(255,255,255,.88) 4px 6px); }
+.seat .stack .tower i:first-child { margin-top: 0; }
 .seat .stack.bump { animation: stackbump .32s ease-out; }
-@keyframes stackbump { 40% { transform: scale(1.35); box-shadow: 0 0 0 4px rgba(255,220,140,.7); } }
+@keyframes stackbump { 40% { transform: scale(1.25); filter: drop-shadow(0 0 6px rgba(255,220,140,.9)); } }
+/* losing chips: the team's seats darken, its pile trembles, flinches at each chip taken, and slumps at the end */
+.seat.pain { box-shadow: inset 0 0 0 999px rgba(0,0,0,.38); }
+.seat.pain .nm { opacity: .6; }
+.seat.pain .stack b { color: #ff7a7a; border-color: rgba(255,90,90,.7); }
+.seat .stack.dread { animation: dread .75s linear; }
+@keyframes dread { 10%, 50%, 90% { transform: translateX(-2px) rotate(-3deg); } 30%, 70% { transform: translateX(2px) rotate(3deg); } }
+.seat .stack.flinch { animation: flinch .4s ease-out; }
+@keyframes flinch { 15% { transform: translateX(-4px) scaleY(.88); filter: drop-shadow(0 0 7px rgba(255,60,60,.95)); } 45% { transform: translateX(3px) scaleY(1.04); } 70% { transform: translateX(-1px); } }
+.seat .stack.slump { animation: slump .9s ease-out both; }
+@keyframes slump { 30% { transform: scaleY(.8) rotate(-7deg); } 60% { transform: scaleY(1.03) rotate(2deg); } 100% { transform: none; } }
 .chipfly { position: fixed; z-index: 30; width: 24px; height: 24px; border-radius: 50%; box-sizing: border-box; background: var(--teamA); border: 3px dashed rgba(255,255,255,.85); box-shadow: 0 5px 12px rgba(0,0,0,.55); pointer-events: none; }
 .chipfly.t1 { background: var(--teamB); }
-@media (max-width: 700px), (max-height: 500px) { .seat .stack { left: -10px; bottom: -13px; font-size: .7rem; padding: 2px 7px 1px 5px; } .seat .stack i { width: 10px; height: 10px; margin-left: -7px; } }
+.chiploss { position: fixed; z-index: 31; width: 28px; text-align: center; color: #ff5a5a; font-weight: 800; font-size: 1.35rem; text-shadow: 0 2px 4px rgba(0,0,0,.75); pointer-events: none; }
+@media (max-width: 700px), (max-height: 500px) {
+  .seat .stack { left: -14px; bottom: -6px; gap: 2px; }
+  .seat .stack b { font-size: .68rem; padding: 1px 5px 0; }
+  .seat .stack .tower i { width: 18px; height: 5px; margin-top: -3px; background: repeating-linear-gradient(90deg, var(--chip) 0 3px, rgba(255,255,255,.88) 3px 5px); }
+}
 
 /* clean sweep: the losers took no point */
 .sweep { position: fixed; inset: 0; z-index: 27; display: grid; place-items: center; cursor: pointer; overflow: hidden; color: var(--ivory);

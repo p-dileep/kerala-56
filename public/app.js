@@ -54,6 +54,9 @@
   let lastPhaseKey = '';
   let chipHold = null;          // chip counts shown while the chips of a settled hand are still flying (see chipsFly)
   const chipsNow = (g, t) => (g ? (chipHold ? chipHold[t] : g.tables[t]) : 12);
+  let chipPain = null;          // the paying team while its chips are being taken (its seats dim)
+  // the team's chips beside its captain: a vertical pile, one disc per chip (up to 24); the first disc is the top one
+  const towerHtml = (n) => '<i></i>'.repeat(Math.max(0, Math.min(n, 24)));
   const shedding = new Set();   // seats whose kunukku has just come off (see kunukkuSmash)
   let smashQueued = false;      // the hand-result screens will run the smash when they are done
   const socket = io({ transports: ['websocket', 'polling'] });
@@ -358,37 +361,68 @@
     el.onclick = finish;
     setTimeout(finish, all56 ? 4600 : 3200);
   }
-  // The chips of a settled hand fly from the paying team's stack (beside its captain) to the receiving team's,
-  // and both counts change as each one lands. The server has already moved them, so the old counts are held meanwhile.
+  // The chips of a settled hand are taken from the paying team's pile (beside its captain) to the receiving team's.
+  // Made to hurt: the losers' seats dim and their pile trembles; each chip is wrenched off the top of their pile
+  // (it wobbles, resists, then is yanked away), their pile flinches and a red "−1" rises; at the end their pile slumps.
+  // The server has already moved the chips, so the old counts are held meanwhile (chipHold).
   function chipsFly(payer, receiver, amount, tables, after) {
     const stackOf = (t) => document.querySelector(`#seats .seat[data-seat="${t}"] .stack`);
     const from = stackOf(payer), to = stackOf(receiver);
     if (!from || !to || !(amount > 0) || payer === receiver) return after && after();
     chipHold = []; chipHold[payer] = tables[payer] + amount; chipHold[receiver] = tables[receiver] - amount;
-    const paint = () => [0, 1].forEach((t) => { const b = stackOf(t); if (b) b.querySelector('b').textContent = chipHold[t]; $(`tables${t}`).textContent = T('{0} chips', chipHold[t]); });
-    paint();
-    const a = from.getBoundingClientRect(), b = to.getBoundingClientRect();
-    const dx = b.left + b.width / 2 - (a.left + a.width / 2), dy = b.top + b.height / 2 - (a.top + a.height / 2);
-    const n = Math.min(amount, 8), each = Math.floor(amount / n), FLY = 800, STEP = 240, WAIT = 450;
+    chipPain = payer;
+    const paint = (t) => {
+      const s = stackOf(t);
+      if (s) { s.querySelector('b').textContent = chipHold[t]; s.querySelector('.tower').innerHTML = towerHtml(chipHold[t]); }
+      $(`tables${t}`).textContent = T('{0} chips', chipHold[t]);
+    };
+    const kick = (el, cls) => { if (!el) return; el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); };
+    document.querySelectorAll(`#seats .seat.t${payer}`).forEach((e) => e.classList.add('pain'));
+    paint(payer); paint(receiver);
+    kick(from, 'dread');
+    const n = Math.min(amount, 12), each = Math.floor(amount / n), TUG = 520, FLY = 620, STEP = 560, WAIT = 800;
     for (let i = 0; i < n; i++) {
-      const c = document.createElement('i');
-      c.className = `chipfly t${payer}`;
-      c.style.cssText = `left:${a.left + a.width / 2 - 12}px;top:${a.top + a.height / 2 - 12}px`;
-      document.body.appendChild(c);
-      c.animate([
-        { transform: 'translate(0,0) scale(.6)', opacity: 0 },
-        { transform: 'translate(0,0) scale(1)', opacity: 1, offset: .08 },
-        { transform: `translate(${dx * .5}px,${dy * .5 - 90}px) scale(1.7)`, opacity: 1, offset: .5 },
-        { transform: `translate(${dx}px,${dy}px) scale(1)`, opacity: 1 }
-      ], { duration: FLY, delay: WAIT + i * STEP, easing: 'ease-in-out', fill: 'both' });
+      const k = i === n - 1 ? amount - each * (n - 1) : each;
       setTimeout(() => {
-        c.remove();
-        const k = i === n - 1 ? amount - each * (n - 1) : each;
         if (!chipHold) return;
-        chipHold[payer] -= k; chipHold[receiver] += k; paint();
-        const s = stackOf(receiver); if (s) { s.classList.remove('bump'); void s.offsetWidth; s.classList.add('bump'); }
-        if (i === n - 1) setTimeout(() => { chipHold = null; if (room && room.game) { renderScores(room.game); renderSeats(room.game); } after && after(); }, 500);
-      }, WAIT + i * STEP + FLY);
+        const s = stackOf(payer), d = stackOf(receiver);
+        if (!s || !d) return;
+        // the chip leaves from the top of the losers' pile and lands on top of the winners'
+        const top = (s.querySelector('.tower i') || s).getBoundingClientRect();
+        const dt = (d.querySelector('.tower i') || d.querySelector('.tower')).getBoundingClientRect();
+        const x0 = top.left + top.width / 2, y0 = top.top + top.height / 2;
+        const dx = dt.left + dt.width / 2 - x0, dy = dt.top - 8 - y0;
+        chipHold[payer] -= k; paint(payer); kick(stackOf(payer), 'flinch');
+        const m = document.createElement('span');
+        m.className = 'chiploss'; m.textContent = `−${k}`;
+        m.style.cssText = `left:${x0 - 14}px;top:${y0 - 40}px`;
+        document.body.appendChild(m);
+        m.animate([{ transform: 'translateY(0) scale(.6)', opacity: 0 }, { transform: 'translateY(-14px) scale(1.25)', opacity: 1, offset: .2 },
+          { transform: 'translateY(-46px) scale(1)', opacity: 0 }], { duration: 1100, easing: 'ease-out', fill: 'both' }).onfinish = () => m.remove();
+        const c = document.createElement('i');
+        c.className = `chipfly t${payer}`;
+        c.style.cssText = `left:${x0 - 12}px;top:${y0 - 12}px`;
+        document.body.appendChild(c);
+        const tug = TUG / (TUG + FLY);
+        c.animate([
+          { transform: 'translate(0,0) rotate(0) scale(.8)' },
+          { transform: 'translate(-4px,2px) rotate(-14deg) scale(1)', offset: tug * .2 },
+          { transform: 'translate(4px,-3px) rotate(12deg) scale(1)', offset: tug * .4 },
+          { transform: 'translate(-3px,1px) rotate(-9deg) scale(1)', offset: tug * .6 },
+          { transform: 'translate(0,5px) rotate(0) scale(1.15,.8)', offset: tug * .85 },      // straining against the pull
+          { transform: 'translate(0,-6px) rotate(0) scale(.95,1.15)', offset: tug, easing: 'cubic-bezier(.5,0,.9,.5)' },
+          { transform: `translate(${dx * .45}px,${dy * .45 - 70}px) rotate(260deg) scale(1.3)`, offset: tug + (1 - tug) * .45 },
+          { transform: `translate(${dx}px,${dy}px) rotate(540deg) scale(.9)` }
+        ], { duration: TUG + FLY, fill: 'both' });
+        setTimeout(() => {
+          c.remove();
+          if (!chipHold) return;
+          chipHold[receiver] += k; paint(receiver); kick(stackOf(receiver), 'bump');
+          if (i < n - 1) return;
+          kick(stackOf(payer), 'slump');
+          setTimeout(() => { chipHold = null; chipPain = null; if (room && room.game) { renderScores(room.game); renderSeats(room.game); } after && after(); }, 900);
+        }, TUG + FLY);
+      }, WAIT + i * STEP);
     }
   }
   if (location.hostname === 'localhost') {
@@ -552,7 +586,8 @@
       // seats 1 and 2 are the captains' seats (one per team): a marker only, the team's chips are kept beside them
       const cap = s.seat < 2;
       if (cap) cls.push('cap');
-      const stack = cap ? `<span class="stack" title="${T('Team captain. The team chips are kept here')}"><i></i><i></i><i></i><b>${chipsNow(g, s.team)}</b></span>` : '';
+      const stack = cap ? `<span class="stack" title="${T('Team captain. The team chips are kept here')}"><b>${chipsNow(g, s.team)}</b><span class="tower">${towerHtml(chipsNow(g, s.team))}</span></span>` : '';
+      if (g && chipPain === s.team) cls.push('pain');
       if (isMe) cls.push('me');
       if (g) cls.push('ingame');
       if (openSeat === s.seat) cls.push('open');

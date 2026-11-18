@@ -1,11 +1,13 @@
 'use strict';
 const path = require('path');
+const fs = require('fs');
 const http = require('http');
 const crypto = require('crypto');
 const express = require('express');
 const { Server } = require('socket.io');
 const E = require('./engine');
 const Bot = require('./bot');
+const NetPlay = require('./netplay');
 
 const PORT = Number(process.env.PORT) || 3056;
 const BOT_DELAY_MS = Number(process.env.BOT_DELAY_MS) || 900;
@@ -17,11 +19,17 @@ const glog = (room, msg) => console.log(`${new Date().toISOString()} [${room ? r
 const ROOM_IDLE_MS = 1000 * 60 * 60 * 3;
 const SUPABASE_URL = process.env.SUPABASE_URL || '';
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || '';
+// Without Supabase (a local server) every finished hand goes to a local file instead, same row format.
+// HAND_LOG=<file> chooses the file, HAND_LOG=off turns it off (the socket test).
+const LOCAL_HAND_LOG = process.env.HAND_LOG === 'off' ? '' :
+  process.env.HAND_LOG || (SUPABASE_URL ? '' : path.join(__dirname, '..', 'data', 'local_hands.jsonl'));
 // "<site>@<commit>": both sites log to the same Supabase table, the prefix says which one the hand came from
 const COMMIT = process.env.GAME_VERSION || process.env.RENDER_GIT_COMMIT || null;
 const GAME_VERSION = COMMIT && `${process.env.RENDER ? 'render' : 'play56.in'}@${COMMIT}`;
 
 const BOT_NAMES = ['Kuttan', 'Ammini', 'Pappan', 'Chinnu', 'Unni', 'Kunjamma', 'Appu', 'Sarojini', 'Mathai', 'Leela'];
+// Bots only the host can pick (never named for an automatic seat): they play their cards with a neural net.
+const PICK_ONLY = NetPlay.NAMES;
 
 const app = express();
 app.use(express.static(path.join(__dirname, '..', 'public')));
@@ -125,7 +133,6 @@ function publicSeats(room) {
 
 // Fire-and-forget: one row per finished hand. Never blocks or throws into the game loop.
 function logHand(room) {
-  if (!SUPABASE_URL || !SUPABASE_KEY) return;
   const g = room.game;
   const row = {
     room: room.code,
@@ -142,6 +149,11 @@ function logHand(room) {
     tables_after: g.tables,
     game_version: GAME_VERSION
   };
+  if (LOCAL_HAND_LOG) {
+    fs.mkdir(path.dirname(LOCAL_HAND_LOG), { recursive: true }, () =>
+      fs.appendFile(LOCAL_HAND_LOG, JSON.stringify({ id: Date.now(), created_at: new Date().toISOString(), ...row }) + '\n', () => {}));
+  }
+  if (!SUPABASE_URL || !SUPABASE_KEY) return;
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 5000);
   fetch(`${SUPABASE_URL}/rest/v1/hands`, {
@@ -264,7 +276,9 @@ function autoAct(room, seat) {
   const s = room.seats[seat];
   if (s.kind === 'human') glog(room, `bot takes over for ${s.name} seat ${seat} after ${Math.round((Date.now() - (room.awaySince[seat] || Date.now())) / 1000)}s away (${g.phase})`);
   try {
-    const d = Bot.decide(Bot.botView(g, seat), Bot.paramsFor(room.botStyle, room.seats[seat].name));
+    const view = Bot.botView(g, seat), name = room.seats[seat].name;
+    const netCard = NetPlay.NAMES.includes(name) && s.kind === 'bot' && g.phase === 'playing' ? NetPlay.choose(view) : null;
+    const d = netCard ? { kind: 'play', cardId: netCard } : Bot.decide(view, Bot.paramsFor(room.botStyle, name));
     if (!d) return;
     if (d.kind === 'bid') E.applyBid(g, seat, d.action);
     else E.playCard(g, seat, d.cardId);
@@ -392,7 +406,7 @@ io.on('connection', (socket) => {
     const s = room.seats[seat];
     if (!s) return;
     // with a name: that bot sits here and stays (picked); without: any bot, named when the match starts
-    if (on && s.kind !== 'human' && BOT_NAMES.includes(name) && !room.seats.some((x, i) => i !== seat && x.picked && x.name === name))
+    if (on && s.kind !== 'human' && (BOT_NAMES.includes(name) || PICK_ONLY.includes(name)) && !room.seats.some((x, i) => i !== seat && x.picked && x.name === name))
       room.seats[seat] = { ...emptySeat(), kind: 'bot', name, picked: true };
     else if (on && !name && s.kind !== 'human') room.seats[seat] = { ...emptySeat(), kind: 'bot', name: BOT_NAMES[seat] };
     if (!on && s.kind === 'bot') room.seats[seat] = emptySeat();

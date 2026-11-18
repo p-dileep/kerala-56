@@ -7,15 +7,16 @@
   const T = window.T, Lang = window.Lang;
   const named = (o) => new Proxy(o, { get: (t, k) => T(t[k]) });   // a table of words, read in the player's language
   // each bot's temperament and which ones bid with the human-tuned numbers (keep in step with BOT_PERSONALITY and HUMAN_TUNED_BOTS in src/bot.js)
-  const BOT_CHAR = { Kuttan: 'aggressive', Ammini: 'defensive', Pappan: 'medium', Chinnu: 'aggressive', Unni: 'medium', Kunjamma: 'defensive', Appu: 'aggressive', Sarojini: 'medium', Mathai: 'defensive', Leela: 'medium' };
+  const BOT_CHAR = { Kuttan: 'aggressive', Ammini: 'defensive', Pappan: 'medium', Chinnu: 'aggressive', Unni: 'medium', Kunjamma: 'defensive', Appu: 'aggressive', Sarojini: 'medium', Mathai: 'defensive', Leela: 'medium', Jalaja: 'medium', Ponnappan: 'medium' };
   const BOT_TUNED = ['Kuttan', 'Ammini', 'Unni', 'Sarojini', 'Leela'];
+  const BOT_NET = ['Jalaja', 'Ponnappan'];   // card play by a neural net (src/netplay.js); host's pick only
   const CHAR_NAME = named({ aggressive: 'Bold', medium: 'Steady', defensive: 'Careful' });
   const CHAR_TEXT = named({ aggressive: 'Bids often, fights for the contract and jumps to 40 when strong.', medium: 'Bids what the hand is worth and jumps only when it is sure.', defensive: 'Bids rarely and stays low, but usually makes what it bids.' });
-  // the ten bots with their character: a list to read (lobby, table panel) or buttons to pick from (host, before the first deal)
+  // the bots with their character: a list to read (lobby, table panel) or buttons to pick from (host, before the first deal)
   function botCards(pick, used = []) {
     return `<div class="bot-list">${Object.keys(BOT_CHAR).map((n) => {
       const c = BOT_CHAR[n];
-      const inner = `<b>${esc(Lang.botName(n))}</b><span class="chr ${c}">${CHAR_NAME[c]}</span><span class="what">${CHAR_TEXT[c]}${BOT_TUNED.includes(n) ? ' ' + T('Bidding learned from human play.') : ''}</span>`;
+      const inner = `<b>${esc(Lang.botName(n))}</b><span class="chr ${c}">${CHAR_NAME[c]}</span><span class="what">${CHAR_TEXT[c]}${BOT_TUNED.includes(n) ? ' ' + T('Bidding learned from human play.') : ''}${BOT_NET.includes(n) ? ' ' + T('Plays its cards with a neural network that learned from millions of searched positions.') : ''}</span>`;
       return pick ? `<button class="bot-card" data-pick="${n}" ${used.includes(n) ? 'disabled' : ''}>${inner}</button>` : `<div class="bot-card">${inner}</div>`;
     }).join('')}</div>`;
   }

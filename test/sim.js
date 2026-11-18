@@ -416,4 +416,39 @@ assert.throws(()=>E.applyBid(s, s.turn, {type:'pass'}), /Opener/);
   assert.equal(s.tables[c2.team], before[c2.team] + b2.win * c2.mult);
   const t = E.newMatch({}, () => 0.3); toPlay(t); t.tables = [1, 23];
   E.concedeHand(t, 0); assert.equal(t.phase, 'matchover'); assert.equal(t.winner, 1); }
+// NS answer (user's convention: NS = "I cut this suit, change the trump", never a no-trump contract to play):
+// once one team mate has passed the NS, the next team mate must name a suit
+{ const s = E.newMatch({}, () => 0.3); const op = s.turn, x1 = (op + 1) % 6;
+  const give = s.hands[x1].filter((c) => c.suit === 'H'), take = s.hands[op].filter((c) => c.suit !== 'H').slice(0, give.length);
+  s.hands[x1] = s.hands[x1].filter((c) => c.suit !== 'H').concat(take); s.hands[op] = s.hands[op].filter((c) => !take.includes(c)).concat(give);
+  E.applyBid(s, op, { type: 'bid', value: 28, suit: 'H' });
+  const ns = E.legalBidActions(s, x1).ns.find((o) => o.suit === 'H'); assert.ok(ns);
+  E.applyBid(s, x1, { type: 'ns', value: ns.value });
+  E.applyBid(s, s.turn, { type: 'pass' });                               // opponent
+  E.applyBid(s, s.turn, { type: 'pass' });                               // first team mate passes
+  E.applyBid(s, s.turn, { type: 'pass' });                               // opponent
+  const mate = s.turn; assert.equal(E.team(mate), E.team(x1));
+  const a = B.chooseBid(B.botView(s, mate), B.DEFAULT_PARAMS);
+  assert.equal(a.type, 'bid'); assert.notEqual(a.suit, 'H');              // a suit it is sure of, or NT one up
+  // answered with no-trump: the NS caller (a bot here) names the trump itself
+  E.applyBid(s, mate, { type: 'bid', value: E.legalBidActions(s, mate).minBid, suit: 'NT' });
+  while (s.turn !== x1) E.applyBid(s, s.turn, { type: 'pass' });
+  const c = B.chooseBid(B.botView(s, x1), B.DEFAULT_PARAMS);
+  assert.equal(c.type, 'bid'); assert.notEqual(c.suit, 'H'); assert.notEqual(c.suit, 'NT'); }
+// Jalaja / Ponnappan (neural-net card play, src/netplay.js): only legal cards at 6 players, steps aside (null) at 8
+{ const J = require('../src/netplay'); let n = 0, rng = 11;
+  const rand = () => ((rng = (rng * 16807) % 2147483647) / 2147483647);
+  for (let m = 0; m < 20; m++) {
+    const s = E.newMatch({ players: 6 }, rand);
+    while (s.phase === 'bidding' || s.phase === 'selfraise') E.applyBid(s, s.turn, B.decide(B.botView(s, s.turn)).action);
+    while (s.phase === 'playing') {
+      if (s.trick.complete) { E.collectTrick(s); continue; }
+      const v = B.botView(s, s.turn), id = J.choose(v);
+      assert.ok(v.legal.cards.includes(id)); E.playCard(s, s.turn, id); n++;
+    }
+  }
+  assert.ok(n > 100);
+  const t = E.newMatch({ players: 8 }, rand);
+  while (t.phase === 'bidding' || t.phase === 'selfraise') E.applyBid(t, t.turn, B.decide(B.botView(t, t.turn)).action);
+  if (t.phase === 'playing') assert.equal(J.choose(B.botView(t, t.turn)), null); }
 console.log('all tests passed');

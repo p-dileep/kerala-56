@@ -143,6 +143,7 @@
     'Bids what the hand is worth and jumps only when it is sure.': 'കൈയ്ക്ക് ഒത്ത വിളി മാത്രം; ഉറപ്പുണ്ടെങ്കിലേ ചാടൂ.',
     'Bids rarely and stays low, but usually makes what it bids.': 'അപൂർവമായേ വിളിക്കൂ, താഴ്ന്ന വിളി; പക്ഷേ വിളിച്ചത് മിക്കവാറും നേടും.',
     'Bidding learned from human play.': 'വിളി പഠിച്ചത് മനുഷ്യരുടെ കളിയിൽ നിന്ന്.',
+    'Plays its cards with a neural network that learned from millions of searched positions.': 'ചീട്ട് ഇറക്കുന്നത് ലക്ഷക്കണക്കിന് കളിനിലകൾ തിരഞ്ഞു പഠിച്ച ഒരു ന്യൂറൽ നെറ്റ്‌വർക്ക്.',
     'bot': 'ബോട്ട്',
     'away': 'പുറത്ത്',
     'deals': 'വിളമ്പി',
@@ -280,7 +281,7 @@
   };
 
   // The bots' names, shown in Malayalam script (only for bot seats; a player's typed name is never changed).
-  const BOTS = { Kuttan: 'കുട്ടൻ', Ammini: 'അമ്മിണി', Pappan: 'പാപ്പൻ', Chinnu: 'ചിന്നു', Unni: 'ഉണ്ണി', Kunjamma: 'കുഞ്ഞമ്മ', Appu: 'അപ്പു', Sarojini: 'സരോജിനി', Mathai: 'മത്തായി', Leela: 'ലീല' };
+  const BOTS = { Kuttan: 'കുട്ടൻ', Ammini: 'അമ്മിണി', Pappan: 'പാപ്പൻ', Chinnu: 'ചിന്നു', Unni: 'ഉണ്ണി', Kunjamma: 'കുഞ്ഞമ്മ', Appu: 'അപ്പു', Sarojini: 'സരോജിനി', Mathai: 'മത്തായി', Leela: 'ലീല', Jalaja: 'ജലജ', Ponnappan: 'പൊന്നപ്പൻ' };
 
   // Server sentences with names or numbers in them: [pattern, Malayalam with $1, $2].
   // Order matters where one sentence ends like another.

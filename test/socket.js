@@ -1,6 +1,6 @@
 // End-to-end: one human socket + 5 bots plays a full hand through the real server.
 process.env.RESERVED_TABLES = 'HIDE6:6, hide8:8, bad';
-process.env.PORT = 0; process.env.BOT_DELAY_MS = 5; process.env.BOT_BID_DELAY_MS = 5; process.env.TRICK_PAUSE_MS = 5;
+process.env.PORT = 0; process.env.HAND_LOG = 'off'; process.env.BOT_DELAY_MS = 5; process.env.BOT_BID_DELAY_MS = 5; process.env.TRICK_PAUSE_MS = 5;
 const { server } = require('../src/server');
 const { io } = require('socket.io-client');
 const { HUMAN_TUNED_BOTS } = require('../src/bot');

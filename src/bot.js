@@ -59,6 +59,10 @@ const DEFAULT_PARAMS = {
   readCutW: 2,
   // answer a partner's NS by naming a suit (1 = on): an NS is a prompt, not a contract to play
   nsAnswer: 1,
+  // once a team mate has passed a partner's NS, the next team mate must call (1 = on): a suit it is sure of,
+  // else the next value in no-trump ("nothing here, you choose"), and the NS caller then names the trump.
+  // Otherwise the NS caller is left playing no-trump, which an NS never asks for (user's convention)
+  nsForce: 1,
   // Plus 1 only when the team can still stand the raised contract (estimate within this slack)
   plusSlack: 2,
   // contested bids from this value up are checked by the Monte Carlo layout (which honours the auction)
@@ -71,6 +75,9 @@ const DEFAULT_PARAMS = {
   // going back to a probing partner's first suit (1 = checked): not after a support bid, not into a
   // partner's NS suit, team-aware estimate within backSlack of the value, Monte Carlo from simMinValue
   backCheck: 1, backSlack: 2,
+  // answering a partner's probe (a new suit after earlier calls): go back to any suit the TEAM called before,
+  // not only the prober's first suit (1 = on; user: "J hearts was settled, my J spade asked how other suits are")
+  backTeam: 1,
   // play: a partner holds the trick but an opponent still to play could beat it; take it with my
   // cheapest sure winner when the trick holds at least this many points (0 = always, 99 = off: duck)
   coverMinPts: 0,
@@ -103,7 +110,8 @@ const STYLES = {
 };
 // Each named bot has its own temperament; the host's table setting 'mixed' uses these.
 const BOT_PERSONALITY = { Kuttan: 'aggressive', Ammini: 'defensive', Pappan: 'medium', Chinnu: 'aggressive', Unni: 'medium',
-  Kunjamma: 'defensive', Appu: 'aggressive', Sarojini: 'medium', Mathai: 'defensive', Leela: 'medium' };
+  Kunjamma: 'defensive', Appu: 'aggressive', Sarojini: 'medium', Mathai: 'defensive', Leela: 'medium',
+  Jalaja: 'medium', Ponnappan: 'medium' };   // pick-only: rule bidding, card play by a neural net (src/netplay.js)
 // Human-tuned bidding: test/imitate.js fits the bidding knobs to the humans' calls in the logged hands
 // (data/hands.jsonl). Half of the named bots always carry these numbers (as shifts on top of their style),
 // the other half keep the self-play numbers, so live play keeps comparing the two. Retune as hands accumulate;
@@ -190,13 +198,32 @@ function chooseBid(view, P = DEFAULT_PARAMS) {
     // Partner's NS ("I hold none of X, I will cut it") is a prompt, not a no-trump contract they want:
     // name our own leading suit (their cut on X helps it), otherwise go back to the suit they called
     // before, otherwise to the suit we called before.
-    if (P.nsAnswer && b.high.ns && legal.minBid && b.high.value < P.backMaxValue) {
+    const nsAt = b.high.ns ? b.actions.findLastIndex((a) => a.type === 'ns' && a.seat === b.high.seat) : -1;
+    const mustAnswer = P.nsForce && nsAt >= 0 &&
+      b.actions.slice(nsAt + 1).some((a) => a.type === 'pass' && a.seat !== seat && E.team(a.seat) === E.team(seat));
+    if (P.nsAnswer && b.high.ns && legal.minBid && (b.high.value < P.backMaxValue || mustAnswer)) {
       const ok = (s) => s && s !== 'NT' && s !== b.high.ns && legal.suits.includes(s);
       const lead = options.find((o) => ok(o.suit) && hand.filter((c) => c.suit === o.suit).length >= P.altMinLen &&
         hand.some((c) => c.suit === o.suit && (c.rank === 'J' || c.rank === '9')) && o.est >= legal.minBid + P.altMargin);
       if (lead) return { type: 'bid', value: legal.minBid, suit: lead.suit };
       const lastSuit = (s2) => [...b.actions].reverse().find((a) => a.seat === s2 && (a.type === 'bid' || a.type === 'plus') && a.suit !== 'NT');
       for (const a of [lastSuit(b.high.seat), lastSuit(seat)]) if (a && ok(a.suit)) return { type: 'bid', value: legal.minBid, suit: a.suit };
+      // a team mate passed: we are the last answer before the NS caller would have to play no-trump.
+      // A suit we are sure of (3+ cards, or 2 with the Jack), else no-trump one up: "nothing here, you choose".
+      if (mustAnswer) {
+        const n = (s2) => hand.filter((c) => c.suit === s2).length, hasJ = (s2) => hand.some((c) => c.suit === s2 && c.rank === 'J');
+        const sure = options.find((o) => ok(o.suit) && (n(o.suit) >= P.altMinLen || (n(o.suit) >= 2 && hasJ(o.suit))));
+        if (sure) return { type: 'bid', value: legal.minBid, suit: sure.suit };
+        if (legal.suits.includes('NT')) return { type: 'bid', value: legal.minBid, suit: 'NT' };
+        const any = options.find((o) => ok(o.suit));
+        if (any) return { type: 'bid', value: legal.minBid, suit: any.suit };
+      }
+    }
+    // Our NS was answered with no-trump ("nothing here, you choose"): name the trump ourselves.
+    const myNs = [...b.actions].reverse().find((a) => a.seat === seat && a.type === 'ns');
+    if (P.nsForce && myNs && b.high.suit === 'NT' && !b.high.ns && legal.minBid) {
+      const pick = options.find((o) => o.suit !== 'NT' && o.suit !== myNs.ns && legal.suits.includes(o.suit));
+      if (pick) return { type: 'bid', value: legal.minBid, suit: pick.suit };
     }
     // Partner probed: the high bidder earlier named a different suit (their strong one) and is now
     // on a second suit to ask for information. If everyone passes they play the weak suit, so answer
@@ -209,26 +236,35 @@ function chooseBid(view, P = DEFAULT_PARAMS) {
     // Not a probe when a teammate had already called the high bidder's new suit: that bid supports them.
     const supportBid = P.backCheck && b.actions.some((a, i) => i < probeIdx && a.seat !== hb &&
       E.team(a.seat) === E.team(seat) && (a.type === 'bid' || a.type === 'plus') && a.suit === partnerSuit);
-    if (legal.minBid && firstSuit && firstSuit !== partnerSuit && !answered && !supportBid && b.high.value < P.backMaxValue) {
-      const inFirst = hand.filter((c) => c.suit === firstSuit);
-      const power = inFirst.some((c) => c.rank === 'J' || c.rank === '9');
-      const estFirst = estimate(hand, firstSuit, P), estProbe = estimate(hand, partnerSuit, P);
+    const probing = own.some((a) => a.suit !== partnerSuit);
+    if (legal.minBid && firstSuit && (P.backTeam ? probing : firstSuit !== partnerSuit) && !answered && !supportBid && b.high.value < P.backMaxValue) {
+      const estProbe = estimate(hand, partnerSuit, P);
       // Going back must still be a contract the team can make: no partner has said NS in that suit, the
       // auction-aware estimate is near the value, and from simMinValue up the Monte Carlo layout agrees.
-      const backHolds = () => {
+      const backHolds = (bs) => {
         if (!P.backCheck) return true;
         const facts = inferFacts(view);
         if (Array.from({ length: N }, (_, x) => x).some((x) => x !== seat && E.team(x) === E.team(seat) &&
-          [...facts.voids[x]].includes(firstSuit))) return false;
-        if (teamAware(firstSuit) < legal.minBid - P.backSlack) return false;
+          [...facts.voids[x]].includes(bs))) return false;
+        if (teamAware(bs) < legal.minBid - P.backSlack) return false;
         if (P.simDeals && legal.minBid >= P.simMinValue) {
-          const q = simPoints(view, firstSuit, P);
+          const q = simPoints(view, bs, P);
           if (q !== null && q < simNeed(legal.minBid, P)) return false;
         }
         return true;
       };
-      if (legal.suits.includes(firstSuit) && (inFirst.length >= 2 || power) && estFirst >= estProbe + P.backGap && backHolds())
-        return { type: 'bid', value: legal.minBid, suit: firstSuit };
+      // where to go back: the prober's first suit, or (backTeam) any suit the team called before the probe,
+      // the one our hand rates highest
+      const back = P.backTeam
+        ? [...new Set(b.actions.filter((a, i) => i < probeIdx && E.team(a.seat) === E.team(seat) &&
+          (a.type === 'bid' || a.type === 'plus') && a.suit !== 'NT' && a.suit !== partnerSuit).map((a) => a.suit))]
+          .sort((x, y) => estimate(hand, y, P) - estimate(hand, x, P))
+        : [firstSuit];
+      for (const bs of back) {
+        const inB = hand.filter((c) => c.suit === bs), power = inB.some((c) => c.rank === 'J' || c.rank === '9');
+        if (legal.suits.includes(bs) && (inB.length >= 2 || power) && estimate(hand, bs, P) >= estProbe + P.backGap && backHolds(bs))
+          return { type: 'bid', value: legal.minBid, suit: bs };
+      }
       const estNt = estimate(hand, 'NT', P);
       if (legal.suits.includes('NT') && estNt >= legal.minBid + P.backNtMargin && estNt >= estProbe + P.backGap)
         return { type: 'bid', value: legal.minBid, suit: 'NT' };
@@ -456,6 +492,8 @@ const evAt = (results, value) => {
 function simRun(view, suit, P, rng = Math.random, declSeat = view.mySeat) {
   const deals = P.simDeals | 0;
   if (!deals) return null;
+  // optional learned evaluator (neural/bidnet.js): same sorted list of my team's points, no layouts
+  if (P.simNet) { const r = P.simNet(view, suit, declSeat); if (r) return r; }
   const N = view.players || 6, me = E.team(view.mySeat), hs = view.handSize || 8;
   const facts = inferFacts(view);
   const results = [];

@@ -16,8 +16,10 @@
   function botCards(pick, used = []) {
     return `<div class="bot-list">${Object.keys(BOT_CHAR).map((n) => {
       const c = BOT_CHAR[n];
-      const inner = `<b>${esc(Lang.botName(n))}</b><span class="chr ${c}">${CHAR_NAME[c]}</span><span class="what">${CHAR_TEXT[c]}${BOT_TUNED.includes(n) ? ' ' + T('Bidding learned from human play.') : ''}${BOT_NET.includes(n) ? ' ' + T('Plays its cards with a neural network that learned from millions of searched positions.') : ''}</span>`;
-      return pick ? `<button class="bot-card" data-pick="${n}" ${used.includes(n) ? 'disabled' : ''}>${inner}</button>` : `<div class="bot-card">${inner}</div>`;
+      const kind = BOT_NET.includes(n) ? 'net' : BOT_TUNED.includes(n) ? 'human' : '';
+      const how = kind === 'net' ? T('Plays its cards with a neural network that learned from millions of searched positions.') : kind === 'human' ? T('Bidding learned from human play.') : '';
+      const inner = `<b>${esc(Lang.botName(n))}</b><span class="chr ${c}">${CHAR_NAME[c]}</span>${kind ? `<span class="chr ${kind}">${T(kind === 'net' ? 'Neural net' : 'Human-trained')}</span>` : ''}<span class="what">${CHAR_TEXT[c]}</span>${how ? `<span class="how">${how}</span>` : ''}`;
+      return pick ? `<button class="bot-card ${kind}" data-pick="${n}" ${used.includes(n) ? 'disabled' : ''}>${inner}</button>` : `<div class="bot-card ${kind}">${inner}</div>`;
     }).join('')}</div>`;
   }
   function pickBot(seat) {

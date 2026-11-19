@@ -142,6 +142,8 @@
     'Bids often, fights for the contract and jumps to 40 when strong.': 'കൂടെക്കൂടെ വിളിക്കും, വിളി പിടിക്കാൻ പൊരുതും, കൈ നല്ലതെങ്കിൽ 40-ലേക്ക് ചാടും.',
     'Bids what the hand is worth and jumps only when it is sure.': 'കൈയ്ക്ക് ഒത്ത വിളി മാത്രം; ഉറപ്പുണ്ടെങ്കിലേ ചാടൂ.',
     'Bids rarely and stays low, but usually makes what it bids.': 'അപൂർവമായേ വിളിക്കൂ, താഴ്ന്ന വിളി; പക്ഷേ വിളിച്ചത് മിക്കവാറും നേടും.',
+    'Human-trained': 'ആളുകളിൽ നിന്ന് പഠിച്ചത്',
+    'Neural net': 'ന്യൂറൽ നെറ്റ്',
     'Bidding learned from human play.': 'വിളി പഠിച്ചത് ആളുകളുടെ കളി കണ്ട്.',
     'Plays its cards with a neural network that learned from millions of searched positions.': 'ചീട്ട് ഇറക്കുന്നത് ലക്ഷക്കണക്കിന് കളിനിലകൾ തിരഞ്ഞു പഠിച്ച ഒരു ന്യൂറൽ നെറ്റ്‌വർക്ക്.',
     'bot': 'ബോട്ട്',

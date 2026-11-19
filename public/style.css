@@ -534,11 +534,21 @@ body.lang-ml .deal-row.bidder .who::after { content: ' (വിളി)'; }
 
 /* the ten bots with their character: a list to read, or buttons to pick from */
 .bot-list { display: grid; gap: 6px; margin: 10px 0; max-width: 62ch; }
-.bot-card { display: grid; grid-template-columns: auto auto 1fr; column-gap: 8px; row-gap: 1px; align-items: center; text-align: left; padding: 7px 10px 6px; border-radius: 10px; border: 1px solid rgba(30,26,20,.2); background: rgba(255,255,255,.55); color: inherit; font: inherit; }
+.bot-card { display: flex; flex-wrap: wrap; column-gap: 8px; row-gap: 1px; align-items: center; text-align: left; padding: 7px 10px 6px; border-radius: 10px; border: 1px solid rgba(30,26,20,.2); background: rgba(255,255,255,.55); color: inherit; font: inherit; }
 button.bot-card { cursor: pointer; width: 100%; }
 button.bot-card:hover:not([disabled]) { border-color: var(--kasavu); box-shadow: 0 0 0 2px var(--kasavu); }
 button.bot-card[disabled] { opacity: .38; cursor: default; }
-.bot-card .chr { justify-self: start; font-size: .7rem; font-weight: 700; border-radius: 999px; padding: 2px 8px 1px; color: #fff; line-height: 1.3; }
+.bot-card .chr { font-size: .7rem; font-weight: 700; border-radius: 999px; padding: 2px 8px 1px; color: #fff; line-height: 1.3; }
 .chr.aggressive { background: #C2394A; } .chr.medium { background: #8A6D1E; } .chr.defensive { background: #2F7A6B; }
-.bot-card .what { grid-column: 1 / -1; font-size: .8rem; opacity: .8; line-height: 1.35; }
+.bot-card .what { flex-basis: 100%; font-size: .8rem; opacity: .8; line-height: 1.35; }
+/* the bots that learned differently: their own badge, a coloured edge and the "how" line */
+.chr.human { background: #2F5FA8; } .chr.net { background: #6B3FA0; }
+.bot-card.human { border-left: 4px solid #2F5FA8; }
+.bot-card.net { border-left: 4px solid #6B3FA0; }
+.bot-card .how { flex-basis: 100%; font-size: .8rem; font-weight: 600; line-height: 1.35; color: #2F5FA8; }
+.bot-card.net .how { color: #6B3FA0; }
 .rules .bot-card { background: rgba(255,255,255,.06); border-color: rgba(207,227,226,.22); }
+.rules .bot-card.human { border-left-color: #6E9BE0; background: rgba(110,155,224,.12); }
+.rules .bot-card.net { border-left-color: #B08AE0; background: rgba(176,138,224,.12); }
+.rules .bot-card.human .how { color: #9DBDF0; }
+.rules .bot-card.net .how { color: #CDB3F0; }

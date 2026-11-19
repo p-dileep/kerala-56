@@ -78,6 +78,10 @@ const DEFAULT_PARAMS = {
   // answering a partner's probe (a new suit after earlier calls): go back to any suit the TEAM called before,
   // not only the prober's first suit (1 = on; user: "J hearts was settled, my J spade asked how other suits are")
   backTeam: 1,
+  // going back to the team's suit after a probe: skip the Monte Carlo check when the team holds both Jacks
+  // there (mine plus the ones partners showed in the auction); 1 = on. Hand #920: Ponnappan (JS) passed
+  // Dileep's 32H probe after both had shown JS; spades made 42, hearts 29 for the bots
+  backJacks: 1,
   // play: a partner holds the trick but an opponent still to play could beat it; take it with my
   // cheapest sure winner when the trick holds at least this many points (0 = always, 99 = off: duck)
   coverMinPts: 0,
@@ -247,7 +251,9 @@ function chooseBid(view, P = DEFAULT_PARAMS) {
         if (Array.from({ length: N }, (_, x) => x).some((x) => x !== seat && E.team(x) === E.team(seat) &&
           [...facts.voids[x]].includes(bs))) return false;
         if (teamAware(bs) < legal.minBid - P.backSlack) return false;
-        if (P.simDeals && legal.minBid >= P.simMinValue) {
+        const bothJacks = P.backJacks && hand.filter((c) => c.suit === bs && c.rank === 'J').length +
+          facts.must.reduce((n, m, x) => n + (x !== seat && E.team(x) === E.team(seat) ? m.filter((r) => r === `J${bs}`).length : 0), 0) >= 2;
+        if (P.simDeals && legal.minBid >= P.simMinValue && !bothJacks) {
           const q = simPoints(view, bs, P);
           if (q !== null && q < simNeed(legal.minBid, P)) return false;
         }

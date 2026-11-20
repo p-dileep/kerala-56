@@ -28,6 +28,7 @@ console.log({matches, hands, avgHandsPerMatch:(hands/matches).toFixed(1), contra
 { let m8=0, h8=0, made8=0;
   for (let m=0;m<60;m++){
     const s = E.newMatch({players:8}); let guard=0;
+    assert.deepEqual(s.tables, [15, 15]); assert.deepEqual(E.newMatch().tables, [12, 12]);
     assert.equal(s.hands.length, 8); assert.ok(s.hands.every((h) => h.length === 8));
     assert.equal(E.makeDeck(8).length, 64); assert.equal(E.makeDeck(8).reduce((t, c) => t + E.POINTS[c.rank], 0), 56);
     while (s.phase!=='matchover' && guard++<500000){
@@ -35,7 +36,7 @@ console.log({matches, hands, avgHandsPerMatch:(hands/matches).toFixed(1), contra
       if (s.phase==='playing' && s.trick.complete){ assert.equal(s.trick.cards.length, 8); E.collectTrick(s); if(s.phase!=='playing') {h8++; if(s.result.made) made8++; assert.ok(s.trickNo<=8);} continue; }
       const v = B.botView(s, s.turn); const d = B.decide(v);
       if (d.kind==='bid') E.applyBid(s, s.turn, d.action); else E.playCard(s, s.turn, d.cardId);
-      assert.equal(s.tables[0]+s.tables[1], 24);
+      assert.equal(s.tables[0]+s.tables[1], 30);
     }
     assert.equal(s.phase,'matchover'); m8++;
   }
@@ -178,7 +179,7 @@ assert.throws(()=>E.applyBid(s, s.turn, {type:'pass'}), /Opener/);
   assert.deepEqual(B.paramsFor('mixed', 'Kunjamma'), { ...B.paramsFor('defensive'), ...B.SELF_PLAY_TUNED });
   assert.deepEqual(B.paramsFor('mixed', 'Bot 3'), B.DEFAULT_PARAMS);
   // half of the named bots carry the human-tuned bidding numbers as shifts on top of their style
-  assert.deepEqual(B.HUMAN_TUNED_BOTS, new Set(['Kuttan', 'Ammini', 'Unni', 'Sarojini', 'Leela']));
+  assert.deepEqual(B.HUMAN_TUNED_BOTS, new Set(['Kuttan', 'Ammini', 'Unni', 'Buffett', 'Eisenhower']));
   assert.deepEqual(B.paramsFor('mixed', 'Unni'), { ...B.DEFAULT_PARAMS, ...B.HUMAN_TUNED });
   assert.equal(B.paramsFor('mixed', 'Kuttan').estBase, B.paramsFor('aggressive').estBase + B.HUMAN_TUNED.estBase - B.DEFAULT_PARAMS.estBase);
   assert.equal(B.paramsFor('mixed', 'Kuttan').cutMinPts, B.paramsFor('aggressive').cutMinPts);
@@ -415,7 +416,15 @@ assert.throws(()=>E.applyBid(s, s.turn, {type:'pass'}), /Opener/);
   assert.equal(s.result.conceded, 1 - c2.team); assert.equal(s.result.made, true);
   assert.equal(s.tables[c2.team], before[c2.team] + b2.win * c2.mult);
   const t = E.newMatch({}, () => 0.3); toPlay(t); t.tables = [1, 23];
-  E.concedeHand(t, 0); assert.equal(t.phase, 'matchover'); assert.equal(t.winner, 1); }
+  E.concedeHand(t, 0); assert.equal(t.phase, 'matchover'); assert.equal(t.winner, 1);
+  // shortfall: the paying team holds fewer chips than the stake; result.paid (and the log) show what moved
+  const u = E.newMatch({}, () => 0.3); toPlay(u); const cu = u.contract;
+  u.tables[cu.team] = 1; u.tables[1 - cu.team] = 23;
+  E.concedeHand(u, cu.team);                                             // declarers pay the "down" stake (>= 2)
+  assert.equal(u.result.amount, E.bidBaseTables(cu.value).lose * cu.mult); assert.equal(u.result.paid, 1);
+  assert.equal(u.tables[cu.team], 0); assert.equal(u.tables[1 - cu.team], 24); assert.equal(u.phase, 'matchover');
+  assert.ok(u.log.some((l) => /conceded — pays 1 chip\(s\)\.$/.test(l)));
+  assert.equal(s.result.paid, s.result.amount); }                        // no shortfall: paid = stake
 // NS answer (user's convention: NS = "I cut this suit, change the trump", never a no-trump contract to play):
 // once one team mate has passed the NS, the next team mate must name a suit
 { const s = E.newMatch({}, () => 0.3); const op = s.turn, x1 = (op + 1) % 6;
@@ -435,7 +444,7 @@ assert.throws(()=>E.applyBid(s, s.turn, {type:'pass'}), /Opener/);
   while (s.turn !== x1) E.applyBid(s, s.turn, { type: 'pass' });
   const c = B.chooseBid(B.botView(s, x1), B.DEFAULT_PARAMS);
   assert.equal(c.type, 'bid'); assert.notEqual(c.suit, 'H'); assert.notEqual(c.suit, 'NT'); }
-// Jalaja / Ponnappan (neural-net card play, src/netplay.js): only legal cards at 6 players, steps aside (null) at 8
+// Jalaja / Keaton (neural-net card play, src/netplay.js): only legal cards at 6 players, steps aside (null) at 8
 { const J = require('../src/netplay'); let n = 0, rng = 11;
   const rand = () => ((rng = (rng * 16807) % 2147483647) / 2147483647);
   for (let m = 0; m < 20; m++) {

@@ -20,7 +20,13 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; }
 body { overflow: hidden; -webkit-tap-highlight-color: transparent; }
-button, input { font: inherit; }
+button, input, select { font: inherit; }
+/* dropdowns in the theme (lobby player count, the host's bot style on the mat) instead of the plain white control */
+select { background: rgba(8,42,48,.85); color: var(--ivory); border: 1px solid rgba(207,227,226,.35); border-radius: 10px; padding: .4em .7em .3em; cursor: pointer; }
+select option { background: var(--kayal-deep, #0b2f35); color: var(--ivory); }
+.center select { background: #fff; color: var(--ink); border-color: #CDBF9F; }
+.center select option { background: #fff; color: var(--ink); }
+.levels .btn, #raiseBtns .btn, #createBtn, #joinBtn { white-space: nowrap; }
 .hidden { display: none !important; }
 :focus-visible { outline: 3px solid var(--teamA); outline-offset: 2px; }
 
@@ -73,8 +79,16 @@ button, input { font: inherit; }
   grid-template-columns: minmax(0, 1fr) var(--rail);
   grid-template-rows: auto 1fr auto auto;
   grid-template-areas: "top rail" "arena rail" "bid rail" "hand rail";
+  overflow: clip;   /* a kunukku landing or a seat pulsing at the screen edge must not widen the page (phones keep the wider layout) */
 }
 .topbar { grid-area: top; display: flex; gap: 10px; align-items: center; padding: 10px 14px; flex-wrap: wrap; }
+/* wide screens: one row always; the contract chip shrinks (its stake text gives way first) instead of
+   pushing the scores to a second row, which made the whole table jump when play started */
+@media (min-width: 1101px) {
+  .topbar { flex-wrap: nowrap; }
+  #contractChip { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .scores, #codeChip { flex: none; white-space: nowrap; }
+}
 .chip {
   border: 1px solid rgba(207,227,226,.25); background: rgba(8,42,48,.6); color: var(--mist);
   border-radius: 999px; padding: .45em .9em .3em; font-size: .92rem; cursor: default;
@@ -122,7 +136,8 @@ button, input { font: inherit; }
 .center .bidval { font-size: clamp(36px, 5.5vw, 60px); font-weight: 700; line-height: 1; }
 .center .bidval.pulse { animation: bidpulse .3s ease-out; }
 @keyframes bidpulse { 0% { transform: scale(.92); opacity: .4; } 100% { transform: none; opacity: 1; } }
-.mat-info { position: absolute; left: 50%; top: 13%; transform: translateX(-50%); display: flex; gap: 14px; color: var(--ink); font-size: .95rem; opacity: .8; white-space: nowrap; }
+.mat-info { position: absolute; left: 50%; top: 41%; transform: translate(-50%, -50%); display: flex; gap: 14px; color: var(--ink); font-size: .95rem; opacity: .8; white-space: nowrap; }
+.mat.trick-on .mat-info { top: 50%; flex-direction: column; align-items: center; gap: 0; line-height: 1.25; }
 .mat-info .suit { font-size: 1.2em; } .mat-info .suit.red { color: #c4161c; }
 .center .bidval .suit { font-size: .95em; }
 .center .bidval .sname { font-size: .45em; font-weight: 600; vertical-align: middle; }
@@ -160,6 +175,7 @@ button, input { font: inherit; }
   position: absolute; left: 50%; top: -12px; transform: translate(-50%, -100%);
   background: var(--ivory); color: var(--ink); border-radius: 10px; padding: 4px 10px 2px; font-weight: 700; white-space: nowrap;
   box-shadow: 0 4px 12px rgba(0,0,0,.3);
+  z-index: 3;   /* above the chip pile and the kunukku */
 }
 .seat .said.red { color: var(--kumkum); }
 .seat.top .said { top: auto; bottom: -12px; transform: translate(-50%, 100%); }
@@ -177,6 +193,7 @@ button, input { font: inherit; }
 .kunukku svg { display: block; width: 100%; height: auto; overflow: visible; }
 .kunukku .kun-drop { transform-box: view-box; transform-origin: 30px 45px; animation: kunswing 1.3s ease-in-out infinite alternate; }
 .seat .kunukku { position: absolute; right: -24px; bottom: -46px; z-index: 2; }
+.seat.me .kunukku { right: -32px; bottom: -14px; }   /* my own hangs beside my seat, clear of the bid panel and my cards */
 .kunukku.big { width: 64px; flex: none; }
 .kun-line { display: flex; gap: 14px; align-items: center; text-align: left; }
 @keyframes kunswing { from { transform: rotate(-11deg); } to { transform: rotate(11deg); } }
@@ -203,7 +220,19 @@ button, input { font: inherit; }
 .kun-smash { position: fixed; inset: 0; z-index: 27; pointer-events: none; overflow: hidden; }
 .kun-shard { position: absolute; filter: drop-shadow(0 2px 2px rgba(0,0,0,.45)); }
 .kun-ring { position: absolute; width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 50%; border: 3px solid #F4EFD8; box-shadow: 0 0 16px rgba(185,227,106,.85); }
-@media (max-width: 700px), (max-height: 500px) { .kunukku { width: 30px; } .seat .kunukku { right: -21px; bottom: -34px; } }
+/* "Kunukku oori!" under the burst: rises with the first smash, fades with the shards' layer */
+.kun-cap { position: absolute; transform: translate(-50%, -50%); text-align: center; white-space: nowrap; max-width: 94vw;
+  padding: 8px 18px; border-radius: 14px; background: rgba(4,20,24,.72); animation: caprise .45s var(--d, 1s) both; }
+@keyframes caprise { from { opacity: 0; transform: translate(-50%, -20%); } }
+.kun-cap .kicker { font-size: clamp(1.4rem, 5.5vmin, 2.6rem); font-weight: 800; color: #B9E36A; text-shadow: 0 3px 0 rgba(0,0,0,.35); }
+.kun-cap .team { font-size: clamp(1rem, 3.6vmin, 1.6rem); font-weight: 700; white-space: normal; }
+.kun-cap .team.t0 { color: #F3D27A; } .kun-cap .team.t1 { color: #F5A3AD; }
+.modal-card .kun-off { font-weight: 700; }
+/* Skip: ends the whole end-of-hand chain (sweep, chips, trophy, kunukku) and opens the result box */
+/* bottom centre: over the finished hand, clear of the top-bar and rail buttons */
+.chip.skip { position: fixed; left: 50%; bottom: max(14px, env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 40; cursor: pointer;
+  font-size: 1.1rem; padding: .35em .9em .25em; background: rgba(8,42,48,.85); color: var(--ivory); }
+@media (max-width: 700px), (max-height: 500px) { .kunukku { width: 30px; } .seat .kunukku { right: -21px; bottom: -34px; } .seat.right .kunukku { right: auto; left: -21px; } .seat.me .kunukku { right: -24px; bottom: -10px; } }
 /* short screens (phone held sideways): keep the pop-up buttons reachable, drop the how-to line */
 .modal-card { max-height: calc(100dvh - 24px); overflow-y: auto; }
 @media (max-height: 500px) { .kun-line .how { display: none; } .kunukku.big { width: 40px; } }
@@ -226,7 +255,7 @@ button, input { font: inherit; }
 .group-label em { font-style: normal; opacity: .75; }
 .fixed-tables { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0 0 6px; }
 .fixed-col { display: flex; flex-direction: column; gap: 6px; }
-.fixed-col .big-btn { width: 100%; }
+.fixed-col .big-btn { width: 100%; flex: 1; }   /* both public-table buttons as tall as the taller one */
 .big-btn .status { font-size: .8rem; font-weight: 600; margin-top: 4px; min-height: 1em; }
 .big-btn .live { display: inline-block; background: #c4161c; color: #fff; border-radius: 999px; padding: 0 7px; font-size: .7rem; letter-spacing: .08em; animation: livepulse 1.4s ease-in-out infinite; }
 @keyframes livepulse { 50% { opacity: .55; } }
@@ -298,6 +327,12 @@ button, input { font: inherit; }
   background: var(--ivory); color: var(--ink); border-radius: 16px; padding: 12px 14px;
   display: grid; gap: 10px; box-shadow: 0 0 0 2px var(--kasavu), 0 18px 40px rgba(0,0,0,.4);
 }
+#table.nogame .hand { min-height: 0; padding: 0; }
+.bid-panel.idle { visibility: hidden; }   /* keeps its room while the others call */
+/* one height for the empty placeholder, my bid panel and the keep-or-raise panel, so the table does not resize
+   between turns (the landscape phone layout floats the panel instead and resets this) */
+.bid-panel { min-height: 244px; align-content: start; }
+#selfRaisePanel { align-content: center; }
 .bid-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 #bidPrompt { font-weight: 700; }
 .conv { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -351,7 +386,8 @@ body.four .log .su-C { color: #8FD9A8 !important; }
 .modal-card { background: var(--ivory); color: var(--ink); border-radius: 18px; padding: 22px 24px; width: min(440px, 100%); box-shadow: 0 0 0 3px var(--kasavu), 0 30px 70px rgba(0,0,0,.5); }
 .modal-card h2 { margin: 0 0 6px; font-size: 1.7rem; line-height: 1.15; }
 .modal-card p { margin: .4em 0; line-height: 1.5; }
-.modal-card .row { display: flex; gap: 10px; margin-top: 14px; justify-content: flex-end; }
+.modal-card .row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; justify-content: flex-end; }
+.modal-card .row .btn { white-space: nowrap; }   /* buttons wrap as whole buttons, not word by word */
 .modal-card .btn { background: #fff; color: var(--ink); border-color: #CDBF9F; }
 .modal-card .btn.primary { background: var(--kasavu); border-color: var(--kasavu); }
 .modal-card .team-pick .btn { flex: 1; }
@@ -452,12 +488,18 @@ body.four .log .su-C { color: #8FD9A8 !important; }
   .team-score { padding: .3em .55em .15em; }
   .team-score .hpts { display: none; }
   .team-score .tname { max-width: 10ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .team-score .tables { white-space: nowrap; }
+  /* 8 players before the deal: the middle seats (with Sit / Add bot) cover the middle of the mat, so the host's
+     controls sit lower and the title and note go (the code is in the top bar) */
+  #table.p8 .center.pre { top: 67%; }
+  #table.p8 .center.pre .big, #table.p8 .center.pre .note { display: none; }
   .levels { margin-left: 0; }
   .bid-panel { width: calc(100% - 12px); padding: 10px; gap: 8px; }
   .suits { grid-template-columns: repeat(3, 1fr); }
   .suits .btn { font-size: 1.05rem; }
   .raise { flex-wrap: wrap; }
-  .mat-info { font-size: .8rem; top: 4%; }
+  .mat-info { font-size: .8rem; }
+  .mat.trick-on .mat-info { top: 57%; }   /* below the side seats' call bubbles, above my trick card */
   .seat .cnt { top: -9px; right: 6px; background: rgba(8,42,48,.9); color: var(--mist); border-radius: 999px; padding: 1px 6px 0; opacity: 1; font-size: .65rem; line-height: 1.3; }
   .chip.contract .stake { display: none; }
 }
@@ -473,7 +515,7 @@ body.four .log .su-C { color: #8FD9A8 !important; }
   .chip.icon { display: inline-block; margin-left: 0; }
   .arena { margin: 0 56px 2px; }
   .mat { inset: 6% 3%; }
-  .mat-info { top: 3%; font-size: .78rem; }
+  .mat-info { font-size: .78rem; }
   .center .bidval { font-size: clamp(24px, 7vh, 40px); }
   .center .sub { font-size: .82rem; margin-top: 2px; }
   .center .sub.wait { margin-top: 6px; }
@@ -501,6 +543,13 @@ body.four .log .su-C { color: #8FD9A8 !important; }
   .raise-label { font-size: .75rem; }
   .stepper output { font-size: 1.05rem; }
   .bid-actions .btn { padding: .35em 1em .25em; font-size: .9rem; }
+  /* docked on the right during my auction, so my seat, my neighbours and the "to call" line stay in view;
+     the table and my cards move over to make room */
+  .bid-panel { left: auto; right: 6px; top: 40px; bottom: 6px; transform: none; width: min(330px, 42vw); overflow-y: auto; align-content: start; min-height: 0; }
+  .bid-panel .suits { grid-template-columns: repeat(3, 1fr); }
+  .bid-panel .raise { flex-wrap: wrap; }
+  #table.auction .arena { margin-right: calc(min(330px, 42vw) + 14px); }
+  #table.auction .hand { margin-right: calc(min(330px, 42vw) + 6px); }
 }
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }
@@ -521,6 +570,9 @@ body.lang-ml .deal-row.bidder .who::after { content: ' (വിളി)'; }
 /* the pile stands at the seat's lower left corner and grows upward: count on top, one striped disc per chip */
 .seat .stack { position: absolute; left: -20px; bottom: -8px; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 3px; transform-origin: 50% 100%; --chip: var(--teamA); }
 .seat.t1 .stack { --chip: var(--teamB); }
+/* right-hand seats: the call bubble is on their left, so the pile goes on the right and the kunukku on the left */
+.seat.right .stack { left: auto; right: -20px; }
+.seat.right .kunukku { right: auto; left: -24px; }
 .seat .stack b { background: rgba(8,42,48,.96); border: 1px solid rgba(251,246,233,.4); border-radius: 999px; padding: 2px 7px 1px; font-size: .78rem; line-height: 1; color: var(--ivory); box-shadow: 0 3px 8px rgba(0,0,0,.35); min-width: 1.2em; text-align: center; transition: color .2s; }
 .seat .stack .tower { display: flex; flex-direction: column; align-items: center; filter: drop-shadow(0 3px 3px rgba(0,0,0,.5)); }
 .seat .stack .tower i { display: block; width: 24px; height: 5px; margin-top: -2px; border-radius: 3px; box-sizing: border-box; border: 1px solid rgba(0,0,0,.35);
@@ -542,7 +594,8 @@ body.lang-ml .deal-row.bidder .who::after { content: ' (വിളി)'; }
 .chipfly.t1 { background: var(--teamB); }
 .chiploss { position: fixed; z-index: 31; width: 28px; text-align: center; color: #ff5a5a; font-weight: 800; font-size: 1.35rem; text-shadow: 0 2px 4px rgba(0,0,0,.75); pointer-events: none; }
 @media (max-width: 700px), (max-height: 500px) {
-  .seat .stack { left: -14px; bottom: -6px; gap: 2px; }
+  .seat .stack { left: -22px; bottom: -6px; gap: 2px; }   /* its count stays clear of the ★ and "deals" badges */
+  .seat.right .stack { left: auto; right: -22px; }   /* its count stays clear of the seat's card count */
   .seat .stack b { font-size: .68rem; padding: 1px 5px 0; }
   .seat .stack .tower i { width: 18px; height: 5px; margin-top: -3px; background: repeating-linear-gradient(90deg, var(--chip) 0 3px, rgba(255,255,255,.88) 3px 5px); }
 }

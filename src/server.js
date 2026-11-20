@@ -28,9 +28,10 @@ const LOCAL_HAND_LOG = process.env.HAND_LOG === 'off' ? '' :
 const COMMIT = process.env.GAME_VERSION || process.env.RENDER_GIT_COMMIT || null;
 const GAME_VERSION = COMMIT && `${process.env.RENDER ? 'render' : 'play56.in'}@${COMMIT}`;
 
-const BOT_NAMES = ['Kuttan', 'Ammini', 'Pappan', 'Chinnu', 'Unni', 'Kunjamma', 'Appu', 'Sarojini', 'Mathai', 'Leela'];
-// Bots only the host can pick (never named for an automatic seat): they play their cards with a neural net.
+const BOT_NAMES = ['Kuttan', 'Ammini', 'Pappan', 'Chinnu', 'Unni', 'Kunjamma', 'Navratilova', 'Buffett', 'Chamberlain', 'Eisenhower'];
+// Neural-net bots (card play by src/netplay.js, 6 players only). A 6-player match always gets at least one.
 const PICK_ONLY = NetPlay.NAMES;
+const pickRandom = (a) => a[crypto.randomInt(a.length)];
 
 // Player accounts (name + PIN) that keep a record per player. Supabase table `players` when Supabase is set,
 // else a local file; PLAYERS_FILE=<file> chooses the file, PLAYERS_FILE=off keeps them in memory (the socket test).
@@ -322,10 +323,11 @@ function autoAct(room, seat) {
 }
 
 // Name for a bot at `seat`. A team with a human on it gets exactly one human-tuned bot
-// (Bot.HUMAN_TUNED_BOTS); its other bots come from the self-play half. All-bot teams: any free name.
+// (Bot.HUMAN_TUNED_BOTS); its other bots come from the self-play half and the neural bots. All-bot teams:
+// any free name. The name is drawn at random; neural bots only at 6 players (at 8 the net steps aside).
 function botName(room, seat) {
   const used = new Set(room.seats.filter((s, i) => i !== seat).map((s) => s.name));
-  const free = BOT_NAMES.filter((n) => !used.has(n));
+  const free = [...BOT_NAMES, ...(room.players === 6 ? PICK_ONLY : [])].filter((n) => !used.has(n));
   const mates = room.seats.filter((s, i) => i !== seat && i % 2 === seat % 2);
   let pool = free;
   if (mates.some((s) => s.kind === 'human')) {
@@ -333,18 +335,32 @@ function botName(room, seat) {
     const fit = free.filter((n) => Bot.HUMAN_TUNED_BOTS.has(n) === wantTuned);
     if (fit.length) pool = fit;
   }
-  return pool.includes(BOT_NAMES[seat]) ? BOT_NAMES[seat] : pool[0] || `Bot ${seat + 1}`;
+  return pool.length ? pickRandom(pool) : `Bot ${seat + 1}`;
 }
 
 function startMatch(room) {
   // A bot the host picked by name keeps it (the one-human-tuned-bot rule does not apply to picked bots).
-  // Every other bot (added without a name, or filling an empty seat) is named afresh, now that the teams are known.
+  // Every other bot (added without a name, or filling an empty seat) is named afresh at random, now that the teams are known.
   room.seats.forEach((s, i) => {
     if (s.kind !== 'human' && !s.picked) room.seats[i] = { ...emptySeat(), kind: 'bot' };
   });
-  room.seats.forEach((s, i) => {
-    if (s.kind === 'bot' && !s.picked) s.name = botName(room, i);
-  });
+  const open = room.seats.map((s, i) => i).filter((i) => room.seats[i].kind === 'bot' && !room.seats[i].picked);
+  for (let i = open.length - 1; i > 0; i--) { const j = crypto.randomInt(i + 1); [open[i], open[j]] = [open[j], open[i]]; }
+  // 6 players: at least one neural bot unless the host picked every bot. It goes on a random open seat, preferring
+  // one that leaves its team room for the human-tuned bot a team with a human gets.
+  const names = new Set(room.seats.map((s) => s.name));
+  const freeNet = PICK_ONLY.filter((n) => !names.has(n));
+  if (room.players === 6 && open.length && !room.seats.some((s) => s.kind === 'bot' && PICK_ONLY.includes(s.name)) && freeNet.length) {
+    const mates = (i) => room.seats.filter((s, k) => k !== i && k % 2 === i % 2);
+    const roomy = open.filter((i) => !mates(i).some((s) => s.kind === 'human')
+      || open.some((k) => k !== i && k % 2 === i % 2)
+      || mates(i).some((s) => s.picked && Bot.HUMAN_TUNED_BOTS.has(s.name)));
+    room.seats[pickRandom(roomy.length ? roomy : open)].name = pickRandom(freeNet);
+  }
+  // teams with a human are named first, so the all-bot team cannot use up the self-play names they need
+  const withHuman = (i) => room.seats.some((s, k) => k % 2 === i % 2 && s.kind === 'human');
+  open.sort((a, b) => withHuman(b) - withHuman(a));
+  open.forEach((i) => { if (!room.seats[i].name) room.seats[i].name = botName(room, i); });
   room.game = E.newMatch({ players: room.players });
   room.loggedHand = 0;
   sysChat(room, 'Match started. Good luck!');
@@ -545,7 +561,7 @@ io.on('connection', (socket) => {
     if (!room || socket.data.token !== room.hostToken) return fail('Only the host can reset the chips');
     if (!room.game) return;
     E.resetChips(room.game);
-    sysChat(room, 'Chips reset to 12 each.');
+    sysChat(room, `Chips reset to ${room.game.settings.startingTables} each.`);
     broadcast(room);
   });
 

@@ -61,7 +61,7 @@
     'Close': 'അടയ്ക്കൂ',
     'Last trick': 'കഴിഞ്ഞ പിടി',
     'Reset chips': 'മേശ റീസെറ്റ്',
-    'Host only: both teams back to 12 chips': 'ഹോസ്റ്റിന് മാത്രം: രണ്ട് ടീമിനും വീണ്ടും 12 മേശ',
+    'Host only: both teams back to their starting chips': 'ഹോസ്റ്റിന് മാത്രം: രണ്ട് ടീമിനും തുടക്കത്തിലെ മേശ വീണ്ടും',
     'Show the hands': 'കൈകൾ കാണിക്കൂ',
     "Everyone's cards as dealt (after the hand)": 'എല്ലാവർക്കും കിട്ടിയ ചീട്ടുകൾ (കളി കഴിഞ്ഞ ശേഷം)',
     'Concede': 'വിട്ടുകൊടുക്കൂ',
@@ -191,6 +191,7 @@
     '{0} made {1}': '{0} ജയിച്ചു · {1}',
     '{0} went down on {1}': '{0} തോറ്റു · {1}',
     'Use "Last trick", "Show the hands" and the log on the right to review the hand.': 'കളി വീണ്ടും നോക്കാൻ "കഴിഞ്ഞ പിടി", "കൈകൾ കാണിക്കൂ", വലതുവശത്തെ കളിവിവരം എന്നിവ ഉപയോഗിക്കാം.',
+    'Open Chat for "Last trick", "Show the hands" and the hand log.': 'കളി വീണ്ടും നോക്കാൻ ചാറ്റ് തുറക്കൂ: "കഴിഞ്ഞ പിടി", "കൈകൾ കാണിക്കൂ", കളിവിവരം എന്നിവ അവിടെയുണ്ട്.',
     'Show the initial hands': 'കിട്ടിയ കൈകൾ കാണിക്കൂ',
     'Next hand': 'അടുത്ത കളി',
     'The host deals the next hand.': 'അടുത്ത കളി ഹോസ്റ്റ് വിളമ്പും.',
@@ -222,7 +223,7 @@
     '<b>{0}</b> wants {1} to give up this hand and pay {2} to {3}.': '<b>{0}</b> ഈ കളി വിട്ടുകൊടുക്കാമെന്ന് പറയുന്നു. {1} {2} കൊടുക്കണം ({3} വാങ്ങും).',
     'Agree': 'സമ്മതം',
     'Reset chips?': 'മേശ റീസെറ്റ് ചെയ്യണോ?',
-    'Both teams go back to 12 chips. The current hand continues.': 'രണ്ട് ടീമിനും വീണ്ടും 12 മേശ. ഇപ്പോഴത്തെ കളി തുടരും.',
+    'Both teams go back to {0} chips. The current hand continues.': 'രണ്ട് ടീമിനും വീണ്ടും {0} മേശ. ഇപ്പോഴത്തെ കളി തുടരും.',
     'Reset': 'റീസെറ്റ്',
     'Hand void': 'കളി അസാധു',
     '{0} bid {1}, but {2} holds no {3}. No chips change; the deal passes to the next player.': '{0} വിളിച്ചത് {1}; പക്ഷേ {2}: കൈയിൽ {3} ഇല്ല. മേശ മാറില്ല; അടുത്തയാൾ ചീട്ട് വിളമ്പും.',
@@ -239,6 +240,8 @@
       'അടുത്ത മത്സരത്തിലെ ആദ്യ കളി വിളിച്ച് ജയിച്ചാൽ ടീം മുഴുവൻ കുണുക്ക് ഊരാം. അതു കഴിഞ്ഞാൽ ഓരോരുത്തരും സ്വയം വിളിച്ച് ജയിച്ച് സ്വന്തം കുണുക്ക് ഊരണം.',
     // ---- trophy and kunukku screens
     'Kunukku kayari!': 'കുണുക്ക് കയറി!',
+    'Kunukku oori!': 'കുണുക്ക് ഊരി!',
+    '{0} takes off the kunukku.': '{0} കുണുക്ക് ഊരി.',
     'wears the kunukku': 'കുണുക്ക് അണിയുന്നു',
     'Champions': 'ചാമ്പ്യന്മാർ',
     'Hand won': 'കളി ജയിച്ചു',
@@ -326,7 +329,7 @@
   };
 
   // The bots' names, shown in Malayalam script (only for bot seats; a player's typed name is never changed).
-  const BOTS = { Kuttan: 'കുട്ടൻ', Ammini: 'അമ്മിണി', Pappan: 'പാപ്പൻ', Chinnu: 'ചിന്നു', Unni: 'ഉണ്ണി', Kunjamma: 'കുഞ്ഞമ്മ', Appu: 'അപ്പു', Sarojini: 'സരോജിനി', Mathai: 'മത്തായി', Leela: 'ലീല', Jalaja: 'ജലജ', Ponnappan: 'പൊന്നപ്പൻ' };
+  const BOTS = { Kuttan: 'കുട്ടൻ', Ammini: 'അമ്മിണി', Pappan: 'പാപ്പൻ', Chinnu: 'ചിന്നു', Unni: 'ഉണ്ണി', Kunjamma: 'കുഞ്ഞമ്മ', Navratilova: 'നവരത്തിലോവ', Buffett: 'ബഫറ്റ്', Chamberlain: 'ചേംബർലെയ്ൻ', Eisenhower: 'ഐസൻഹോവർ', Jalaja: 'ജലജ', Keaton: 'കീറ്റൺ' };
 
   // Server sentences with names or numbers in them: [pattern, Malayalam with $1, $2].
   // Order matters where one sentence ends like another.

@@ -320,6 +320,14 @@ select option { background: var(--kayal-deep, #0b2f35); color: var(--ivory); }
 .hand.active .card.legal { cursor: pointer; transform: translateY(-10px); }
 .hand.active .card.legal:hover, .hand.active .card.legal:focus-visible { transform: translateY(-22px); }
 .hand.active .card:not(.legal) { filter: brightness(.6) saturate(.6); }
+/* the turn reminder (turnNudge): a pulsing banner just above my cards, and the cards I may play bob */
+.hand { position: relative; }
+.hand.nudge::before { content: attr(data-nudge); position: absolute; left: 50%; bottom: 100%; z-index: 6; transform: translate(-50%, -6px);
+  background: var(--kasavu); color: var(--ink); font-weight: 700; padding: 6px 16px 4px; border-radius: 999px; white-space: nowrap;
+  box-shadow: 0 0 0 3px rgba(251,246,233,.85), 0 6px 16px rgba(0,0,0,.45); pointer-events: none; animation: nudgepulse 1.1s ease-in-out infinite; }
+.hand.nudge .card.legal { animation: nudgebob 1.1s ease-in-out infinite; }
+@keyframes nudgepulse { 50% { transform: translate(-50%, -6px) scale(1.08); } }
+@keyframes nudgebob { 50% { transform: translateY(-20px); } }
 
 /* ---------------------------------------------------------- bidding */
 .bid-panel {
@@ -567,15 +575,24 @@ body.lang-ml .deal-row.bidder .who::after { content: ' (വിളി)'; }
 
 /* captain seats: badge and the team's chip stack */
 .seat .tok.capt { background: var(--kasavu); padding: 1px 6px 0; }
-/* the pile stands at the seat's lower left corner and grows upward: count on top, one striped disc per chip */
-.seat .stack { position: absolute; left: -20px; bottom: -8px; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 3px; transform-origin: 50% 100%; --chip: var(--teamA); }
+/* the pile stands on the mat in front of its captain (between the seat and the middle of the table), so the chips
+   cross the table from one captain to the other: count on top, one striped disc per chip.
+   Seats at the bottom: above the seat, clear of the badges; across the table: below; at the ends: on the inner side. */
+.seat .stack { position: absolute; left: 50%; bottom: calc(100% + 10px); translate: -50% 0; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 3px; transform-origin: 50% 100%; --chip: var(--teamA); }
+.seat.top .stack { bottom: auto; top: calc(100% + 4px); }
+.seat.left .stack, .seat.right .stack { bottom: 50%; translate: 0 50%; }
+.seat.left .stack { left: calc(100% + 6px); }
+.seat.right .stack { left: auto; right: calc(100% + 6px); }
 .seat.t1 .stack { --chip: var(--teamB); }
-/* right-hand seats: the call bubble is on their left, so the pile goes on the right and the kunukku on the left */
-.seat.right .stack { left: auto; right: -20px; }
+/* a captain's call bubble moves aside for the pile: beside it at the bottom and top, beyond it at the ends */
+.seat.cap .said { left: calc(50% + 22px); transform: translate(0, -100%); }
+.seat.cap.top .said { transform: translate(0, 100%); }
+.seat.cap.left .said { left: auto; right: -50px; transform: translate(100%, -50%); }
+.seat.cap.right .said { left: -50px; transform: translate(-100%, -50%); }
 .seat.right .kunukku { right: auto; left: -24px; }
 .seat .stack b { background: rgba(8,42,48,.96); border: 1px solid rgba(251,246,233,.4); border-radius: 999px; padding: 2px 7px 1px; font-size: .78rem; line-height: 1; color: var(--ivory); box-shadow: 0 3px 8px rgba(0,0,0,.35); min-width: 1.2em; text-align: center; transition: color .2s; }
 .seat .stack .tower { display: flex; flex-direction: column; align-items: center; filter: drop-shadow(0 3px 3px rgba(0,0,0,.5)); }
-.seat .stack .tower i { display: block; width: 24px; height: 5px; margin-top: -2px; border-radius: 3px; box-sizing: border-box; border: 1px solid rgba(0,0,0,.35);
+.seat .stack .tower i { display: block; width: 24px; height: 5px; margin-top: -3px; border-radius: 3px; box-sizing: border-box; border: 1px solid rgba(0,0,0,.35);
   background: repeating-linear-gradient(90deg, var(--chip) 0 4px, rgba(255,255,255,.88) 4px 6px); }
 .seat .stack .tower i:first-child { margin-top: 0; }
 .seat .stack.bump { animation: stackbump .32s ease-out; }
@@ -594,8 +611,10 @@ body.lang-ml .deal-row.bidder .who::after { content: ' (വിളി)'; }
 .chipfly.t1 { background: var(--teamB); }
 .chiploss { position: fixed; z-index: 31; width: 28px; text-align: center; color: #ff5a5a; font-weight: 800; font-size: 1.35rem; text-shadow: 0 2px 4px rgba(0,0,0,.75); pointer-events: none; }
 @media (max-width: 700px), (max-height: 500px) {
-  .seat .stack { left: -22px; bottom: -6px; gap: 2px; }   /* its count stays clear of the ★ and "deals" badges */
-  .seat.right .stack { left: auto; right: -22px; }   /* its count stays clear of the seat's card count */
+  .seat .stack { gap: 2px; }
+  .seat.cap .said { left: calc(50% + 18px); }
+  .seat.cap.left .said { right: -40px; }
+  .seat.cap.right .said { left: -40px; }
   .seat .stack b { font-size: .68rem; padding: 1px 5px 0; }
   .seat .stack .tower i { width: 18px; height: 5px; margin-top: -3px; background: repeating-linear-gradient(90deg, var(--chip) 0 3px, rgba(255,255,255,.88) 3px 5px); }
 }

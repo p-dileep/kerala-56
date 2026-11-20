@@ -74,6 +74,7 @@
     'Send': 'അയയ്ക്കൂ',
     'Connection lost. Reconnecting…': 'കണക്ഷൻ പോയി. വീണ്ടും കണക്ട് ചെയ്യുന്നു…',
     '● Your turn · 56': '● നിങ്ങളുടെ ഊഴം · 56',
+    'Your turn: play a card': 'നിങ്ങളുടെ ഊഴം: ഒരു ചീട്ട് ഇടൂ',
     '56 · Kerala card table': '56 · കേരള ചീട്ടുകളി',
     'Your cards': 'നിങ്ങളുടെ ചീട്ടുകൾ',
     // ---- suits and calls

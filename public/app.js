@@ -1009,10 +1009,12 @@
 
   function renderHand(g) {
     const h = $('hand');
-    if (!g || room.mySeat === null) { h.innerHTML = ''; return; }
+    if (!g || room.mySeat === null) { h.innerHTML = ''; turnNudge(null); return; }
     const legal = new Set(g.legal ? g.legal.cards : []);
     const active = g.phase === 'playing' && g.turn === room.mySeat;
     h.classList.toggle('active', active);
+    h.dataset.nudge = T('Your turn: play a card');
+    turnNudge(active ? `${g.handNo}:${g.trickNo}:${g.trick.cards.length}` : null);
     let prev = null;
     h.innerHTML = g.hand.map((c) => {
       const cls = [legal.has(c.id) ? 'legal' : '', prev && prev !== c.suit ? 'gap' : ''].join(' ');
@@ -1023,6 +1025,17 @@
         : html;
     }).join('');
     h.querySelectorAll('[data-card]').forEach((b) => (b.onclick = () => socket.emit('play', { cardId: b.dataset.card })));
+  }
+
+  // People forget to play: 5 seconds into my turn to play a card, a "Your turn" banner pulses over my hand,
+  // the cards I may play bob, and a phone buzzes, until I play.
+  let nudgeKey = null, nudgeTimer = null;
+  function turnNudge(key) {
+    if (key === nudgeKey) return;
+    nudgeKey = key;
+    clearTimeout(nudgeTimer);
+    $('hand').classList.remove('nudge');
+    if (key) nudgeTimer = setTimeout(() => { $('hand').classList.add('nudge'); if (navigator.vibrate) navigator.vibrate([150, 100, 150]); }, 5000);
   }
 
   function renderBidPanel() {

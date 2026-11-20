@@ -8,6 +8,7 @@ const { Server } = require('socket.io');
 const E = require('./engine');
 const Bot = require('./bot');
 const NetPlay = require('./netplay');
+const { makeAccounts } = require('./accounts');
 
 const PORT = Number(process.env.PORT) || 3056;
 const BOT_DELAY_MS = Number(process.env.BOT_DELAY_MS) || 900;
@@ -30,6 +31,14 @@ const GAME_VERSION = COMMIT && `${process.env.RENDER ? 'render' : 'play56.in'}@$
 const BOT_NAMES = ['Kuttan', 'Ammini', 'Pappan', 'Chinnu', 'Unni', 'Kunjamma', 'Appu', 'Sarojini', 'Mathai', 'Leela'];
 // Bots only the host can pick (never named for an automatic seat): they play their cards with a neural net.
 const PICK_ONLY = NetPlay.NAMES;
+
+// Player accounts (name + PIN) that keep a record per player. Supabase table `players` when Supabase is set,
+// else a local file; PLAYERS_FILE=<file> chooses the file, PLAYERS_FILE=off keeps them in memory (the socket test).
+const accounts = makeAccounts({
+  url: SUPABASE_URL && SUPABASE_KEY ? SUPABASE_URL : '', key: SUPABASE_KEY, secret: process.env.LOGIN_SECRET || '',
+  file: process.env.PLAYERS_FILE === 'off' ? '' : process.env.PLAYERS_FILE || path.join(__dirname, '..', 'data', 'local_players.json'),
+  reserved: [...BOT_NAMES, ...PICK_ONLY]
+});
 
 const app = express();
 app.use(express.static(path.join(__dirname, '..', 'public')));
@@ -127,6 +136,7 @@ function publicSeats(room) {
     connected: s.kind === 'bot' ? true : s.connected,
     tuned: s.kind === 'bot' && Bot.HUMAN_TUNED_BOTS.has(s.name),
     picked: s.kind === 'bot' && !!s.picked,
+    verified: s.kind === 'human' && !!s.pid,     // a registered player (name held by the account)
     kunukku: !!room.kunukku[i]
   }));
 }
@@ -140,7 +150,7 @@ function logHand(room) {
     hand_no: g.handNo,
     dealer: g.dealer,
     bot_style: room.botStyle,
-    seats: room.seats.map((s) => ({ kind: s.kind, name: s.name })),
+    seats: room.seats.map((s) => ({ kind: s.kind, name: s.name, pid: s.pid || null })),
     dealt: g.dealt.map((h) => h.map((c) => c.id)),
     auction: g.bidding.actions,
     contract: g.contract,
@@ -169,6 +179,23 @@ function logHand(room) {
   }).then((r) => { if (!r.ok) console.error('hand log failed', r.status); })
     .catch((err) => console.error('hand log error', err.message))
     .finally(() => clearTimeout(t));
+}
+
+// A registered player's last `n` logged hands, newest first, from the same store logHand writes to.
+// Only hands logged since accounts exist carry `pid` in their seats.
+async function recentHands(pid, n = 5) {
+  if (SUPABASE_URL && SUPABASE_KEY) {
+    const cols = 'id,created_at,players,hand_no,dealer,seats,dealt,auction,contract,played,result';
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 5000);
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/hands?select=${cols}&seats=cs.${encodeURIComponent(JSON.stringify([{ pid }]))}&order=id.desc&limit=${n}`,
+      { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, signal: ctrl.signal }).finally(() => clearTimeout(t));
+    if (!r.ok) throw new Error(`hands ${r.status}`);
+    return r.json();
+  }
+  if (!LOCAL_HAND_LOG || !fs.existsSync(LOCAL_HAND_LOG)) return [];
+  const rows = (await fs.promises.readFile(LOCAL_HAND_LOG, 'utf8')).split(/\r?\n/).filter(Boolean).map((l) => JSON.parse(l));
+  return rows.filter((h) => h.seats.some((x) => x.pid === pid)).slice(-n).reverse();
 }
 
 // Kunukku: the team that loses a match wears it (every seat of that team) into the next match.
@@ -208,6 +235,12 @@ function broadcast(room) {
     room.loggedHand = g.handNo;
     updateKunukku(room);
     logHand(room);
+    // records of the registered players at the table; their lobby card updates at once
+    const ids = accounts.recordHand(room.seats.map((s) => ({ pid: s.kind === 'human' ? s.pid || null : null })), g.result, g.phase === 'matchover' ? g.winner : null);
+    for (const sid of io.sockets.adapter.rooms.get(room.code) || []) {
+      const sock = io.sockets.sockets.get(sid);
+      if (sock && ids.includes(sock.data.pid)) sock.emit('account', accounts.get(sock.data.pid), true);
+    }
   }
   room.touched = Date.now();
   ensureHost(room);
@@ -325,20 +358,64 @@ io.on('connection', (socket) => {
 
   const fail = (msg) => socket.emit('errorMsg', msg);
   const getRoom = () => rooms.get(socket.data.room);
+  // The name this socket sits under: a registered player always uses the account's name; a guest may not take one.
+  const nameFor = (name) => {
+    if (socket.data.pid) return { name: socket.data.name };
+    const n = clean(name);
+    return n && accounts.isHeld(n) ? { err: 'That name belongs to a registered player. Sign in, or pick another name.' } : { name: n };
+  };
+  // Signed in: the seat, host role and reconnects follow the account ('p:<id>') on any device.
+  const signIn = (id) => { socket.data.pid = id; socket.data.token = 'p:' + id; socket.data.name = accounts.get(id).name; };
 
-  socket.on('hello', ({ token } = {}) => {
-    socket.data.token = typeof token === 'string' && token.length >= 16 ? token.slice(0, 64) : crypto.randomUUID();
-    socket.emit('token', socket.data.token);
+  socket.on('hello', ({ token, login } = {}) => {
+    socket.data.guest = typeof token === 'string' && token.length >= 16 && !token.startsWith('p:') ? token.slice(0, 64) : crypto.randomUUID();
+    socket.data.token = socket.data.guest;
+    const pid = accounts.resume(login);
+    if (pid) signIn(pid);
+    socket.emit('token', socket.data.guest);
+    socket.emit('account', pid ? accounts.get(pid) : null, accounts.ready());   // ready: a null means the session is gone
     socket.emit('lobby', lobbyInfo());
+  });
+
+  // Register (new name) or sign in (existing name) with a PIN; lobby only.
+  const account = (fn) => async ({ name, pin } = {}) => {
+    if (!socket.data.guest) return fail('Not ready');
+    if (socket.data.room) return fail('Leave the table first.');
+    const r = await fn(name, pin).catch((err) => { console.error('account error', err.message); return { err: 'Sign-in is not available right now.' }; });
+    if (r.err) return fail(r.err);
+    signIn(r.id);
+    socket.emit('login', { session: r.session, account: r.account });
+  };
+  socket.on('register', account(accounts.register));
+  socket.on('login', account(accounts.login));
+  // The signed-in player's last 5 hands, for the replay on the record card. Player ids stay on the server.
+  socket.on('myHands', async () => {
+    const pid = socket.data.pid;
+    if (!pid) return fail('Sign in first.');
+    const rows = await recentHands(pid).catch((err) => { console.error('replay error', err.message); return null; });
+    if (!rows) return fail('Replays are not available right now.');
+    socket.emit('myHands', rows.map((h) => ({
+      id: h.id, at: h.created_at, players: h.players, handNo: h.hand_no, dealer: h.dealer,
+      me: h.seats.findIndex((x) => x.pid === pid), seats: h.seats.map((x) => ({ kind: x.kind, name: x.name })),
+      dealt: h.dealt, auction: h.auction, contract: h.contract, played: h.played, result: h.result
+    })));
+  });
+  socket.on('logout', () => {
+    if (socket.data.room) return fail('Leave the table first.');
+    socket.data.pid = null;
+    socket.data.token = socket.data.guest;
+    socket.emit('account', null, true);
   });
 
   socket.on('createRoom', ({ name, players, team } = {}) => {
     if (!socket.data.token) return fail('Not ready');
-    if (!clean(name)) return fail('Please type your name first.');
+    const nm = nameFor(name);
+    if (nm.err) return fail(nm.err);
+    if (!nm.name) return fail('Please type your name first.');
     const room = createRoom(socket.data.token, Number(players) === 8 ? 8 : 6);
-    socket.data.name = clean(name);
+    socket.data.name = nm.name;
     const hostSeat = Number(team) === 1 ? 1 : 0;       // seat parity is the team (even = A, odd = B)
-    room.seats[hostSeat] = { kind: 'human', name: clean(name) || 'Host', token: socket.data.token, socketId: socket.id, connected: true };
+    room.seats[hostSeat] = { kind: 'human', name: nm.name, pid: socket.data.pid || null, token: socket.data.token, socketId: socket.id, connected: true };
     socket.join(room.code);
     socket.data.room = room.code;
     sysChat(room, `${room.seats[hostSeat].name} created the table.`);
@@ -349,24 +426,26 @@ io.on('connection', (socket) => {
     if (!socket.data.token) return fail('Not ready');
     const room = rooms.get(String(code || '').toUpperCase().trim());
     if (!room) return fail('Room not found. Check the code.');
-    if (!clean(name) && seatOfToken(room, socket.data.token) < 0) return fail('Please type your name first.');
+    const nm = nameFor(name);
+    if (nm.err) return fail(nm.err);
+    if (!nm.name && seatOfToken(room, socket.data.token) < 0) return fail('Please type your name first.');
     socket.join(room.code);
     socket.data.room = room.code;
-    if (clean(name)) socket.data.name = clean(name);
+    if (nm.name) socket.data.name = nm.name;
 
     let seat = seatOfToken(room, socket.data.token);
     if (seat >= 0) {                                   // reconnect
       if (!room.seats[seat].connected) glog(room, `${room.seats[seat].name} seat ${seat} reconnected after ${Math.round((Date.now() - (room.awaySince[seat] || Date.now())) / 1000)}s`);
       Object.assign(room.seats[seat], { socketId: socket.id, connected: true });
       delete room.awaySince[seat];
-      if (name) room.seats[seat].name = clean(name) || room.seats[seat].name;
+      if (nm.name) room.seats[seat].name = nm.name;
     } else if (!room.game) {                           // auto-sit: first empty seat on the chosen team, else any
       const want = team === 0 || team === 1 ? team : null;
       if (want !== null) seat = room.seats.findIndex((s, i) => s.kind === 'empty' && E.team(i) === want);
       if (seat < 0) seat = room.seats.findIndex((s) => s.kind === 'empty');
       if (want !== null && seat >= 0 && E.team(seat) !== want) fail(`${room.teamNames[want]} is full, so you are on ${room.teamNames[1 - want]}.`);
       if (seat >= 0) {
-        room.seats[seat] = { kind: 'human', name: clean(name) || `Player ${seat + 1}`, token: socket.data.token, socketId: socket.id, connected: true };
+        room.seats[seat] = { kind: 'human', name: nm.name || `Player ${seat + 1}`, pid: socket.data.pid || null, token: socket.data.token, socketId: socket.id, connected: true };
         sysChat(room, `${room.seats[seat].name} joined.`);
       }
     }
@@ -384,13 +463,15 @@ io.on('connection', (socket) => {
     const canTake = target.kind === 'empty' ? !room.game : target.kind === 'bot';
     if (!canTake) return fail('That seat is taken.');
     const cur = seatOfToken(room, socket.data.token);
-    let myName = clean(name);
+    const nm = nameFor(name);
+    if (nm.err) return fail(nm.err);
+    let myName = nm.name;
     if (myName) socket.data.name = myName;
     if (cur >= 0) {
       myName = myName || room.seats[cur].name;
       room.seats[cur] = emptySeat();
     }
-    room.seats[seat] = { kind: 'human', name: myName || `Player ${seat + 1}`, token: socket.data.token, socketId: socket.id, connected: true };
+    room.seats[seat] = { kind: 'human', name: myName || `Player ${seat + 1}`, pid: socket.data.pid || null, token: socket.data.token, socketId: socket.id, connected: true };
     if (cur >= 0 && room.game) {
       room.seats[cur] = { ...emptySeat(), kind: 'bot', name: botName(room, cur) };
       sysChat(room, `${room.seats[cur].name} took over ${myName}'s old seat.`);
@@ -589,4 +670,4 @@ if (require.main === module) {
   server.listen(PORT, () => console.log(`56 server listening on http://localhost:${PORT}`));
 }
 
-module.exports = { server, io, rooms, updateKunukku };
+module.exports = { server, io, rooms, updateKunukku, accounts };

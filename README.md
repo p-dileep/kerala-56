@@ -34,6 +34,10 @@ Run a **single** process. Rooms are held in memory. A restart ends the tables in
 | `BOT_BID_DELAY_MS` | 1900 | Bot thinking time during bidding (calls are shown a second slower than card plays) |
 | `TRICK_PAUSE_MS` | 2200 | How long a finished trick stays on the mat |
 | `AWAY_TAKEOVER_MS` | 20000 | A bot plays for a disconnected player after this long |
+| `LOGIN_SECRET` | derived from the Supabase key | Signs the sessions of registered players (name + PIN) |
+| `PLAYERS_FILE` | `data/local_players.json` | Player accounts when Supabase is not set (`off` = memory only) |
+
+**Registered players (optional):** a player name + 4-8 digit PIN keeps a record across devices: rating (Elo per hand), hands, bids and matches won, and a replay of the last 5 hands. Guests play as before but cannot sit under a registered name. Accounts live in the Supabase table `players` (SQL in `docs/claude-plans/2026-11-20_site-logins.md`).
 
 ## Rules implemented (`src/engine.js`)
 - 48 cards (J 9 A 10 K Q ×2 packs); the 8-player table adds 8 and 7 ×2 packs below the Queen, worth nothing. Points: J 3, 9 2, A 1, 10 1 = 56. Teams sit alternately.

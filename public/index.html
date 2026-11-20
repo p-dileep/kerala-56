@@ -16,9 +16,15 @@
 </head>
 <body>
 
+<!-- Player account (#account): sign in / register, or the record and replays; filled by app.js -->
+<main id="account" class="screen hidden">
+  <div class="lobby-card" id="accountPage"></div>
+</main>
+
 <!-- Lobby -->
 <main id="lobby" class="screen">
   <div class="lobby-card">
+    <div class="lobby-top"><button type="button" id="acctBtn" class="btn small acct-btn"></button></div>
     <h1 class="wordmark"><span class="num">56</span><span class="ml">അമ്പത്തിയാറ്</span><button type="button" class="btn small ghost lang-btn" lang="ml">മലയാളം</button></h1>
     <p class="lede" data-t>Two teams, two packs, 56 points. Type your name, walk into the 6-player or 8-player table, and pick a seat. Bots fill any empty seats.</p>
     <label class="field">

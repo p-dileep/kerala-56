@@ -65,7 +65,7 @@
   const socket = io({ transports: ['websocket', 'polling'] });
 
   // ------------------------------------------------------------ connection
-  socket.on('connect', () => socket.emit('hello', { token: store.get('g56token', '') }));
+  socket.on('connect', () => socket.emit('hello', { token: store.get('g56token', ''), login: store.get('g56login', '') }));
   socket.on('token', (t) => {
     store.set('g56token', t);
     const code = new URLSearchParams(location.search).get('room');
@@ -86,7 +86,127 @@
 
   // ------------------------------------------------------------ lobby
   $('nameInput').value = store.get('g56name', '');
+  // Registered players (name + PIN): the record follows them to any device; the name field then holds the account name.
+  // Top of the lobby: "Sign in" (guest) or "✓ name · rating"; both open the account page (#account), a screen of its own.
+  let account = null;
+  function renderAccount() {
+    const inp = $('nameInput');
+    inp.readOnly = !!account;
+    if (account) inp.value = account.name;
+    else if (inp.value === inp.dataset.acct) inp.value = store.get('g56name', '');
+    inp.dataset.acct = account ? account.name : '';
+    $('acctBtn').innerHTML = account ? `✓ ${esc(account.name)} · <b>${account.rating}</b>` : T('Sign in');
+    $('acctBtn').classList.toggle('in', !!account);
+    if (!$('account').classList.contains('hidden')) renderAccountPage();
+  }
+  function renderAccountPage() {
+    const back = `<button type="button" class="btn small ghost acct-back" id="acctBack">← ${T('Back to the tables')}</button>`;
+    if (!account) {
+      $('accountPage').innerHTML = `${back}
+        <h2 class="acct-title">${T('Sign in / Register')}</h2>
+        <p class="lede">${T('Keep your record (rating, hands, matches) on any device.')}</p>
+        <p class="hint">${T('No email needed. Pick a player name and a PIN of 4 to 8 digits. Use the same two on any phone or computer and your record follows you. Nobody else can sit under a registered name.')}</p>
+        <label class="field"><span>${T('Player name')}</span><input id="acctName" maxlength="18" autocomplete="username" value="${esc($('nameInput').value.trim())}"></label>
+        <label class="field"><span>${T('PIN (4 to 8 digits)')}</span><input id="acctPin" type="password" inputmode="numeric" maxlength="8" autocomplete="current-password"></label>
+        <div class="acct-actions"><button type="button" class="btn primary" id="acctLogin">${T('Sign in')}</button><button type="button" class="btn" id="acctNew">${T('Register this name')}</button></div>`;
+      const send = (ev) => socket.emit(ev, { name: $('acctName').value.trim(), pin: $('acctPin').value.trim() });
+      $('acctLogin').onclick = () => send('login');
+      $('acctNew').onclick = () => send('register');
+      $('acctPin').addEventListener('keydown', (e) => { if (e.key === 'Enter') send('login'); });
+    } else {
+      const a = account, tile = (n, label, sub = '') => `<div class="acct-tile"><b>${n}</b><span>${label}</span>${sub ? `<em>${sub}</em>` : ''}</div>`;
+      $('accountPage').innerHTML = `${back}
+        <h2 class="acct-title">✓ ${esc(a.name)}</h2>
+        <div class="acct-stats">${tile(a.rating, T('Rating'))}${tile(a.hands, T('Hands'), T('won {0}', a.hands_won))}${tile(a.bids, T('Bids'), T('made {0}', a.bids_made))}${tile(a.matches, T('Matches'), T('won {0}', a.matches_won))}</div>
+        <div class="acct-actions"><button type="button" class="btn primary" id="replayBtn">${T('Replay my last 5 hands')}</button><button type="button" class="btn ghost" id="signOutBtn">${T('Sign out')}</button></div>`;
+      $('replayBtn').onclick = () => socket.emit('myHands');
+      $('signOutBtn').onclick = () => { socket.emit('logout'); store.set('g56login', ''); leaveAccount(); };
+    }
+    $('acctBack').onclick = leaveAccount;
+  }
+  let acctPushed = false;    // the page added its own history entry, so Back (browser or button) returns to the lobby
+  function openAccount() {
+    if (location.hash !== '#account') { history.pushState(null, '', '#account'); acctPushed = true; }
+    show('account');
+    renderAccountPage();
+    const f = $('acctName') && ($('acctName').value ? $('acctPin') : $('acctName'));
+    if (f) f.focus();
+  }
+  function leaveAccount() {
+    if (acctPushed) history.back();
+    else { history.replaceState(null, '', location.pathname + location.search); show('lobby'); }
+  }
+  window.addEventListener('popstate', () => {
+    acctPushed = false;
+    if (location.hash === '#account' && !room) openAccount();
+    else if (!$('account').classList.contains('hidden')) show('lobby');
+  });
+  $('acctBtn').onclick = openAccount;
+  // ready = the server could check the session: a null then means it is no longer valid
+  socket.on('account', (a, ready) => { account = a || null; if (!a && ready) store.set('g56login', ''); renderAccount(); });
+  socket.on('login', ({ session, account: a }) => {
+    store.set('g56login', session);
+    account = a;
+    renderAccount();
+    leaveAccount();
+    toast(T('Signed in as {0}', a.name));
+  });
+  renderAccount();
+  if (location.hash === '#account' && !new URLSearchParams(location.search).get('room')) openAccount();
+
+  // Replays: the signed-in player's last 5 logged hands, stepped through from the deal, call by call, card by card.
+  let replays = [];
+  socket.on('myHands', (rows) => { replays = rows; showReplayList(); });
+  const cardOf = (id) => ({ id, rank: id.slice(0, -2), suit: id.slice(-2, -1) });   // ids are rank + suit + copy
+  const rpName = (h, i) => { const s = h.seats[i]; return s.kind === 'bot' ? Lang.botName(s.name) : s.name; };
+  function rpOutcome(h) {
+    const r = h.result, c = h.contract;
+    if (!c || !r) return '';
+    if (r.void) return T('Void hand');
+    return T(r.made ? 'made with {0}' : 'down with {0}', r.points[c.team]);
+  }
+  function showReplayList() {
+    const list = replays.map((h, k) => {
+      const c = h.contract, d = new Date(h.at);
+      const bid = c ? `${esc(rpName(h, c.seat))} ${colourSuits(bidText(c.value, c.suit, c.hasJack))}${c.mult > 1 ? ` ×${c.mult}` : ''} · ${rpOutcome(h)}` : '';
+      return `<button class="btn replay-item" data-rp="${k}"><b>${d.toLocaleDateString()} ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · ${T('Hand {0}', h.handNo)}</b><span class="sub">${bid}</span></button>`;
+    }).join('');
+    openModal(`<h2>${T('My last hands')}</h2>
+      ${list ? `<div class="replay-list">${list}</div>` : `<p>${T('No hands yet. Hands you play while signed in show up here.')}</p>`}
+      <div class="row"><button class="btn" data-close>${T('Close')}</button></div>`, true);
+    $('modalBody').querySelectorAll('[data-rp]').forEach((b) => (b.onclick = () => showReplay(replays[Number(b.dataset.rp)], 0)));
+  }
+  // step 0 = the deal; then one step per call; then one per card played
+  function showReplay(h, step) {
+    const A = h.auction.length, last = A + h.played.length;
+    step = Math.max(0, Math.min(step, last));
+    const plays = h.played.slice(0, Math.max(0, step - A));
+    const gone = new Set(plays.map((p) => p.card.id));
+    const who = (i) => `<span class="who t${i % 2}">${esc(rpName(h, i))}</span>`;
+    let now;
+    if (!plays.length) {        // the deal and the auction: the calls so far, newest last
+      const calls = h.auction.slice(0, step);
+      now = `<p class="sub">${T('{0} deals.', who(h.dealer))}</p>${calls.length ? `<p class="rp-calls">${calls.slice(-8).map((a) => `${who(a.seat)} ${colourSuits(actionNamed(a))}`).join(' · ')}</p>` : ''}`;
+    } else {                    // play: the trick in progress (or just completed)
+      const t = plays[plays.length - 1].trick;
+      now = `<p class="sub">${T('Trick {0}', t + 1)}</p><div class="mini-trick">${plays.filter((p) => p.trick === t).map((p) => `
+        <figure>${cardHTML(p.card)}<figcaption>${who(p.seat)}</figcaption></figure>`).join('')}</div>`;
+    }
+    const c = h.contract;
+    if (step === last && c) now += `<p><b>${esc(rpName(h, c.seat))} ${colourSuits(bidText(c.value, c.suit, c.hasJack))}: ${rpOutcome(h)}</b></p>`;
+    openModal(`<h2>${T('Hand {0}', h.handNo)}</h2>${now}
+      <div class="deal-list replay">${h.dealt.map((cards, i) => `
+        <div class="deal-row t${i % 2} ${c && step >= A && i === c.seat ? 'bidder' : ''}">
+          <div class="who t${i % 2}">${esc(rpName(h, i))}${i === h.me ? ` ${T('(you)')}` : ''}</div>
+          <div class="deal-cards">${cards.filter((id) => !gone.has(id)).map((id) => cardHTML(cardOf(id))).join('')}</div>
+        </div>`).join('')}</div>
+      <div class="row replay-ctl">${[[0, '⏮'], [step - 1, '◀'], [step + 1, '▶'], [last, '⏭']].map(([n, l]) => `<button class="btn" data-step="${n}">${l}</button>`).join('')}<span>${step} / ${last}</span></div>
+      <div class="row"><button class="btn" id="rpBack">${T('My last hands')}</button><button class="btn primary" data-close>${T('Close')}</button></div>`, true);
+    $('modalBody').querySelectorAll('[data-step]').forEach((b) => (b.onclick = () => showReplay(h, Number(b.dataset.step))));
+    $('rpBack').onclick = showReplayList;
+  }
   const myName = () => {
+    if (account) return account.name;
     const n = $('nameInput').value.trim();
     if (n) store.set('g56name', n);
     return n;
@@ -139,6 +259,7 @@
 
   function show(which) {
     $('lobby').classList.toggle('hidden', which !== 'lobby');
+    $('account').classList.toggle('hidden', which !== 'account');
     $('table').classList.toggle('hidden', which !== 'table');
   }
 
@@ -181,6 +302,7 @@
     setDeck(document.body.classList.contains('four'));
     syncFs();
     renderLobby();
+    renderAccount();
     if (room) render();
   }));
   syncFs();
@@ -640,7 +762,7 @@
         if (s.kind === 'human' && !isMe && (host || seated))
           actions += `<button class="btn small ghost" data-kick="${s.seat}">${g ? T('Replace with bot') : T('Remove')}</button>`;
         body = `${s.kunukku || shedding.has(s.seat) ? `<span class="kunukku" title="${T(KUNUKKU_TIP)}">${KUNUKKU}</span>` : ''}${g ? `<span class="cnt" title="${T('Cards in hand')}">${g.handCounts[s.seat]}</span>` : ''}${toks.length ? `<div class="toks">${toks.join('')}</div>` : ''}
-          <div class="nm">${anyBot ? T('Any bot') : esc(nameOf(s.seat))}${g && s.tuned ? ` <svg viewBox="0 0 16 16" width=".85em" height=".85em" fill="currentColor" style="vertical-align:-.08em"><title>${T('Bids with numbers tuned on human play')}</title><circle cx="8" cy="5" r="3.2"/><path d="M2 15c0-3.6 2.7-5.6 6-5.6s6 2 6 5.6z"/></svg>` : ''}</div>${meta.length ? `<div class="meta">${meta.join(' ')}</div>` : ''}
+          <div class="nm">${anyBot ? T('Any bot') : esc(nameOf(s.seat))}${s.verified ? ` <span class="tick" title="${T('Registered player')}">✓</span>` : ''}${g && s.tuned ? ` <svg viewBox="0 0 16 16" width=".85em" height=".85em" fill="currentColor" style="vertical-align:-.08em"><title>${T('Bids with numbers tuned on human play')}</title><circle cx="8" cy="5" r="3.2"/><path d="M2 15c0-3.6 2.7-5.6 6-5.6s6 2 6 5.6z"/></svg>` : ''}</div>${meta.length ? `<div class="meta">${meta.join(' ')}</div>` : ''}
           ${actions ? `<div class="seat-actions">${actions}</div>` : ''}`;
       }
       return `<div class="${cls.join(' ')}" data-seat="${s.seat}" style="left:${x}%;top:${y}%" title="${teamName(s.team)}">${said}${stack}${body}</div>`;

@@ -233,6 +233,37 @@ button, input { font: inherit; }
 .big-btn { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 14px 10px; }
 .big-btn .sub { font-size: .78rem; font-weight: 400; opacity: .85; }
 .field .req { font-style: normal; font-size: .75rem; opacity: .7; margin-left: 4px; }
+/* registered players: lobby record card, sign-in form, tick beside the seat name */
+.lobby-top { display: flex; justify-content: flex-end; margin-bottom: -8px; }
+.acct-btn { border-radius: 999px; }
+.acct-btn.in { border-color: var(--kasavu); color: var(--ivory); }
+.acct-btn.in b { color: var(--kasavu); }
+#account { display: grid; place-items: center; padding: 24px; overflow: auto; }
+.acct-back { justify-self: start; }
+.acct-title { margin: 0; font-size: clamp(26px, 7vw, 36px); color: var(--ivory); }
+.acct-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.acct-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.acct-tile { display: grid; gap: 2px; padding: 12px 14px; border-radius: 12px; background: rgba(8,42,48,.8); border: 1px solid rgba(207,227,226,.25); }
+.acct-tile b { font-size: 1.8rem; line-height: 1.1; color: var(--kasavu); }
+.acct-tile span { font-weight: 700; color: var(--ivory); }
+.acct-tile em { font-style: normal; font-size: .85rem; color: var(--pai); }
+.field input[readonly] { opacity: .8; }
+.modal-card .field { margin-top: 10px; }
+.modal-card .field input { background: #fff; color: var(--ink); border: 1px solid #CDBF9F; }
+.modal-card .row.wrap { flex-wrap: wrap; }
+.nm .tick { color: #2e8b57; font-weight: 700; }
+.replay-list { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
+.modal-card .replay-item { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; }
+.replay-item .sub { font-size: .85rem; font-weight: 400; }
+.rp-calls { font-size: .9rem; }
+.rp-calls .who, .modal-card .mini-trick .who, .modal-card .sub .who { font-weight: 700; }
+.rp-calls .who.t0, .modal-card .mini-trick .who.t0, .modal-card .sub .who.t0 { color: #8a5a00; }
+.rp-calls .who.t1, .modal-card .mini-trick .who.t1, .modal-card .sub .who.t1 { color: #8a1420; }
+.modal-card .replay-ctl { justify-content: center; align-items: center; margin-top: 6px; }
+.modal-card .replay-ctl .btn { min-width: 44px; }
+.deal-list.replay .deal-row { grid-template-columns: 84px 1fr; }
+.deal-list.replay .deal-cards { --cw: 30px; gap: 3px; flex-wrap: nowrap; }
+.deal-list.replay .who.t0 { color: #8a5a00; } .deal-list.replay .who.t1 { color: #8a1420; }
 /* ---------------------------------------------------------- cards */
 .card {
   width: var(--cw); height: calc(var(--cw) * 1.42); border-radius: var(--radius-card);

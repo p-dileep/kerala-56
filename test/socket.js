@@ -1,7 +1,8 @@
 // End-to-end: one human socket + 5 bots plays a full hand through the real server.
 process.env.RESERVED_TABLES = 'HIDE6:6, hide8:8, bad';
-process.env.PORT = 0; process.env.HAND_LOG = 'off'; process.env.BOT_DELAY_MS = 5; process.env.BOT_BID_DELAY_MS = 5; process.env.TRICK_PAUSE_MS = 5;
-const { server } = require('../src/server');
+process.env.PORT = 0; process.env.HAND_LOG = require('path').join(require('os').tmpdir(), `g56_socket_test_${process.pid}.jsonl`);   // replays read it back
+process.env.PLAYERS_FILE = 'off'; process.env.BOT_DELAY_MS = 5; process.env.BOT_BID_DELAY_MS = 5; process.env.TRICK_PAUSE_MS = 5;
+const { server, accounts } = require('../src/server');
 const { io } = require('socket.io-client');
 const { HUMAN_TUNED_BOTS } = require('../src/bot');
 { // kunukku: loser of a match wears it; off for the team if it bids and makes the first hand after that (or wins the match); else a bidder who makes a contract sheds their own
@@ -22,10 +23,36 @@ const { HUMAN_TUNED_BOTS } = require('../src/bot');
   hand('matchover', 2, true, { winner: 0 }); assert.equal(worn(), '135');            // A wins that match on its own bid: all off A, B wears it
   console.log('kunukku rules passed');
 }
+{ // records: Elo per hand (team average, guests and bots 1500), bids, matches; void hands count for nothing
+  const assert = require('assert');
+  const { makeAccounts } = require('../src/accounts');
+  const acc = makeAccounts({ reserved: ['Kuttan'] });
+  acc.loaded.then(async () => {
+    const { id } = await acc.register('Rec One', '1234');
+    assert.equal((await acc.register('rec one', '9999')).err, 'That name is already registered. Sign in instead.');
+    assert.equal((await acc.register('Kuttan', '1234')).err, 'That name cannot be registered.');
+    assert.equal((await acc.register('Rec Two', '12')).err, 'The PIN must be 4 to 8 digits.');
+    const seats = [{ pid: id }, {}, {}, {}, {}, {}];
+    acc.recordHand(seats, { void: true, receiver: null });
+    acc.recordHand(seats, { receiver: 0, made: true, contract: { seat: 0 } }, 0);
+    let a = acc.get(id);
+    assert.deepEqual([a.rating, a.hands, a.hands_won, a.bids, a.bids_made, a.matches, a.matches_won], [1508, 1, 1, 1, 1, 1, 1]);
+    acc.recordHand(seats, { receiver: 1, made: false, contract: { seat: 2 } });
+    a = acc.get(id);
+    assert.deepEqual([a.hands, a.hands_won, a.bids], [2, 1, 1]);
+    assert.ok(a.rating < 1508 && a.rating > 1490);
+    const s1 = (await acc.login('REC ONE', '1234')).session;
+    assert.equal(acc.resume(s1), id);
+    assert.equal(acc.resume(s1.slice(0, -1) + 'x'), null);
+    for (let i = 0; i < 5; i++) assert.equal((await acc.login('Rec One', '0000')).err, 'Wrong PIN.');
+    assert.equal((await acc.login('Rec One', '1234')).err, 'Too many wrong PINs. Try again in 15 minutes.');
+    console.log('records passed');
+  }).catch((e) => { console.error(e); process.exit(1); });
+}
 server.listen(0, () => {
   const url = `http://localhost:${server.address().port}`;
   const s = io(url, { transports: ['websocket'] });
-  let started = false, hands = 0, guest, mate;
+  let started = false, hands = 0, counted = 0, guest, mate;
   const concede = { proposed: false, declined: false, agreed: false };
   { // reserved tables: joinable by code, absent from the lobby list (checked below), shown with their code
     const h = io(url, { transports: ['websocket'] });
@@ -34,6 +61,41 @@ server.listen(0, () => {
     h.on('errorMsg', (m) => { console.error('reserved table join failed', m); process.exit(1); });
     h.on('room', (r) => { if (r.code !== 'HIDE8' || r.players !== 8 || r.fixed) { console.error('reserved table wrong', r.code, r.players, r.fixed); process.exit(1); }
       if (!h.done) { h.done = true; console.log('reserved table passed'); h.disconnect(); } });
+  }
+  { // registered players over the socket (reserved table HIDE6: no lobby broadcasts)
+    const fail = (m) => { console.error('login test:', m); process.exit(1); };
+    const sock = (hello) => { const x = io(url, { transports: ['websocket'] }); x.on('connect', () => x.emit('hello', hello)); return x; };
+    const once = (x, ev) => new Promise((ok) => x.once(ev, (...a) => ok(a)));
+    (async () => {
+      const a = sock({});
+      await once(a, 'token');
+      a.emit('register', { name: 'Regd', pin: '4321' });
+      const [{ session, account }] = await once(a, 'login');
+      if (account.name !== 'Regd' || account.rating !== 1500) fail('bad account ' + JSON.stringify(account));
+      const g = sock({});
+      await once(g, 'token');
+      g.emit('joinRoom', { code: 'HIDE6', name: 'regd' });
+      const [m] = await once(g, 'errorMsg');
+      if (!/registered player/.test(m)) fail('a guest took a registered name: ' + m);
+      g.emit('login', { name: 'Regd', pin: '1111' });
+      if ((await once(g, 'errorMsg'))[0] !== 'Wrong PIN.') fail('wrong PIN accepted');
+      const b = sock({ login: session });                      // first device, signed in
+      const [acct] = await once(b, 'account');
+      if (!acct || acct.name !== 'Regd') fail('session not resumed');
+      b.emit('joinRoom', { code: 'HIDE6', name: 'Someone' });
+      const [rb] = await once(b, 'room');
+      const seat = rb.mySeat;
+      if (seat === null || rb.seats[seat].name !== 'Regd' || !rb.seats[seat].verified) fail('signed-in seat wrong ' + JSON.stringify(rb.seats[seat]));
+      const c = sock({ login: session, token: 'another-device-token-0123456789' });   // second device, same account
+      await once(c, 'token');
+      c.emit('joinRoom', { code: 'HIDE6' });
+      const [rc] = await once(c, 'room');
+      if (rc.mySeat !== seat) fail('second device did not get the same seat');
+      const d = sock({ login: session.slice(0, -2) + 'zz' });  // forged session: a guest
+      if ((await once(d, 'account'))[0] !== null) fail('forged session accepted');
+      [a, g, b, c, d].forEach((x) => x.disconnect());
+      console.log('logins passed');
+    })().catch((e) => fail(e.message));
   }
   s.on('connect', () => s.emit('hello', {}));
   s.on('token', () => s.emit('createRoom', { name: 'Tester', players: 8 }));
@@ -54,7 +116,8 @@ server.listen(0, () => {
       });
       mate = io(url, { transports: ['websocket'] });     // third human, on the host's team (even seat)
       mate.on('connect', () => mate.emit('hello', {}));
-      mate.on('token', () => mate.emit('joinRoom', { code: r.code, name: 'Mate', team: 0 }));
+      mate.on('token', () => mate.emit('register', { name: 'Mate', pin: '5678' }));
+      mate.on('login', ({ account }) => { mate.pid = account.id; mate.emit('joinRoom', { code: r.code, team: 0 }); });
       mate.on('room', (mr) => {
         if (mr.mySeat !== null && mr.mySeat % 2 !== 0) { console.error('Mate should sit on team A'); process.exit(1); }
         if (mr.mySeat !== null) mate.ready = true;
@@ -86,8 +149,21 @@ server.listen(0, () => {
     }
     if (g.phase === 'handover' || g.phase === 'matchover') {
       if (g.handNo === 2 && !(g.result.conceded === 0 && concede.declined && concede.agreed)) { console.error('hand 2 should end by concede after a decline then an agree', g.result, concede); process.exit(1); }
-      if (g.handNo > hands) { hands = g.handNo; console.log(`hand ${g.handNo}:`, g.log.slice(-1)[0], 'tables', g.tables); }
-      if (hands >= 3) { console.log('socket e2e passed'); process.exit(0); }
+      if (g.handNo > hands) { hands = g.handNo; if (!g.result.void) counted++; console.log(`hand ${g.handNo}:`, g.log.slice(-1)[0], 'tables', g.tables); }
+      if (hands >= 3) {
+        const m = accounts.get(mate.pid), ms = r.seats.find((x) => x.name === 'Mate');
+        if (!ms || !ms.verified || m.hands !== counted) { console.error('Mate record wrong', m, counted, ms); process.exit(1); }
+        console.log('records in play passed', m);
+        mate.once('myHands', (rows) => {      // replay: Mate's logged hands, newest first, Mate's seat marked
+          require('fs').rmSync(process.env.HAND_LOG, { force: true });
+          const ok = rows.length === 3 && rows[0].handNo === 3 && rows.every((h) => h.seats[h.me].name === 'Mate' && h.dealt.length === 8 && !h.seats.some((x) => 'pid' in x));
+          if (!ok) { console.error('replay rows wrong', rows.map((h) => [h.handNo, h.me])); process.exit(1); }
+          console.log('replays passed');
+          console.log('socket e2e passed'); process.exit(0);
+        });
+        mate.emit('myHands');
+        return;
+      }
       if (g.phase === 'handover') s.emit('nextHand');   // host clicks Next hand
     }
     if (g.turn === r.mySeat) act(s, r);

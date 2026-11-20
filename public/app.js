@@ -7,9 +7,9 @@
   const T = window.T, Lang = window.Lang;
   const named = (o) => new Proxy(o, { get: (t, k) => T(t[k]) });   // a table of words, read in the player's language
   // each bot's temperament and which ones bid with the human-tuned numbers (keep in step with BOT_PERSONALITY and HUMAN_TUNED_BOTS in src/bot.js)
-  const BOT_CHAR = { Kuttan: 'aggressive', Ammini: 'defensive', Pappan: 'medium', Chinnu: 'aggressive', Unni: 'medium', Kunjamma: 'defensive', Appu: 'aggressive', Sarojini: 'medium', Mathai: 'defensive', Leela: 'medium', Jalaja: 'medium', Ponnappan: 'medium' };
-  const BOT_TUNED = ['Kuttan', 'Ammini', 'Unni', 'Sarojini', 'Leela'];
-  const BOT_NET = ['Jalaja', 'Ponnappan'];   // card play by a neural net (src/netplay.js); host's pick only
+  const BOT_CHAR = { Kuttan: 'aggressive', Ammini: 'defensive', Pappan: 'medium', Chinnu: 'aggressive', Unni: 'medium', Kunjamma: 'defensive', Navratilova: 'aggressive', Buffett: 'medium', Chamberlain: 'defensive', Eisenhower: 'medium', Jalaja: 'medium', Keaton: 'medium' };
+  const BOT_TUNED = ['Kuttan', 'Ammini', 'Unni', 'Buffett', 'Eisenhower'];
+  const BOT_NET = ['Jalaja', 'Keaton'];   // card play by a neural net (src/netplay.js); host's pick only
   const CHAR_NAME = named({ aggressive: 'Bold', medium: 'Steady', defensive: 'Careful' });
   const CHAR_TEXT = named({ aggressive: 'Bids often, fights for the contract and jumps to 40 when strong.', medium: 'Bids what the hand is worth and jumps only when it is sure.', defensive: 'Bids rarely and stays low, but usually makes what it bids.' });
   // the bots with their character: a list to read (lobby, table panel) or buttons to pick from (host, before the first deal)
@@ -56,12 +56,22 @@
   let chgVal = 29, chgKey = '';
   let lastPhaseKey = '';
   let chipHold = null;          // chip counts shown while the chips of a settled hand are still flying (see chipsFly)
-  const chipsNow = (g, t) => (g ? (chipHold ? chipHold[t] : g.tables[t]) : 12);
+  const chipsNow = (g, t) => (g ? (chipHold ? chipHold[t] : g.tables[t]) : (room && room.players === 8 ? 15 : 12));
   let chipPain = null;          // the paying team while its chips are being taken (its seats dim)
-  // the team's chips beside its captain: a vertical pile, one disc per chip (up to 24); the first disc is the top one
-  const towerHtml = (n) => '<i></i>'.repeat(Math.max(0, Math.min(n, 24)));
+  // the team's chips beside its captain: a vertical pile, one disc per chip (up to 30: the 8-player table holds 30 chips); the first disc is the top one
+  const towerHtml = (n) => '<i></i>'.repeat(Math.max(0, Math.min(n, 30)));
   const shedding = new Set();   // seats whose kunukku has just come off (see kunukkuSmash)
   let smashQueued = false;      // the hand-result screens will run the smash when they are done
+  // End-of-hand chain (sweep -> chips -> trophy -> smash / kayaral -> result box). While it runs the mat, log and
+  // chat keep quiet so they do not give the result away; Skip ends the whole chain, a tap ends one screen.
+  let endSeq = false, skipChain = false, chainFinish = null;
+  const holdChips = (payer, receiver, n, tables) => { chipHold = []; chipHold[payer] = tables[payer] + n; chipHold[receiver] = tables[receiver] - n; };
+  function endChain() {
+    endSeq = false; skipChain = false; chainFinish = null;
+    $('skipBtn').classList.add('hidden');
+    if (room && room.game) { renderCenter(room.game); renderRail(room.game); }
+  }
+  $('skipBtn').onclick = () => { skipChain = true; if (chainFinish) chainFinish(); };
   const socket = io({ transports: ['websocket', 'polling'] });
 
   // ------------------------------------------------------------ connection
@@ -379,6 +389,7 @@
   // Kunukku kayaral: after the champions screen a giant kunukku drops in, then one flies to every seat of the
   // losing team and lands there. The seats' own kunukkus stay hidden (#seats.kun-pending) until the landing.
   function kunukkuKayaral(team, after) {
+    if (skipChain) { $('seats').classList.remove('kun-pending'); return after && after(); }
     const old = $('kayaral'); if (old) old.remove();
     const el = document.createElement('div');
     el.id = 'kayaral'; el.className = 'kayaral';
@@ -389,6 +400,7 @@
     const land = () => { $('seats').classList.remove('kun-pending'); $('seats').classList.add('kun-landed'); setTimeout(() => $('seats').classList.remove('kun-landed'), 900); };
     const end = () => { if (done) return; done = true; land(); el.remove(); after && after(); };
     el.onclick = end;
+    chainFinish = end;
     setTimeout(() => {
       if (done) return;
       const from = el.querySelector('.kunukku').getBoundingClientRect();
@@ -414,19 +426,24 @@
     }, 1900);
   }
   if (location.hostname === 'localhost') window.demoKunukku = (t = 0) => kunukkuKayaral(t);
+  // Who takes the kunukku off: several seats at once is always one team (match won, or first hand made), else one player.
+  const shedWho = (seats) => (seats.length > 1 ? teamName(room.seats[seats[0]].team) : esc(nameOf(seats[0])));
   // Kunukku comes off: it is plucked from each seat in `shedding`, flies to the middle of the table and
-  // breaks into pieces there.
+  // breaks into pieces there, under a "Kunukku oori!" caption.
   function kunukkuSmash(after) {
     smashQueued = false;
-    const els = [...shedding].map((i) => document.querySelector(`#seats .seat[data-seat="${i}"] .kunukku`)).filter(Boolean);
+    const seats = [...shedding];
+    const els = seats.map((i) => document.querySelector(`#seats .seat[data-seat="${i}"] .kunukku`)).filter(Boolean);
     shedding.clear();
-    if (!els.length) { after && after(); return; }
+    if (!els.length || skipChain) { if (els.length) renderSeats(room.game); after && after(); return; }
     const m = $('mat').getBoundingClientRect(), cx = m.left + m.width / 2, cy = m.top + m.height / 2;
     const u = Math.min(m.width, m.height) / 4;
     const layer = document.createElement('div');
     layer.className = 'kun-smash';
-    document.body.appendChild(layer);
     const STEP = 320, FLY = 1000, rnd = (a, b) => a + Math.random() * (b - a);
+    layer.innerHTML = `<div class="kun-cap" style="left:${cx}px;top:${cy + u * .9}px;--d:${FLY}ms"><div class="kicker">${T('Kunukku oori!')}</div>
+      <div class="team t${room.seats[seats[0]].team}">${shedWho(seats)}</div></div>`;
+    document.body.appendChild(layer);
     const COLS = ['#6FB53A', '#3C8526', '#B9E36A', '#F4EFD8', '#F4EFD8', '#A39545', '#F6C59C'];
     const burst = () => {
       const ring = document.createElement('i');
@@ -465,12 +482,16 @@
       setTimeout(() => { f.remove(); burst(); }, FLY + n * STEP);
     });
     renderSeats(room.game);   // the flyers stand in for the seats' own from here
-    setTimeout(() => { layer.remove(); after && after(); }, FLY + (els.length - 1) * STEP + 1150);
+    let done = false;
+    const finish = () => { if (done) return; done = true; layer.remove(); after && after(); };
+    chainFinish = finish;
+    setTimeout(finish, FLY + (els.length - 1) * STEP + 1800);   // a little longer than the shards, to read the caption
   }
   if (location.hostname === 'localhost') window.demoSmash = (...seats) => { seats.forEach((i) => shedding.add(i)); renderSeats(room.game); kunukkuSmash(); };
   // matchWin: the big six-second "Champions" version; otherwise a shorter one for the hand's winner.
   // Clean sweep: the losing team did not take a single point. A burst of suit signs and the score slammed in.
   function sweep(team, loser, score, all56, after) {
+    if (skipChain) return after && after();
     const old = $('sweep'); if (old) old.remove();
     const el = document.createElement('div');
     el.id = 'sweep'; el.className = `sweep t${team}${all56 ? ' all' : ''}`;
@@ -485,6 +506,7 @@
     let done = false;
     const finish = () => { if (done) return; done = true; el.classList.add('out'); setTimeout(() => { el.remove(); after && after(); }, 380); };
     el.onclick = finish;
+    chainFinish = finish;
     setTimeout(finish, all56 ? 4600 : 3200);
   }
   // The chips of a settled hand are taken from the paying team's pile (beside its captain) to the receiving team's.
@@ -494,13 +516,22 @@
   function chipsFly(payer, receiver, amount, tables, after) {
     const stackOf = (t) => document.querySelector(`#seats .seat[data-seat="${t}"] .stack`);
     const from = stackOf(payer), to = stackOf(receiver);
-    if (!from || !to || !(amount > 0) || payer === receiver) return after && after();
-    chipHold = []; chipHold[payer] = tables[payer] + amount; chipHold[receiver] = tables[receiver] - amount;
+    let finished = false;
+    const finishFly = () => {
+      if (finished) return; finished = true;
+      chipHold = null; chipPain = null;
+      document.querySelectorAll('.chipfly, .chiploss').forEach((e) => e.remove());
+      if (room && room.game) { renderScores(room.game); renderSeats(room.game); }
+      after && after();
+    };
+    if (!from || !to || !(amount > 0) || payer === receiver || skipChain) return finishFly();
+    holdChips(payer, receiver, amount, tables);
     chipPain = payer;
+    chainFinish = finishFly;
     const paint = (t) => {
       const s = stackOf(t);
       if (s) { s.querySelector('b').textContent = chipHold[t]; s.querySelector('.tower').innerHTML = towerHtml(chipHold[t]); }
-      $(`tables${t}`).textContent = T('{0} chips', chipHold[t]);
+      $(`tables${t}`).textContent = chipsText(chipHold[t]);
     };
     const kick = (el, cls) => { if (!el) return; el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); };
     document.querySelectorAll(`#seats .seat.t${payer}`).forEach((e) => e.classList.add('pain'));
@@ -546,7 +577,7 @@
           chipHold[receiver] += k; paint(receiver); kick(stackOf(receiver), 'bump');
           if (i < n - 1) return;
           kick(stackOf(payer), 'slump');
-          setTimeout(() => { chipHold = null; chipPain = null; if (room && room.game) { renderScores(room.game); renderSeats(room.game); } after && after(); }, 900);
+          setTimeout(finishFly, 900);
         }, TUG + FLY);
       }, WAIT + i * STEP);
     }
@@ -557,6 +588,7 @@
   }
 
   function celebrate(team, matchWin, sub, after) {
+    if (skipChain) return after && after();
     const old = $('cheer'); if (old) old.remove();
     const el = document.createElement('div');
     el.id = 'cheer'; el.className = `cheer t${team}${matchWin ? ' match' : ''}`;
@@ -569,6 +601,7 @@
     let done = false;
     const finish = () => { if (done) return; done = true; el.classList.add('out'); setTimeout(() => { el.remove(); after && after(); }, 420); };
     el.onclick = finish;
+    chainFinish = finish;
     setTimeout(finish, matchWin ? 6000 : 3800);
   }
   if (location.hostname === 'localhost') window.demoWin = (t = 0, match = true) => celebrate(t, match, match ? 'wins the match' : 'takes 2 chips');
@@ -635,8 +668,10 @@
     $('modal').classList.remove('hidden');
     $('modal').dataset.closable = closable ? '1' : '';
     $('modalBody').querySelectorAll('[data-close]').forEach((b) => (b.onclick = closeModal));
-    $('modalBody').querySelectorAll('[data-start]').forEach((b) => (b.onclick = () => { closeModal(); socket.emit('start'); }));
-    $('modalBody').querySelectorAll('[data-next]').forEach((b) => (b.onclick = () => { closeModal(); socket.emit('nextHand'); }));
+    // Start / Next ignore taps in the first half second, so a tap meant for what was there before cannot deal a hand
+    const openedAt = Date.now(), armed = (fn) => () => { if (Date.now() - openedAt >= 500) fn(); };
+    $('modalBody').querySelectorAll('[data-start]').forEach((b) => (b.onclick = armed(() => { closeModal(); socket.emit('start'); })));
+    $('modalBody').querySelectorAll('[data-next]').forEach((b) => (b.onclick = armed(() => { closeModal(); socket.emit('nextHand'); })));
     $('modalBody').querySelectorAll('[data-hands]').forEach((b) => (b.onclick = showDealtHands));
     $('modalBody').querySelectorAll('[data-reset]').forEach((b) => (b.onclick = () => { closeModal(); socket.emit('resetChips'); }));
   }
@@ -652,16 +687,20 @@
     $('resetChipsBtn').classList.toggle('hidden', !(g && room.isHost));
     $('roomCode').textContent = room.fixed ? T('{0}-player table', room.players) : room.code;
     $('codeChip').classList.toggle('fixed', !!room.fixed);
+    // my own auction: the bid panel keeps its room until play starts, so the table does not jump on every turn
+    $('table').classList.toggle('auction', !!(g && (g.phase === 'bidding' || g.phase === 'selfraise') && room.mySeat != null));
+    $('table').classList.toggle('p8', N() === 8);
+    $('table').classList.toggle('nogame', !g);   // before the first deal there are no cards: the table takes their room
     renderScores(g);
     renderWatchers();
     renderSeats(g);
+    renderPhaseModal(g);   // before the mat and rail: a new result starts the end-of-hand chain, which keeps them quiet
     renderCenter(g);
     renderTrick(g);
     renderHand(g);
     renderBidPanel();
     renderSelfRaise();
     renderRail(g);
-    renderPhaseModal(g);
     renderConcedeModal(g);
     const myTurn = g && g.turn !== null && g.turn === room.mySeat;
     document.title = myTurn ? T('● Your turn · 56') : T('56 · Kerala card table');
@@ -680,7 +719,7 @@
   function renderScores(g) {
     for (const t of [0, 1]) {
       $(`tname${t}`).textContent = rawTeam(t);
-      $(`tables${t}`).textContent = T('{0} chips', chipsNow(g, t));
+      $(`tables${t}`).textContent = chipsText(chipsNow(g, t));
       $(`hpts${t}`).textContent = g && g.contract ? T('{0} pts', g.points[t]) : '';
     }
     const c = g && !(g.result && g.result.void) && g.contract;   // a void hand has no contract to chase
@@ -751,8 +790,11 @@
         if (s.kind === 'human' && !s.connected) meta.push(T('away'));
         const toks = [];
         if (cap) toks.push(`<span class="tok capt" title="${T('Team captain. The team chips are kept here')}">★</span>`);
-        if (g && g.dealer === s.seat) toks.push(`<span class="tok" title="${T('Dealt this hand')}">${T('deals')}</span>`);
-        if (g && g.phase !== 'handover' && g.phase !== 'matchover' && (g.dealer + 1) % N() === s.seat) toks.push(`<span class="tok" title="${T('Opens the bidding and leads the first trick')}">${T('opens')}</span>`);
+        // "deals" / "opens" matter for the auction (and "opens" until the first lead); in play they would cover the card count
+        const auction = g && (g.phase === 'bidding' || g.phase === 'selfraise');
+        const firstLead = g && g.phase === 'playing' && g.trickNo === 0 && !g.trick.cards.length;
+        if (auction && g.dealer === s.seat) toks.push(`<span class="tok" title="${T('Dealt this hand')}">${T('deals')}</span>`);
+        if ((auction || firstLead) && (g.dealer + 1) % N() === s.seat) toks.push(`<span class="tok" title="${T('Opens the bidding and leads the first trick')}">${T('opens')}</span>`);
         let actions = '';
         const seated = room.mySeat !== null;
         if (s.kind === 'bot' && !isMe)
@@ -762,7 +804,7 @@
         // any seated player (or the host) may remove / replace another player
         if (s.kind === 'human' && !isMe && (host || seated))
           actions += `<button class="btn small ghost" data-kick="${s.seat}">${g ? T('Replace with bot') : T('Remove')}</button>`;
-        body = `${s.kunukku || shedding.has(s.seat) ? `<span class="kunukku" title="${T(KUNUKKU_TIP)}">${KUNUKKU}</span>` : ''}${g ? `<span class="cnt" title="${T('Cards in hand')}">${g.handCounts[s.seat]}</span>` : ''}${toks.length ? `<div class="toks">${toks.join('')}</div>` : ''}
+        body = `${s.kunukku || shedding.has(s.seat) ? `<span class="kunukku" title="${T(KUNUKKU_TIP)}">${KUNUKKU}</span>` : ''}${g && g.phase === 'playing' && !firstLead ? `<span class="cnt" title="${T('Cards in hand')}">${g.handCounts[s.seat]}</span>` : ''}${toks.length ? `<div class="toks">${toks.join('')}</div>` : ''}
           <div class="nm">${anyBot ? T('Any bot') : esc(nameOf(s.seat))}${s.verified ? ` <span class="tick" title="${T('Registered player')}">✓</span>` : ''}${g && s.tuned ? ` <svg viewBox="0 0 16 16" width=".85em" height=".85em" fill="currentColor" style="vertical-align:-.08em"><title>${T('Bids with numbers tuned on human play')}</title><circle cx="8" cy="5" r="3.2"/><path d="M2 15c0-3.6 2.7-5.6 6-5.6s6 2 6 5.6z"/></svg>` : ''}</div>${meta.length ? `<div class="meta">${meta.join(' ')}</div>` : ''}
           ${actions ? `<div class="seat-actions">${actions}</div>` : ''}`;
       }
@@ -776,13 +818,15 @@
   }
 
   // Side seats are centred on a point near the screen edge; on a narrow phone a wide seat (name plus
-  // buttons) spills past it. Measure each one and nudge it sideways until it fits.
+  // buttons, or the kunukku hanging off its corner) spills past it. Measure each one and nudge it sideways until it fits.
   function keepSeatsOnScreen() {
     const vw = document.documentElement.clientWidth, pad = 4;
     $('seats').querySelectorAll('.seat').forEach((el) => {
       el.style.setProperty('--nudge', '0px');
-      const r = el.getBoundingClientRect();
-      const dx = r.left < pad ? pad - r.left : r.right > vw - pad ? vw - pad - r.right : 0;
+      // the seat box plus what hangs off its corners (chip pile, kunukku)
+      const boxes = [el, ...el.querySelectorAll(':scope > .kunukku, :scope > .stack')].map((e) => e.getBoundingClientRect());
+      const left = Math.min(...boxes.map((b) => b.left)), right = Math.max(...boxes.map((b) => b.right));
+      const dx = left < pad ? pad - left : right > vw - pad ? vw - pad - right : 0;
       if (dx) el.style.setProperty('--nudge', `${Math.round(dx)}px`);
     });
   }
@@ -824,7 +868,7 @@
     const n = (c.value >= 56 ? (made ? 4 : 5) : c.value >= 48 ? (made ? 3 : 4) : c.value >= 40 ? (made ? 2 : 3) : (made ? 1 : 2)) * c.mult;
     return chipsText(n);
   }
-  const chipsText = (n) => T(n > 1 ? '{0} chips' : '{0} chip', n);
+  const chipsText = (n) => T(n === 1 ? '{0} chip' : '{0} chips', n);
   // Pending concede request on my team: the proposer waits, the others answer. Opponents never get room.concede.
   let lastConcedeKey = null;
   function renderConcedeModal(g) {
@@ -847,21 +891,25 @@
       $('concedeDecline').onclick = () => socket.emit('concede', { action: 'decline' });
     }
   }
-  $('resetChipsBtn').onclick = () => openModal(`<h2>${T('Reset chips?')}</h2><p>${T('Both teams go back to 12 chips. The current hand continues.')}</p>
+  $('resetChipsBtn').onclick = () => openModal(`<h2>${T('Reset chips?')}</h2><p>${T('Both teams go back to {0} chips. The current hand continues.', room.game ? room.game.settings.startingTables : 12)}</p>
     <div class="row"><button class="btn primary" data-reset>${T('Reset')}</button><button class="btn" data-close>${T('Cancel')}</button></div>`, true);
 
   let lastHighKey = '';
   function renderCenter(g) {
     const c = $('center');
     const mi = $('matInfo');
+    // trump / lead sit in the middle of the mat while a trick is on it (no card ever lands there); above the
+    // "Trick n" line while the trick is empty. Near the edge they were hidden under cards and call bubbles.
+    $('mat').classList.toggle('trick-on', !!(g && g.phase === 'playing' && g.trick.cards.length));
     if (g && g.phase === 'playing' && g.contract) {
       const lead = g.trick.cards.length ? g.trick.cards[0].card.suit : null;
       mi.innerHTML = `<span>${g.contract.suit === 'NT' ? T('No trump') : T('Trump {0}', colourSuits(SYM[g.contract.suit]))}</span>${lead ? `<span>${T('Lead {0}', colourSuits(SYM[lead]))}</span>` : ''}`;
     } else mi.innerHTML = '';
+    c.classList.toggle('pre', !g);   // before the deal (8 players on a phone: moved below the middle seats)
     if (!g) {
       const humans = room.seats.filter((s) => s.kind === 'human').length;
       c.innerHTML = `<div class="big">${T('Table {0}', esc(room.code))}</div>
-        <div class="sub">${T(room.fixed ? '{0} of {1} seated; empty seats become bots when the host deals.' : '{0} of {1} seated. Send the code to friends; empty seats become bots when the host deals.', humans, N())}</div>
+        <div class="sub note">${T(room.fixed ? '{0} of {1} seated; empty seats become bots when the host deals.' : '{0} of {1} seated. Send the code to friends; empty seats become bots when the host deals.', humans, N())}</div>
         ${botStyleHtml()}
         ${room.isHost ? `<button class="btn primary" id="startBtn">${T('Deal the first hand')}</button>` : `<div class="sub">${T('Waiting for the host to deal.')}</div>`}`;
       const sb = $('startBtn');
@@ -898,6 +946,7 @@
       c.innerHTML = g.trick.cards.length ? '' : `<div class="sub">${g.turn === room.mySeat ? T('Trick {0} of {1} · your lead', g.trickNo + 1, g.handSize || 8) : T('Trick {0} of {1} · {2} leads', g.trickNo + 1, g.handSize || 8, esc(nameOf(g.turn)))}</div>`;
       return;
     }
+    if (endSeq && (g.phase === 'handover' || g.phase === 'matchover')) { c.innerHTML = ''; return; }   // the result screens are still playing
     if (g.phase === 'matchover') {
       c.innerHTML = `<div class="big">${T('{0} wins', teamName(g.winner))}</div>
         ${botStyleHtml()}
@@ -909,9 +958,13 @@
     }
     if (g.phase === 'handover') {
       const r = g.result;
-      const rb = bidText(r.contract.value, r.contract.suit, r.contract.hasJack);
+      const rb = bidText(r.contract.value, r.contract.suit, r.contract.hasJack).replace(/ /g, ' ');   // keep "40 ♥" on one line
+      // below 1100px the log and the review buttons live in the Chat drawer, not on the right
+      const review = window.matchMedia('(max-width: 1100px)').matches
+        ? T('Open Chat for "Last trick", "Show the hands" and the hand log.')
+        : T('Use "Last trick", "Show the hands" and the log on the right to review the hand.');
       c.innerHTML = `<div class="big">${r.void ? T('Hand void: {0} holds no {1}', teamName(r.voidTeam), SUIT_NAME[r.contract.suit]) : r.conceded != null ? T('{0} conceded {1}', teamName(r.conceded), rb) : T(r.made ? '{0} made {1}' : '{0} went down on {1}', teamName(r.contract.team), rb)}</div>
-        <div class="sub">${T('Use "Last trick", "Show the hands" and the log on the right to review the hand.')}</div>
+        <div class="sub">${review}</div>
         <button class="btn" id="handsBtn2">${T('Show the initial hands')}</button>
         ${room.isHost ? `<button class="btn primary" id="nextBtn">${T('Next hand')}</button>` : `<div class="sub">${T('The host deals the next hand.')}</div>`}`;
       const nb = $('nextBtn');
@@ -973,7 +1026,12 @@
     const g = room && room.game;
     const p = $('bidPanel');
     const mine = g && g.phase === 'bidding' && g.turn === room.mySeat && g.legal;
-    p.classList.toggle('hidden', !mine);
+    // while others call (or the declarer decides on a raise) the panel stays as an invisible placeholder, so the
+    // table keeps its size through my auction; my own self-raise panel takes its place instead
+    const srMine = g && g.phase === 'selfraise' && g.turn === room.mySeat;
+    const idle = !mine && !srMine && $('table').classList.contains('auction');
+    p.classList.toggle('hidden', !mine && !idle);
+    p.classList.toggle('idle', !!idle);
     if (!mine) return;
     const L = g.legal.bid;
     const key = `${g.handNo}:${g.bidding.actions.length}`;
@@ -1064,6 +1122,8 @@
   }
 
   function renderRail(g) {
+    // the end-of-hand screens are still playing: the log and chat wait so they do not tell the result first
+    if (endSeq && g && (g.phase === 'handover' || g.phase === 'matchover')) return;
     // Calls are remembered, not read back: during the auction the rail keeps only the latest round
     // (one call per seat); once play starts the calls are gone.
     const lines = g ? g.log : [];
@@ -1096,6 +1156,7 @@
     lastPhaseKey = key;
     if (!g || (g.phase !== 'handover' && g.phase !== 'matchover')) {
       if ($('modal').dataset.kind === 'phase') closeModal();
+      endChain();   // a new hand began while the result screens were still playing
       return;
     }
     const r = g.result, c = r.contract;
@@ -1112,11 +1173,17 @@
     }
     const bt = teamName(c.team);
     const conceded = r.conceded != null;
-    const chips = chipsText(r.amount);
+    const paid = r.paid ?? r.amount;   // a team that runs out pays only what it has left
+    const chips = chipsText(paid);
     const verdict = conceded ? T('{0} conceded', teamName(r.conceded)) : T(r.made ? '{0} made it' : '{0} went down', bt);
     const flow = r.made ? T('{0} pays {1} to {2}.', teamName(r.payer), chips, bt) : T('{0} pays {1} to {2}.', bt, chips, teamName(r.receiver));
     const over = g.phase === 'matchover';
-    const show = () => openModal(`
+    const shed = [...shedding];   // seats whose kunukku comes off with this result (set when the room arrived)
+    const shedLine = shed.length ? `<p class="kun-off">${T('{0} takes off the kunukku.', shedWho(shed))}</p>` : '';
+    const show = () => {
+      endChain();
+      if (lastPhaseKey !== key) return;   // the table moved on to a new hand meanwhile
+      openModal(`
       <h2>${verdict}</h2>
       <p>${T('{0} bid {1}{2}. ', esc(nameOf(c.seat)), bidText(c.value, c.suit, c.hasJack), c.mult > 1 ? ` ×${c.mult}` : '')}${flow}</p>
       ${!conceded && g.trickNo < (g.handSize || 8) ? `<p class="sub">${T(r.made ? 'Stopped after trick {0}: target reached.' : 'Stopped after trick {0}: target out of reach.', g.trickNo)}</p>` : ''}
@@ -1126,6 +1193,7 @@
         <span>${T('{0} chips', teamName(0))}</span><span class="v">${g.tables[0]}</span>
         <span>${T('{0} chips', teamName(1))}</span><span class="v">${g.tables[1]}</span>
       </div>
+      ${shedLine}
       ${over ? `<p><b>${T('{0} wins the match.', teamName(g.winner))}</b></p>
         <p class="kun-line"><span class="kunukku big">${KUNUKKU}</span><span><b>${T('{0} wears the kunukku.', teamName(1 - g.winner))}</b><span class="how"><br>${T('Bid and win the first hand of the next match and the whole team takes it off. After that, each player sheds their own by bidding and making a contract.')}</span></span></p>` : room.isHost ? '' : `<p class="sub">${T('The host deals the next hand.')}</p>`}
       <div class="row">
@@ -1134,10 +1202,21 @@
         ${!over && room.isHost ? `<button class="btn primary" data-next>${T('Next hand')}</button>` : ''}
         <button class="btn" data-close>${T('Close')}</button>
       </div>`, true, 'phase');
+    };
+    // Seen already (the page was reloaded in this state): straight to the result box, no replay of the screens.
+    // handNo starts again each match, so the key also carries the chips and points.
+    const seenKey = `${room.code}:${key}:${g.tables.join('-')}:${r.points.join('-')}`;
+    let seen = false;
+    try { seen = sessionStorage.getItem('g56endseen') === seenKey; sessionStorage.setItem('g56endseen', seenKey); } catch { /* private mode */ }
+    if (seen) { shedding.clear(); return show(); }
     smashQueued = true;
+    endSeq = true; skipChain = false;
+    $('skipBtn').classList.remove('hidden');
+    // the chips on show stay at their old counts until they fly (the server has already moved them)
+    if (paid > 0 && r.payer != null) { holdChips(r.payer, r.receiver, paid, g.tables); chipPain = null; renderScores(g); renderSeats(g); }
     // first the surprise when the losers took no point at all, then the chips change hands, then the trophy
     const swept = !conceded && r.points[r.payer] === 0 && r.points[r.receiver] > 0;
-    const pay = (next) => chipsFly(r.payer, r.receiver, r.amount, g.tables, next);
+    const pay = (next) => chipsFly(r.payer, r.receiver, paid, g.tables, next);
     const first = (next) => (swept ? sweep(r.receiver, r.payer, `${r.points[r.receiver]} – 0`, c.value === 56 && r.made, () => pay(next)) : pay(next));
     if (over) { $('seats').classList.add('kun-pending'); first(() => celebrate(g.winner, true, T('wins the match'), () => kunukkuSmash(() => kunukkuKayaral(1 - g.winner, show)))); }
     else first(() => celebrate(r.receiver, false, conceded ? T('takes {0} as {1} concedes', chips, teamName(r.conceded)) : r.made ? T('made {0} and takes {1}', esc(bidText(c.value, c.suit, c.hasJack)), chips) : T('set {0} and takes {1}', teamName(c.team), chips), () => kunukkuSmash(show)));

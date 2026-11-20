@@ -22,7 +22,7 @@ const MIN_BID = 28;
 const MAX_BID = 56;
 
 const DEFAULT_SETTINGS = {
-  startingTables: 12,      // tables (kuttu) each team starts with
+  startingTables: null,    // tables (kuttu) each team starts with; null = 12 at 6 players, 15 at 8
   redoubleMultiplier: 4,   // some groups use 3
   selfRaiseNextLevel: true, // raising your own standing bid must reach the next level (40/48/56)
   players: 6               // 6 (3 vs 3, 48 cards) or 8 (4 vs 4, 64 cards with the 8s and 7s); 8 cards each
@@ -73,6 +73,7 @@ function nextLevelAbove(value) {
 function newMatch(settings = {}, rng = Math.random) {
   const s = { ...DEFAULT_SETTINGS, ...settings };
   if (s.players !== 6 && s.players !== 8) throw new Error('players must be 6 or 8');
+  if (s.startingTables == null) s.startingTables = s.players === 8 ? 15 : 12;
   const state = {
     settings: s,
     phase: 'bidding',
@@ -438,7 +439,7 @@ function finishAuction(state) {
   // Invalid hand: the defending team holds no card of the trump suit. No chips move; the deal passes on.
   const suit = b.high.suit, defenders = 1 - team(b.high.seat);
   if (suit !== 'NT' && !state.hands.some((h, s) => team(s) === defenders && h.some((c) => c.suit === suit))) {
-    state.result = { void: true, voidTeam: defenders, contract: state.contract, made: false, points: [0, 0], amount: 0, payer: null, receiver: null };
+    state.result = { void: true, voidTeam: defenders, contract: state.contract, made: false, points: [0, 0], amount: 0, paid: 0, payer: null, receiver: null };
     state.history.push({ hand: state.handNo, ...state.result });
     state.log.push(`Hand void: Team ${'AB'[defenders]} holds no ${{ S: 'Spades', H: 'Hearts', D: 'Diamonds', C: 'Clubs' }[suit]}. No chips change; the deal passes on.`);
     state.phase = 'handover';
@@ -545,14 +546,15 @@ function settle(state, made, conceded = null) {
   state.tables[payer] -= paid;
   state.tables[receiver] += paid;
 
-  state.result = { contract: c, made, points: state.points.slice(), amount, payer, receiver };
+  // amount = the stake; paid = the chips that actually moved (less when the payer runs out and the match ends)
+  state.result = { contract: c, made, points: state.points.slice(), amount, paid, payer, receiver };
   if (conceded !== null) state.result.conceded = conceded;
   state.history.push({ hand: state.handNo, ...state.result });
   state.log.push(conceded !== null
-    ? `Team ${'AB'[conceded]} conceded — pays ${amount} chip(s).`
+    ? `Team ${'AB'[conceded]} conceded — pays ${paid} chip(s).`
     : made
-      ? `Team ${'AB'[bidTeam]} made ${c.value} with ${state.points[bidTeam]} — receives ${amount} chip(s).`
-      : `Team ${'AB'[bidTeam]} fell short of ${c.value} with ${state.points[bidTeam]} — pays ${amount} chip(s).`);
+      ? `Team ${'AB'[bidTeam]} made ${c.value} with ${state.points[bidTeam]} — receives ${paid} chip(s).`
+      : `Team ${'AB'[bidTeam]} fell short of ${c.value} with ${state.points[bidTeam]} — pays ${paid} chip(s).`);
 
   if (paid < amount || state.tables[payer] <= 0) {
     state.phase = 'matchover';

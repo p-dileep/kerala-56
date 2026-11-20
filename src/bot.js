@@ -114,15 +114,15 @@ const STYLES = {
 };
 // Each named bot has its own temperament; the host's table setting 'mixed' uses these.
 const BOT_PERSONALITY = { Kuttan: 'aggressive', Ammini: 'defensive', Pappan: 'medium', Chinnu: 'aggressive', Unni: 'medium',
-  Kunjamma: 'defensive', Appu: 'aggressive', Sarojini: 'medium', Mathai: 'defensive', Leela: 'medium',
-  Jalaja: 'medium', Ponnappan: 'medium' };   // pick-only: rule bidding, card play by a neural net (src/netplay.js)
+  Kunjamma: 'defensive', Navratilova: 'aggressive', Buffett: 'medium', Chamberlain: 'defensive', Eisenhower: 'medium',
+  Jalaja: 'medium', Keaton: 'medium' };   // pick-only: rule bidding, card play by a neural net (src/netplay.js)
 // Human-tuned bidding: test/imitate.js fits the bidding knobs to the humans' calls in the logged hands
 // (data/hands.jsonl). Half of the named bots always carry these numbers (as shifts on top of their style),
 // the other half keep the self-play numbers, so live play keeps comparing the two. Retune as hands accumulate;
 // keep HUMAN_TUNED_BOTS fixed so the comparison stays clean. Tuned 2026-11-10 on 261 hands / 1294 decisions.
 const HUMAN_TUNED = { estBase: 25, estLenW: 2.25, estJackW: 2, plusMaxValue: 38, nsMargin: -2, bidContestMargin: 1,
   readJackW: 2.5, readLenW: 1.5, simMinValue: 34 };
-const HUMAN_TUNED_BOTS = new Set(['Kuttan', 'Ammini', 'Unni', 'Sarojini', 'Leela']);
+const HUMAN_TUNED_BOTS = new Set(['Kuttan', 'Ammini', 'Unni', 'Buffett', 'Eisenhower']);
 // Self-play half (the named bots not in HUMAN_TUNED_BOTS): numbers found by duplicate self-play
 // (test/par.js). leadW 2 gained 0.030 +/- 0.009 chips per hand over 4000 deals (2026-11-12).
 // competeEv 0.05 gained 0.092 +/- 0.013 over 3000 deals (defensive +0.11, medium +0.06, aggressive level).

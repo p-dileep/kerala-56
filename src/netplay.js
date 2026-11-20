@@ -1,6 +1,6 @@
 'use strict';
 /**
- * Card play of the neural bots (Jalaja, Ponnappan): a small neural net (trained off-line by self-play search, see the git-ignored neural/
+ * Card play of the neural bots (Jalaja, Keaton): a small neural net (trained off-line by self-play search, see the git-ignored neural/
  * folder, round 2) picks the card. Bidding stays with the rule bot (bot.js). Weights: cardnet.bin + cardnet.json.
  * Trained on 6-player tables only: at 8 players choose() returns null and the rule bot plays.
  * Same features as neural/common.js encode(): keep the two in step.
@@ -10,7 +10,7 @@ const path = require('path');
 const E = require('./engine');
 const B = require('./bot');
 
-const NAMES = ['Jalaja', 'Ponnappan'];   // same net; pick-only bots
+const NAMES = ['Jalaja', 'Keaton'];   // same net; pick-only bots
 const NT = 32;
 const RANK_IDX = Object.fromEntries(E.RANKS_8P.map((r, i) => [r, i]));
 const LAYOUT = [

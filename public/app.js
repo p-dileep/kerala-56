@@ -492,7 +492,7 @@
   // (it wobbles, resists, then is yanked away), their pile flinches and a red "−1" rises; at the end their pile slumps.
   // The server has already moved the chips, so the old counts are held meanwhile (chipHold).
   function chipsFly(payer, receiver, amount, tables, after) {
-    const stackOf = (t) => document.querySelector(`#seats .seat[data-seat="${t}"] .stack`);
+    const stackOf = (t) => document.querySelector(`#seats .seat[data-seat="${capSeat(t)}"] .stack`);
     const from = stackOf(payer), to = stackOf(receiver);
     if (!from || !to || !(amount > 0) || payer === receiver) return after && after();
     chipHold = []; chipHold[payer] = tables[payer] + amount; chipHold[receiver] = tables[receiver] - amount;
@@ -590,6 +590,9 @@
   function rel(seat) { return room.mySeat === null ? seat : (seat - room.mySeat + N()) % N(); }
   const seatPos = () => N() === 8 ? (narrow() ? SEAT_POS8_NARROW : SEAT_POS8) : (narrow() ? SEAT_POS_NARROW : SEAT_POS);
   const trickPos = () => (N() === 8 ? TRICK_POS8 : TRICK_POS);
+  // The team's captain seat: 0 (Team A) and 3 (Team B), so the chips fly across the table. 6 players: facing each other;
+  // 8 players: a diagonal (the seats straight across and corner to corner are on the same team there).
+  const capSeat = (team) => team * 3;
   // hasJack=false renders suit-first ("Hearts 30"): the caller lacks the Jack of that suit.
   // Bid buttons and seat bubbles: the suit name sits next to its sign, keeping the Jack order ("31 Spade ♠" / "Spade ♠ 31"). Returns HTML.
   const SUIT_ONE = named({ S: 'Spade', H: 'Heart', D: 'Diamond', C: 'Club' });
@@ -709,8 +712,8 @@
       const isMe = s.seat === room.mySeat;
       const cls = ['seat', `t${s.team}`];
       if (s.kind === 'empty') cls.push('empty');
-      // seats 1 and 2 are the captains' seats (one per team): a marker only, the team's chips are kept beside them
-      const cap = s.seat < 2;
+      // one captain's seat per team (capSeat): a marker only, the team's chips are kept beside them
+      const cap = s.seat === capSeat(s.team);
       if (cap) cls.push('cap');
       const stack = cap ? `<span class="stack" title="${T('Team captain. The team chips are kept here')}"><b>${chipsNow(g, s.team)}</b><span class="tower">${towerHtml(chipsNow(g, s.team))}</span></span>` : '';
       if (g && chipPain === s.team) cls.push('pain');

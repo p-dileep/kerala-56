@@ -41,6 +41,16 @@ const { HUMAN_TUNED_BOTS } = require('../src/bot');
     a = acc.get(id);
     assert.deepEqual([a.hands, a.hands_won, a.bids], [2, 1, 1]);
     assert.ok(a.rating < 1508 && a.rating > 1490);
+    { // the rating moves by K per chip at stake, capped at 5 chips
+      const { id: w } = await acc.register('Rec Stake', '1234');
+      const ws = [{}, { pid: w }, {}, {}, {}, {}];
+      acc.recordHand(ws, { receiver: 1, made: true, amount: 3, contract: { seat: 1 } });
+      assert.equal(acc.get(w).rating, 1524);                           // 16 x 3 x (1 - 0.5)
+      const before = acc.get(w).rating;
+      acc.recordHand(ws, { receiver: 0, made: false, amount: 20, contract: { seat: 1 } });
+      const drop = before - acc.get(w).rating;
+      assert.ok(drop > 40 && drop <= 80);                              // redoubled 56 down: capped at 5 chips
+    }
     const s1 = (await acc.login('REC ONE', '1234')).session;
     assert.equal(acc.resume(s1), id);
     assert.equal(acc.resume(s1.slice(0, -1) + 'x'), null);

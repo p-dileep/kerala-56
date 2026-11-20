@@ -37,7 +37,7 @@ Run a **single** process. Rooms are held in memory. A restart ends the tables in
 | `LOGIN_SECRET` | derived from the Supabase key | Signs the sessions of registered players (name + PIN) |
 | `PLAYERS_FILE` | `data/local_players.json` | Player accounts when Supabase is not set (`off` = memory only) |
 
-**Registered players (optional):** a player name + 4-8 digit PIN keeps a record across devices: rating (Elo per hand), hands, bids and matches won, and a replay of the last 5 hands. Guests play as before but cannot sit under a registered name. Accounts live in the Supabase table `players` (SQL in `docs/claude-plans/2026-11-20_site-logins.md`).
+**Registered players (optional):** a player name + 4-8 digit PIN keeps a record across devices: rating (Elo per hand, 16 points per chip at stake, up to 5 chips), hands, bids and matches won, and a replay of the last 5 hands. Guests play as before but cannot sit under a registered name. Accounts live in the Supabase table `players` (SQL in `docs/claude-plans/2026-11-20_site-logins.md`).
 
 ## Rules implemented (`src/engine.js`)
 - 48 cards (J 9 A 10 K Q ×2 packs); the 8-player table adds 8 and 7 ×2 packs below the Queen, worth nothing. Points: J 3, 9 2, A 1, 10 1 = 56. Teams sit alternately.

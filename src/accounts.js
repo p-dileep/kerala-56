@@ -8,7 +8,9 @@ const path = require('path');
 const crypto = require('crypto');
 
 const STATS = ['rating', 'hands', 'hands_won', 'bids', 'bids_made', 'matches', 'matches_won'];
-const ELO_K = 16, BASE = 1500;
+// Elo per hand, weighted by the stake: K points per chip the hand was played for (a 28 made = 1 chip,
+// a 56 down = 5, doubles included), capped at ELO_MAX_CHIPS so a redoubled 56 cannot swing a rating by hundreds.
+const ELO_K = 16, ELO_MAX_CHIPS = 5, BASE = 1500;
 const LOCK_FAILS = 5, LOCK_MS = 15 * 60 * 1000;
 
 const nameKey = (n) => String(n || '').trim().replace(/\s+/g, ' ').toLowerCase();
@@ -171,13 +173,14 @@ function makeAccounts({ url = '', key = '', file = '', secret = '', reserved = [
     const rating = (s) => (s.pid && byId.has(s.pid) ? byId.get(s.pid).rating : BASE);
     const teamAvg = (t) => { const xs = seats.filter((s, i) => i % 2 === t).map(rating); return xs.reduce((a, b) => a + b, 0) / xs.length; };
     const avg = [teamAvg(0), teamAvg(1)];
+    const weight = Math.min(Math.max(result.amount || 1, 1), ELO_MAX_CHIPS);   // chips at stake (conceded: the normal stake)
     const changed = [];
     seats.forEach((s, i) => {
       const rec = s.pid && byId.get(s.pid);
       if (!rec) return;
       const t = i % 2, won = result.receiver === t;
       const expect = 1 / (1 + 10 ** ((avg[1 - t] - avg[t]) / 400));
-      rec.rating += ELO_K * ((won ? 1 : 0) - expect);
+      rec.rating += ELO_K * weight * ((won ? 1 : 0) - expect);
       rec.hands++;
       if (won) rec.hands_won++;
       if (result.contract && result.contract.seat === i) { rec.bids++; if (result.made) rec.bids_made++; }

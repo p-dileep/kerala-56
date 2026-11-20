@@ -106,7 +106,7 @@
         <h2 class="acct-title">${T('Sign in / Register')}</h2>
         <p class="lede">${T('Keep your record (rating, hands, matches) on any device.')}</p>
         <p class="hint">${T('No email needed. Pick a player name and a PIN of 4 to 8 digits. Use the same two on any phone or computer and your record follows you. Nobody else can sit under a registered name.')}</p>
-        <p class="pin-warn">⚠ ${T('Do not use your ATM PIN or any other important PIN, as it can be viewed by the admin.')}</p>
+        <p class="pin-warn">⚠ ${T('Use a PIN only for this game, never your ATM PIN or any other important PIN. PINs are stored scrambled, but a short PIN can still be worked out.')}</p>
         <label class="field"><span>${T('Player name')}</span><input id="acctName" maxlength="18" autocomplete="username" value="${esc($('nameInput').value.trim())}"></label>
         <label class="field"><span>${T('PIN (4 to 8 digits)')}</span><input id="acctPin" type="password" inputmode="numeric" maxlength="8" autocomplete="current-password"></label>
         <div class="acct-actions"><button type="button" class="btn primary" id="acctLogin">${T('Sign in')}</button><button type="button" class="btn" id="acctNew">${T('Register this name')}</button></div>`;

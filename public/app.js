@@ -824,13 +824,14 @@
   // buttons, or the kunukku hanging off its corner) spills past it. Measure each one and nudge it sideways until it fits.
   function keepSeatsOnScreen() {
     const vw = document.documentElement.clientWidth, pad = 4;
+    const zoom = parseFloat(getComputedStyle($('table')).zoom) || 1;   // big screens zoom the table: --nudge is in its own px
     $('seats').querySelectorAll('.seat').forEach((el) => {
       el.style.setProperty('--nudge', '0px');
       // the seat box plus what hangs off its corners (chip pile, kunukku)
       const boxes = [el, ...el.querySelectorAll(':scope > .kunukku, :scope > .stack')].map((e) => e.getBoundingClientRect());
       const left = Math.min(...boxes.map((b) => b.left)), right = Math.max(...boxes.map((b) => b.right));
       const dx = left < pad ? pad - left : right > vw - pad ? vw - pad - right : 0;
-      if (dx) el.style.setProperty('--nudge', `${Math.round(dx)}px`);
+      if (dx) el.style.setProperty('--nudge', `${Math.round(dx / zoom)}px`);
     });
   }
 

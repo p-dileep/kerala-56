@@ -13,6 +13,7 @@
   --cw: clamp(46px, 7.2vw, 78px);
   --radius-card: 7px;
   --rail: 300px;
+  --rail-now: var(--rail);   /* the rail column's width, 0 when the rail is a drawer (<= 1100px) */
   font-family: 'Manjari', system-ui, sans-serif;
   color: var(--mist);
   background: radial-gradient(120% 90% at 50% 40%, #13505A 0%, var(--kayal) 45%, var(--kayal-deep) 100%);
@@ -114,9 +115,13 @@ select option { background: var(--kayal-deep, #0b2f35); color: var(--ivory); }
 .team-score .tables { font-size: 1.15rem; font-weight: 700; color: var(--ivory); }
 .team-score .hpts { font-size: .85rem; opacity: .8; }
 
-.arena { grid-area: arena; position: relative; min-height: 0; margin: 4px 70px 10px; }
+/* The mat and the seats share one stage: the arena's full height, and its width capped at --stage-ratio times
+   that height, centred. Without the cap a short, wide screen (a laptop at 125%, the bid panel open) stretched
+   the oval into a flat strip with the seats piled on its rim. Narrow screens are unaffected (the cap never bites). */
+.arena { grid-area: arena; position: relative; min-height: 0; margin: 4px 70px 10px; container-type: size;
+  --stage-ratio: 2.5; --sw: min(100cqw, 100cqh * var(--stage-ratio)); }
 .mat {
-  position: absolute; inset: 9% 6% 9%;
+  position: absolute; inset: 9% calc(50% - var(--sw) * .44);
   border-radius: 50%;
   background:
     repeating-linear-gradient(90deg, rgba(110,72,26,.22) 0 2px, transparent 2px 13px),
@@ -150,7 +155,7 @@ select option { background: var(--kayal-deep, #0b2f35); color: var(--ivory); }
 .center .who.t1 { color: #7a1420; background: rgba(194,57,74,.30); }
 
 /* seats */
-#seats { position: absolute; inset: 0; pointer-events: none; }
+#seats { position: absolute; top: 0; bottom: 0; left: calc(50% - var(--sw) / 2); width: var(--sw); pointer-events: none; }
 .seat {
   position: absolute; transform: translate(calc(-50% + var(--nudge, 0px)), -50%); pointer-events: auto;
   min-width: 128px; padding: 8px 12px 6px; border-radius: 14px;
@@ -469,6 +474,7 @@ body.four .log .su-C { color: #8FD9A8 !important; }
 
 /* ---------------------------------------------------------- responsive */
 @media (max-width: 1100px) {
+  :root { --rail-now: 0px; }
   #table { grid-template-columns: minmax(0, 1fr); grid-template-areas: "top" "arena" "bid" "hand"; }
   .chip.icon { display: inline-block; }
   .scores { margin-left: 0; }
@@ -483,7 +489,7 @@ body.four .log .su-C { color: #8FD9A8 !important; }
 @media (max-width: 700px) {
   :root { --cw: clamp(38px, 11.4vw, 60px); }
   .arena { margin: 0 8px 4px; }
-  .mat { inset: 12% 10% 12%; }
+  .mat { inset: 12% calc(50% - var(--sw) * .40); }
   .seat { min-width: 0; padding: 5px 8px 3px; font-size: .85rem; }
   .seat .nm { max-width: 84px; }
   .seat .seat-actions { gap: 4px; margin-top: 4px; }
@@ -521,8 +527,8 @@ body.four .log .su-C { color: #8FD9A8 !important; }
   .team-score .tables { font-size: .95rem; }
   .scores { margin-left: auto; }
   .chip.icon { display: inline-block; margin-left: 0; }
-  .arena { margin: 0 56px 2px; }
-  .mat { inset: 6% 3%; }
+  .arena { margin: 0 56px 2px; --stage-ratio: 99; }   /* a phone on its side keeps the full-width oval */
+  .mat { inset: 6% calc(50% - var(--sw) * .47); }
   .mat-info { font-size: .78rem; }
   .center .bidval { font-size: clamp(24px, 7vh, 40px); }
   .center .sub { font-size: .82rem; margin-top: 2px; }
@@ -556,9 +562,28 @@ body.four .log .su-C { color: #8FD9A8 !important; }
   .bid-panel { left: auto; right: 6px; top: 40px; bottom: 6px; transform: none; width: min(330px, 42vw); overflow-y: auto; align-content: start; min-height: 0; }
   .bid-panel .suits { grid-template-columns: repeat(3, 1fr); }
   .bid-panel .raise { flex-wrap: wrap; }
-  #table.auction .arena { margin-right: calc(min(330px, 42vw) + 14px); }
+  #table.auction .arena { margin-right: calc(min(330px, 42vw) + 44px); }   /* + room for the 8-player side seat past the oval */
   #table.auction .hand { margin-right: calc(min(330px, 42vw) + 6px); }
 }
+/* Short screens wider than a phone (a laptop at 125% or 150%, a tablet on its side): the bid panel docks on the
+   right of the table instead of taking ~250px of height under it, which squeezed the mat into a flat strip.
+   A fixed panel leaves the grid, so its row collapses; during the auction the arena leaves room beside it. */
+@media (min-width: 701px) and (min-height: 521px) and (max-height: 820px) {
+  :root { --cw: clamp(46px, min(7.2vw, 10vh), 78px); }   /* cards follow the height too, so tricks fit the shorter mat */
+  .bid-panel { position: fixed; right: calc(var(--rail-now) + 10px); top: 58px; bottom: calc(var(--cw) * 1.42 + 38px);
+    width: min(380px, 34vw); margin: 0; min-height: 0; overflow-y: auto; align-content: start; z-index: 6; }
+  .bid-panel .suits { grid-template-columns: repeat(3, 1fr); }
+  .bid-panel .raise { flex-wrap: wrap; }
+  .bid-panel .suits .btn { font-size: 1rem; }   /* "Diamond ♦ 33" on one line in the narrow panel */
+  #table.auction .arena { margin-right: calc(min(380px, 34vw) + 80px); }   /* + room for the right-hand seats past the oval */
+}
+/* Big screens: the table view is zoomed as a whole (cards, seats, text and rail), in steps, so a 1440p or 4K
+   monitor does not show laptop-sized cards around a huge empty mat. The height is divided back so the
+   zoomed view still fills the window exactly. */
+@media (min-width: 1800px) and (min-height: 1000px) { #table { zoom: 1.15; height: calc(100dvh / 1.15); } .modal { zoom: 1.15; } .modal-card { max-height: calc(100dvh / 1.15 - 24px); } }
+@media (min-width: 2200px) and (min-height: 1180px) { #table { zoom: 1.35; height: calc(100dvh / 1.35); } .modal { zoom: 1.35; } .modal-card { max-height: calc(100dvh / 1.35 - 24px); } }
+@media (min-width: 2800px) and (min-height: 1500px) { #table { zoom: 1.7; height: calc(100dvh / 1.7); } .modal { zoom: 1.7; } .modal-card { max-height: calc(100dvh / 1.7 - 24px); } }
+@media (min-width: 3600px) and (min-height: 1900px) { #table { zoom: 2.1; height: calc(100dvh / 2.1); } .modal { zoom: 2.1; } .modal-card { max-height: calc(100dvh / 2.1 - 24px); } }
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }
 }

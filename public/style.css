@@ -245,6 +245,7 @@ button, input { font: inherit; }
 .acct-back { justify-self: start; }
 .acct-title { margin: 0; font-size: clamp(26px, 7vw, 36px); color: var(--ivory); }
 .acct-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.pin-warn { margin: 0; padding: 8px 12px; border-radius: 10px; background: rgba(196,22,28,.18); border: 1px solid rgba(240,120,120,.45); color: #FFD9D4; font-size: .92rem; line-height: 1.45; }
 .acct-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
 .acct-tile { display: grid; gap: 2px; padding: 12px 14px; border-radius: 12px; background: rgba(8,42,48,.8); border: 1px solid rgba(207,227,226,.25); }
 .acct-tile b { font-size: 1.8rem; line-height: 1.1; color: var(--kasavu); }

@@ -375,6 +375,8 @@ io.on('connection', (socket) => {
     socket.emit('token', socket.data.guest);
     socket.emit('account', pid ? accounts.get(pid) : null, accounts.ready());   // ready: a null means the session is gone
     socket.emit('lobby', lobbyInfo());
+    // the record may have grown on the other server (Render / play56.in) since this one read it
+    if (pid) accounts.refresh(pid).then((a) => { if (a && socket.connected && socket.data.pid === pid) socket.emit('account', a, true); });
   });
 
   // Register (new name) or sign in (existing name) with a PIN; lobby only.

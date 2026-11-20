@@ -22,6 +22,12 @@ Logins are not meant to be strict: they exist so players keep a game record (rat
   end). Only hands logged after this change carry `pid`, so replays start empty. If the `hands` table grows large:
   `create index on hands using gin (seats jsonb_path_ops);`
 
+### Two servers on one table (2026-11-20)
+play56.in and the Render copy share the Supabase `players` table; each server keeps only a cache. A name the
+cache lacks is looked up at sign-in (and after a 409 on register), a signed-in player's record is re-read on every
+reconnect (`refresh`, server `hello`), and the list of registered names is re-read every 5 minutes for the guest
+name check. Left open: one player playing on both sites at the same moment can still overwrite one site's update.
+
 ### Built (2026-11-20)
 - `src/accounts.js` (new): store (Supabase / file / memory), scrypt PIN, signed session, PIN lock, `recordHand` (Elo).
 - `src/server.js`: `hello {login}`, `register`, `login`, `logout`, `myHands`; seats carry `pid`, `publicSeats.verified`;

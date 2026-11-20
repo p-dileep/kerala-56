@@ -24,36 +24,68 @@ async function pinMatches(pin, stored) {
   return crypto.timingSafeEqual(Buffer.from(again), Buffer.from(hash));
 }
 
-function makeAccounts({ url = '', key = '', file = '', secret = '', reserved = [] } = {}) {
+// The shared store when more than one server keeps accounts (play56.in and the Render copy): Supabase table `players`.
+function supabaseRemote(url, key) {
+  const rest = async (q, opts = {}) => {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 5000);
+    try {
+      return await fetch(`${url}/rest/v1/players${q}`, {
+        ...opts, signal: ctrl.signal,
+        headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', ...(opts.headers || {}) }
+      });
+    } finally { clearTimeout(t); }
+  };
+  const rows = async (q) => { const r = await rest(q); if (!r.ok) throw new Error(`players ${r.status}`); return r.json(); };
+  return {
+    all: () => rows('?select=*'),
+    keys: () => rows('?select=id,name_key'),
+    one: async (col, val) => (await rows(`?${col}=eq.${encodeURIComponent(val)}&select=*`))[0] || null,
+    async insert(rec) {
+      const r = await rest('', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(rec) });
+      if (r.status === 409) return { conflict: true };
+      if (!r.ok) throw new Error(`players insert ${r.status}`);
+      return { row: (await r.json())[0] };
+    },
+    async patch(id, body) {
+      const r = await rest(`?id=eq.${id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(body) });
+      if (!r.ok) throw new Error(`players save ${r.status}`);
+    }
+  };
+}
+
+// remote: the shared store (Supabase, or a fake in the tests); without one, `file` (local server) or memory.
+// With a remote this server's copy is only a cache: unknown names are looked up, a player's record is
+// re-read when they sign in or reconnect, and the list of registered names is re-read every few minutes.
+function makeAccounts({ url = '', key = '', file = '', secret = '', reserved = [], remote = null, namesEveryMs = 5 * 60 * 1000 } = {}) {
+  remote = remote || (url ? supabaseRemote(url, key) : null);
   const byId = new Map(), byKey = new Map();
+  const heldKeys = new Set();   // names registered elsewhere that this server has not loaded yet
   const fails = new Map();      // name_key -> { n, until }
   const reservedKeys = new Set(reserved.map(nameKey));
   const hmacKey = secret || (key ? crypto.createHash('sha256').update('play56-login:' + key).digest() : crypto.randomBytes(32));
   let ready = false;
 
-  const rest = (q, opts = {}) => {
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 5000);
-    return fetch(`${url}/rest/v1/players${q}`, {
-      ...opts, signal: ctrl.signal,
-      headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', ...(opts.headers || {}) }
-    }).finally(() => clearTimeout(t));
+  // a row from the store: update the cached record in place (callers may hold it), or add it
+  const keep = (row) => {
+    const rec = byId.has(row.id) ? Object.assign(byId.get(row.id), row) : row;
+    byId.set(rec.id, rec); byKey.set(rec.name_key, rec); heldKeys.delete(rec.name_key);
+    return rec;
   };
-  const keep = (rec) => { byId.set(rec.id, rec); byKey.set(rec.name_key, rec); return rec; };
   const saveFile = () => {
     if (!file) return;
     fs.mkdir(path.dirname(file), { recursive: true }, () =>
       fs.writeFile(file, JSON.stringify([...byId.values()], null, 1), () => {}));
   };
+  const fetchOne = (col, val) => (remote ? remote.one(col, val).then((row) => (row ? keep(row) : null)).catch(() => null) : Promise.resolve(null));
+  const loadNames = () => remote.keys().then((ks) => ks.forEach((x) => { if (!byKey.has(x.name_key)) heldKeys.add(x.name_key); })).catch(() => {});
 
   async function load() {
     try {
-      if (url) {
-        const r = await rest('?select=*');
-        if (!r.ok) throw new Error(`players load ${r.status}`);
-        (await r.json()).forEach(keep);
-      } else if (file && fs.existsSync(file)) JSON.parse(fs.readFileSync(file, 'utf8')).forEach(keep);
+      if (remote) (await remote.all()).forEach(keep);
+      else if (file && fs.existsSync(file)) JSON.parse(fs.readFileSync(file, 'utf8')).forEach(keep);
       ready = true;
+      if (remote) setInterval(loadNames, namesEveryMs).unref();
     } catch (err) {
       console.error('accounts unavailable:', err.message);
       setTimeout(load, 60 * 1000).unref();
@@ -78,19 +110,21 @@ function makeAccounts({ url = '', key = '', file = '', secret = '', reserved = [
     if (c.err) return c;
     if (!/^\d{4,8}$/.test(String(pin || ''))) return { err: 'The PIN must be 4 to 8 digits.' };
     const k = nameKey(c.name);
-    if (byKey.has(k)) return { err: 'That name is already registered. Sign in instead.' };
+    const taken = { err: 'That name is already registered. Sign in instead.' };
+    if (byKey.has(k)) return taken;
     const rec = { name: c.name, name_key: k, pin_hash: await scryptHash(pin), rating: BASE, hands: 0, hands_won: 0, bids: 0, bids_made: 0, matches: 0, matches_won: 0 };
-    if (url) {
-      const r = await rest('', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(rec) }).catch(() => null);
-      if (!r || !r.ok) return { err: r && r.status === 409 ? 'That name is already registered. Sign in instead.' : 'Sign-in is not available right now.' };
-      keep((await r.json())[0]);
+    let out;
+    if (remote) {
+      const r = await remote.insert(rec).catch(() => null);
+      if (!r) return { err: 'Sign-in is not available right now.' };
+      if (r.conflict) { await fetchOne('name_key', k); return taken; }   // registered on the other server
+      out = keep(r.row);
     } else {
       rec.id = byId.size ? Math.max(...byId.keys()) + 1 : 1;
       rec.created_at = new Date().toISOString();
-      keep(rec);
+      out = keep(rec);
       saveFile();
     }
-    const out = byKey.get(k);
     return { account: publicView(out), session: sign(out), id: out.id };
   }
 
@@ -99,11 +133,9 @@ function makeAccounts({ url = '', key = '', file = '', secret = '', reserved = [
     const k = nameKey(name);
     const f = fails.get(k);
     if (f && f.until > Date.now()) return { err: 'Too many wrong PINs. Try again in 15 minutes.' };
+    // a fresh copy from the store: the other server (or the table editor) may have changed it, or created it
     let rec = byKey.get(k);
-    if (rec && url) {          // fresh copy: another server (or the table editor) may have changed it
-      const r = await rest(`?id=eq.${rec.id}&select=*`).catch(() => null);
-      if (r && r.ok) { const rows = await r.json(); if (rows[0]) rec = keep(rows[0]); }
-    }
+    if (remote) rec = (await fetchOne(rec ? 'id' : 'name_key', rec ? rec.id : k)) || rec;
     if (!rec || !(await pinMatches(pin, rec.pin_hash))) {
       const n = (f && !(f.until && f.until <= Date.now()) ? f.n : 0) + 1;   // a lock that ran out starts a new count
       fails.set(k, { n, until: n >= LOCK_FAILS ? Date.now() + LOCK_MS : 0 });
@@ -122,14 +154,14 @@ function makeAccounts({ url = '', key = '', file = '', secret = '', reserved = [
     return a.length === b.length && crypto.timingSafeEqual(a, b) ? rec.id : null;
   }
 
+  // Re-read one player's record from the store (on a reconnect: they may have played on the other server since).
+  // Resolves to the public view, or null when there is no store or nothing could be read.
+  const refresh = (id) => fetchOne('id', id).then((rec) => (rec ? publicView(rec) : null));
+
   function save(rec) {
     rec.last_seen = new Date().toISOString();
-    if (url) {
-      const body = Object.fromEntries([...STATS, 'last_seen'].map((s) => [s, rec[s]]));
-      rest(`?id=eq.${rec.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(body) })
-        .then((r) => { if (!r.ok) console.error('player save failed', r.status); })
-        .catch((err) => console.error('player save error', err.message));
-    } else saveFile();
+    if (remote) remote.patch(rec.id, Object.fromEntries([...STATS, 'last_seen'].map((s) => [s, rec[s]]))).catch((err) => console.error(err.message));
+    else saveFile();
   }
 
   // One finished hand. seats: [{ pid|null }] by seat index, team = seat % 2; result as in engine.settle.
@@ -157,9 +189,9 @@ function makeAccounts({ url = '', key = '', file = '', secret = '', reserved = [
   }
 
   return {
-    loaded, register, login, resume, recordHand, checkName,
+    loaded, register, login, resume, refresh, recordHand, checkName,
     ready: () => ready,
-    isHeld: (name) => byKey.has(nameKey(name)),
+    isHeld: (name) => byKey.has(nameKey(name)) || heldKeys.has(nameKey(name)),
     get: (id) => (byId.has(id) ? publicView(byId.get(id)) : null)
   };
 }

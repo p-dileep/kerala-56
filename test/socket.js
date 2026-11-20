@@ -49,6 +49,36 @@ const { HUMAN_TUNED_BOTS } = require('../src/bot');
     console.log('records passed');
   }).catch((e) => { console.error(e); process.exit(1); });
 }
+{ // two servers on one store (play56.in and the Render copy on Supabase): names and records stay in step
+  const assert = require('assert');
+  const { makeAccounts } = require('../src/accounts');
+  const store = [];
+  const copy = (r) => (r ? { ...r } : null);
+  const fake = {   // stands in for the Supabase table
+    all: async () => store.map(copy),
+    keys: async () => store.map((r) => ({ id: r.id, name_key: r.name_key })),
+    one: async (col, val) => copy(store.find((r) => String(r[col]) === String(val))),
+    insert: async (rec) => (store.some((r) => r.name_key === rec.name_key) ? { conflict: true } : (store.push({ ...rec, id: store.length + 1 }), { row: copy(store[store.length - 1]) })),
+    patch: async (id, body) => { Object.assign(store.find((r) => r.id === id), body); }
+  };
+  const tick = (ms = 0) => new Promise((ok) => setTimeout(ok, ms));
+  const A = makeAccounts({ remote: fake, namesEveryMs: 20 }), B = makeAccounts({ remote: fake, namesEveryMs: 20 });
+  Promise.all([A.loaded, B.loaded]).then(async () => {
+    const { id } = await A.register('Both Sites', '1357');
+    assert.equal(B.isHeld('both sites'), false);                     // B has not heard of it yet
+    assert.equal((await B.register('both sites', '2468')).err, 'That name is already registered. Sign in instead.');
+    assert.equal((await B.login('Both Sites', '1357')).id, id);       // B looks the name up instead of "no player"
+    await A.register('Later', '1111');
+    await tick(60);
+    assert.equal(B.isHeld('later'), true);                            // the names list is re-read
+    const seats = [{ pid: id }, {}, {}, {}, {}, {}], won = { receiver: 0, made: true, contract: { seat: 2 } };
+    A.recordHand(seats, won); await tick();                           // a hand on A
+    assert.equal((await B.refresh(id)).hands, 1);                     // B re-reads on reconnect
+    B.recordHand(seats, won); await tick();                           // then a hand on B
+    assert.equal(store.find((r) => r.id === id).hands, 2);            // nothing overwritten
+    console.log('two servers passed');
+  }).catch((e) => { console.error(e); process.exit(1); });
+}
 server.listen(0, () => {
   const url = `http://localhost:${server.address().port}`;
   const s = io(url, { transports: ['websocket'] });

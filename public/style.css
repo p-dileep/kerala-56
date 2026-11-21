@@ -293,6 +293,11 @@ select option { background: var(--kayal-deep, #0b2f35); color: var(--ivory); }
 .replay-list { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
 .modal-card .replay-item { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; }
 .replay-item .sub { font-size: .85rem; font-weight: 400; }
+/* card review after a hand */
+.review { margin: 10px 0; padding: 8px 12px; border-radius: 10px; background: rgba(0, 0, 0, .05); text-align: left; }
+.review h3 { margin: 0 0 4px; font-size: .9rem; font-weight: 600; opacity: .75; }
+.review p { margin: 3px 0; }
+.review .grade { font-size: .88em; opacity: .75; white-space: nowrap; }
 .rp-calls { font-size: .9rem; }
 .rp-calls .who, .modal-card .mini-trick .who, .modal-card .sub .who { font-weight: 700; }
 .rp-calls .who.t0, .modal-card .mini-trick .who.t0, .modal-card .sub .who.t0 { color: #8a5a00; }

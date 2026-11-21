@@ -9,6 +9,8 @@ const E = require('./engine');
 const Bot = require('./bot');
 const NetPlay = require('./netplay');
 const { makeAccounts } = require('./accounts');
+const { personal } = require('./review');
+const { makeReviewQueue, reviewEnabled } = require('./reviewWorker');
 
 const PORT = Number(process.env.PORT) || 3056;
 const BOT_DELAY_MS = Number(process.env.BOT_DELAY_MS) || 900;
@@ -108,6 +110,7 @@ function resetFixed(room) {
   room.seats = Array.from({ length: room.players }, emptySeat);
   room.game = null; room.chat = []; room.hostToken = null; room.botStyle = 'mixed'; room.teamNames = ['Team A', 'Team B']; room.touched = Date.now();
   room.kunukku = []; room.kunukkuFresh = [false, false];
+  room.review = null;
 }
 
 function lobbyInfo() {
@@ -142,7 +145,8 @@ function publicSeats(room) {
   }));
 }
 
-// Fire-and-forget: one row per finished hand. Never blocks or throws into the game loop.
+// One row per finished hand. Never blocks or throws into the game loop. Returns the row and a promise of its id
+// (null on failure), so the card review can be stored on it later.
 function logHand(room) {
   const g = room.game;
   const row = {
@@ -160,33 +164,92 @@ function logHand(room) {
     tables_after: g.tables,
     game_version: GAME_VERSION
   };
+  let localId = null;
   if (LOCAL_HAND_LOG) {
-    fs.mkdir(path.dirname(LOCAL_HAND_LOG), { recursive: true }, () =>
-      fs.appendFile(LOCAL_HAND_LOG, JSON.stringify({ id: Date.now(), created_at: new Date().toISOString(), ...row }) + '\n', () => {}));
+    localId = Date.now();
+    appendLocal({ id: localId, created_at: new Date().toISOString(), ...row });
   }
-  if (!SUPABASE_URL || !SUPABASE_KEY) return;
+  if (!SUPABASE_URL || !SUPABASE_KEY) return { row, id: Promise.resolve(localId) };
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 5000);
-  fetch(`${SUPABASE_URL}/rest/v1/hands`, {
+  const id = fetch(`${SUPABASE_URL}/rest/v1/hands?select=id`, {
     method: 'POST',
     headers: {
       apikey: SUPABASE_KEY,
       Authorization: `Bearer ${SUPABASE_KEY}`,
       'Content-Type': 'application/json',
-      Prefer: 'return=minimal'
+      Prefer: 'return=representation'
     },
     body: JSON.stringify(row),
     signal: ctrl.signal
-  }).then((r) => { if (!r.ok) console.error('hand log failed', r.status); })
-    .catch((err) => console.error('hand log error', err.message))
+  }).then(async (r) => {
+    if (!r.ok) { console.error('hand log failed', r.status); return null; }
+    const [x] = await r.json();
+    return x ? x.id : null;
+  }).catch((err) => { console.error('hand log error', err.message); return null; })
     .finally(() => clearTimeout(t));
+  return { row, id };
+}
+
+// Local hand log lines are appended in order (a review line after its hand).
+let localWrite = Promise.resolve();
+function appendLocal(obj) {
+  localWrite = localWrite.then(() => fs.promises.mkdir(path.dirname(LOCAL_HAND_LOG), { recursive: true }))
+    .then(() => fs.promises.appendFile(LOCAL_HAND_LOG, JSON.stringify(obj) + '\n')).catch(() => {});
+}
+
+// ---------------------------------------------------------------- card review (with all cards visible)
+// After each 6-player hand a worker thread solves the deal; the review is stored with the hand and shown to the
+// table. Each player sees only their own points given away (personal()), next to the table average.
+const reviews = reviewEnabled() ? makeReviewQueue() : null;
+function queueReview(room, logged) {
+  const g = room.game, r = g.result;
+  room.handSeq = (room.handSeq || 0) + 1;
+  const key = `${room.code}:${room.handSeq}`;
+  if (!reviews || r.void || !g.played.length) { room.review = null; return; }
+  // who held each seat when the hand ended: only they see that seat's number (a newcomer in the seat does not)
+  const tokens = room.seats.map((x) => (x.kind === 'human' ? x.token : null));
+  room.review = { key, handNo: g.handNo, players: room.players, tokens };
+  if (room.players !== 6) { room.review.none = 'players'; return; }
+  room.review.pending = true;
+  reviews.enqueue(logged.row).then(async (review) => {
+    if (room.review && room.review.key === key) {
+      room.review = { key, handNo: g.handNo, players: room.players, tokens, stored: review };
+      broadcast(room);
+    }
+    const id = await logged.id;
+    if (id === null) return;
+    if (LOCAL_HAND_LOG) appendLocal({ review_of: id, review });
+    if (!SUPABASE_URL || !SUPABASE_KEY) return;
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 5000);
+    fetch(`${SUPABASE_URL}/rest/v1/hands?id=eq.${id}`, {
+      method: 'PATCH',
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({ review }),
+      signal: ctrl.signal
+    }).then((x) => { if (!x.ok) console.error('review store failed', x.status); })
+      .catch((err) => console.error('review store error', err.message))
+      .finally(() => clearTimeout(t));
+  }).catch((err) => console.error('review apply error', err));
+}
+// The review as one socket sees it: the personal number only for the player who held the seat at the hand's end.
+function reviewFor(room, seat) {
+  const rv = room.review;
+  if (!rv) return null;
+  const out = { key: rv.key, handNo: rv.handNo, players: rv.players };
+  if (rv.pending) out.pending = true;
+  if (rv.none) out.none = rv.none;
+  const own = seat >= 0 && rv.tokens && rv.tokens[seat] && room.seats[seat].token === rv.tokens[seat];
+  if (rv.stored) Object.assign(out, personal(rv.stored, own ? seat : null));
+  return out;
 }
 
 // A registered player's last `n` logged hands, newest first, from the same store logHand writes to.
 // Only hands logged since accounts exist carry `pid` in their seats.
 async function recentHands(pid, n = 5) {
   if (SUPABASE_URL && SUPABASE_KEY) {
-    const cols = 'id,created_at,players,hand_no,dealer,seats,dealt,auction,contract,played,result';
+    const cols = 'id,created_at,players,hand_no,dealer,seats,dealt,auction,contract,played,result,review';
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 5000);
     const r = await fetch(`${SUPABASE_URL}/rest/v1/hands?select=${cols}&seats=cs.${encodeURIComponent(JSON.stringify([{ pid }]))}&order=id.desc&limit=${n}`,
@@ -195,8 +258,10 @@ async function recentHands(pid, n = 5) {
     return r.json();
   }
   if (!LOCAL_HAND_LOG || !fs.existsSync(LOCAL_HAND_LOG)) return [];
-  const rows = (await fs.promises.readFile(LOCAL_HAND_LOG, 'utf8')).split(/\r?\n/).filter(Boolean).map((l) => JSON.parse(l));
-  return rows.filter((h) => h.seats.some((x) => x.pid === pid)).slice(-n).reverse();
+  const lines = (await fs.promises.readFile(LOCAL_HAND_LOG, 'utf8')).split(/\r?\n/).filter(Boolean).map((l) => JSON.parse(l));
+  const review = new Map(lines.filter((l) => l.review_of != null).map((l) => [l.review_of, l.review]));
+  return lines.filter((h) => h.seats && h.seats.some((x) => x.pid === pid)).slice(-n).reverse()
+    .map((h) => ({ ...h, review: review.get(h.id) || null }));
 }
 
 // Kunukku: the team that loses a match wears it (every seat of that team) into the next match.
@@ -235,7 +300,7 @@ function broadcast(room) {
   if (g && (g.phase === 'handover' || g.phase === 'matchover') && room.loggedHand !== g.handNo) {
     room.loggedHand = g.handNo;
     updateKunukku(room);
-    logHand(room);
+    queueReview(room, logHand(room));
     // records of the registered players at the table; their lobby card updates at once
     const ids = accounts.recordHand(room.seats.map((s) => ({ pid: s.kind === 'human' ? s.pid || null : null })), g.result, g.phase === 'matchover' ? g.winner : null);
     for (const sid of io.sockets.adapter.rooms.get(room.code) || []) {
@@ -265,7 +330,8 @@ function broadcast(room) {
       seats: publicSeats(room),
       watchers: watching,
       chat: room.chat.slice(-40),
-      game: room.game ? E.getView(room.game, seat >= 0 ? seat : null) : null
+      game: room.game ? E.getView(room.game, seat >= 0 ? seat : null) : null,
+      review: reviewFor(room, seat)
     });
   }
   schedule(room);
@@ -315,7 +381,10 @@ function autoAct(room, seat) {
     const d = netCard ? { kind: 'play', cardId: netCard } : Bot.decide(view, Bot.paramsFor(room.botStyle, name));
     if (!d) return;
     if (d.kind === 'bid') E.applyBid(g, seat, d.action);
-    else E.playCard(g, seat, d.cardId);
+    else {
+      E.playCard(g, seat, d.cardId);
+      if (s.kind === 'human') g.played[g.played.length - 1].auto = true;   // the review charges these to nobody
+    }
   } catch (err) {
     console.error('bot error', err);
   }
@@ -415,7 +484,8 @@ io.on('connection', (socket) => {
     socket.emit('myHands', rows.map((h) => ({
       id: h.id, at: h.created_at, players: h.players, handNo: h.hand_no, dealer: h.dealer,
       me: h.seats.findIndex((x) => x.pid === pid), seats: h.seats.map((x) => ({ kind: x.kind, name: x.name })),
-      dealt: h.dealt, auction: h.auction, contract: h.contract, played: h.played, result: h.result
+      dealt: h.dealt, auction: h.auction, contract: h.contract, played: h.played, result: h.result,
+      review: personal(h.review, h.seats.findIndex((x) => x.pid === pid))
     })));
   });
   socket.on('logout', () => {

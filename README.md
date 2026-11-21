@@ -36,8 +36,12 @@ Run a **single** process. Rooms are held in memory. A restart ends the tables in
 | `AWAY_TAKEOVER_MS` | 20000 | A bot plays for a disconnected player after this long |
 | `LOGIN_SECRET` | derived from the Supabase key | Signs the sessions of registered players (name + PIN) |
 | `PLAYERS_FILE` | `data/local_players.json` | Player accounts when Supabase is not set (`off` = memory only) |
+| `REVIEW` | on (off on a single-core machine) | `off` turns the post-hand card review off; `on` forces it on |
+| `REVIEW_NODES` | 180000000 | Search work allowed per hand review (about 30 s of one core on a laptop) |
 
 **Registered players (optional):** a player name + 4-8 digit PIN keeps a record across devices: rating (Elo per hand, 16 points per chip at stake, up to 5 chips), hands, bids and matches won, and a replay of the last 5 hands. Guests play as before but cannot sit under a registered name. Accounts live in the Supabase table `players` (SQL in `docs/claude-plans/2026-11-20_site-logins.md`).
+
+**Card review (6-player tables):** after each hand a worker thread (`src/reviewWorker.js`) solves the deal with all cards visible (`src/review.js`): the most points the bidding team could have taken with perfect play by everyone, where a hand that stopped early would have ended, and how many points each player's own cards gave away. Each player sees only their own number, next to the table average for the hand; cards a bot played for a disconnected player count for nobody. A hand that needs more than the work budget gets "No review for this hand". The review is stored with the hand (`hands.review`, a jsonb column) and shown in the replay of the last 5 hands.
 
 ## Rules implemented (`src/engine.js`)
 - 48 cards (J 9 A 10 K Q ×2 packs); the 8-player table adds 8 and 7 ×2 packs below the Queen, worth nothing. Points: J 3, 9 2, A 1, 10 1 = 56. Teams sit alternately.

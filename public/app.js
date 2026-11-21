@@ -117,6 +117,16 @@
     $('acctBtn').classList.toggle('in', !!account);
     if (!$('account').classList.contains('hidden')) renderAccountPage();
   }
+  // the account page's "How the rating works" (src/accounts.js recordHand: ELO_K 16, ELO_MAX_CHIPS 5, BASE 1500)
+  const RATING_HOW = [
+    'Every registered player starts at 1500. Guests and bots count as 1500 and have no rating of their own.',
+    'It is an Elo rating for the team game: after every finished hand, each registered player at the table gains if their team took the chips and loses if it paid them.',
+    'How much depends on the two teams: each team counts as the average rating of its players. Beating a stronger team gains more; losing to a weaker team costs more.',
+    'Two equal teams: the winners gain 8 points per chip of the hand, the losers lose 8 per chip.',
+    'Chips of a hand: 28 to 39 made 1, down 2; 40: 2 or 3; 48: 3 or 4; 56: 4 or 5; doubled ×2, redoubled ×4; a conceded hand pays the normal stake. At most 5 chips count, so one hand moves a rating by 80 points at the most.',
+    'The method: change = 16 × chips × (result − expected), where result is 1 for a win and 0 for a loss, and expected = 1 / (1 + 10^((their average − your average) / 400)).',
+    'A void hand (the defenders hold no trump) changes nothing.',
+  ];
   function renderAccountPage() {
     const back = `<button type="button" class="btn small ghost acct-back" id="acctBack">← ${T('Back to the tables')}</button>`;
     if (!account) {
@@ -137,6 +147,7 @@
       $('accountPage').innerHTML = `${back}
         <h2 class="acct-title">✓ ${esc(a.name)}</h2>
         <div class="acct-stats">${tile(a.rating, T('Rating'))}${tile(a.hands, T('Hands'), T('won {0}', a.hands_won))}${tile(a.bids, T('Bids'), T('made {0}', a.bids_made))}${tile(a.matches, T('Matches'), T('won {0}', a.matches_won))}</div>
+        <details class="rules"><summary>${T('How the rating works')}</summary><ul>${RATING_HOW.map((x) => `<li>${T(x)}</li>`).join('')}</ul></details>
         <div class="acct-actions"><button type="button" class="btn primary" id="replayBtn">${T('Replay my last 5 hands')}</button><button type="button" class="btn ghost" id="signOutBtn">${T('Sign out')}</button></div>`;
       $('replayBtn').onclick = () => socket.emit('myHands');
       $('signOutBtn').onclick = () => { socket.emit('logout'); store.set('g56login', ''); leaveAccount(); };

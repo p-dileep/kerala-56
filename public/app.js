@@ -41,13 +41,13 @@
   const TRICK_POS = [[50, 72], [69, 62], [69, 36], [50, 27], [31, 36], [31, 62]];
   const SEAT_POS8 = [[50, 93], [82, 86], [95, 50], [82, 14], [50, 7], [18, 14], [5, 50], [18, 86]];
   const SEAT_POS8_NARROW = [[50, 95], [82, 82], [86, 47], [82, 18], [50, 5], [18, 18], [14, 47], [18, 82]];   // the ends a little high, clear of the host's controls before the deal
-  // 8 players on a phone whose bid panel squeezes the table to 330px or less: three rows (three across the top, one at
+  // 8 players on a phone whose bid panel squeezes the table to 360px or less: three rows (three across the top, one at
   // each end, three along the bottom) in place of the oval's five; style.css packs the seats to match
   const SEAT_POS8_SHORT = [[50, 86], [84, 86], [92, 50], [84, 14], [50, 14], [16, 14], [8, 50], [16, 86]];
   const TRICK_POS8 = [[50, 72], [65, 66], [71, 50], [65, 34], [50, 27], [35, 34], [29, 50], [35, 66]];
   const TRICK_POS8_NARROW = [[50, 72], [65, 66], [67, 50], [65, 34], [50, 27], [35, 34], [33, 50], [35, 66]];   // the ends' cards clear of a long name
   const narrow = () => window.matchMedia('(max-width: 700px)').matches;
-  const shortArena = () => document.querySelector('.arena').getBoundingClientRect().height <= 330;
+  const shortArena = () => document.querySelector('.arena').getBoundingClientRect().height <= 360;
   window.addEventListener('resize', () => room && room.game !== undefined && render());
 
   const store = {

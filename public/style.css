@@ -528,7 +528,7 @@ body.four .log .su-C { color: #8FD9A8 !important; }
 }
 /* 8 players on a phone: each call (and the contract, and "takes n pts") sits inside its seat in place of the meta line,
    not in a bubble beside it, where it covered the next seat or the bid in the middle of the mat.
-   On a short phone (the bid panel leaves the table 330px tall or less; app.js shortArena) the seats also stand in three
+   On a short phone (the bid panel leaves the table 360px tall or less; app.js shortArena) the seats also stand in three
    rows (SEAT_POS8_SHORT) and drop the meta line, the chip piles wait out the auction (the top bar has the counts),
    and the middle shows only the standing bid (the panel's head says who holds it and whose call it is). */
 @media (max-width: 700px) {
@@ -547,7 +547,7 @@ body.four .log .su-C { color: #8FD9A8 !important; }
   #table.p8 .seat.lower .stack { bottom: calc(50% - 16px); translate: 0 0; }
   #table.p8 .seat .stack .tower i:nth-child(n+16) { display: none; }
   #table.p8 .seat.left:not(.upper, .lower) .stack, #table.p8 .seat.right:not(.upper, .lower) .stack { left: 50%; right: auto; bottom: auto; top: calc(100% + 4px); translate: -50% 0; }
-  @container (max-height: 330px) {
+  @container (max-height: 360px) {
     #table.p8 .seat { padding: 2px 7px 1px; font-size: .8rem; line-height: 1.2; }
     #table.p8 .seat .meta { display: none; }
     #table.p8 .seat .said { margin: 1px 0; padding: 1px 6px 0; font-size: .72rem; }

@@ -296,18 +296,16 @@
     'won {0}': 'ജയം {0}',
     'made {0}': 'ജയിച്ചത് {0}',
     'How the rating works': 'റേറ്റിങ് കണക്കാക്കുന്ന വിധം',
-    'Every registered player starts at 1500. Guests and bots count as 1500 and have no rating of their own.':
-      'രജിസ്റ്റർ ചെയ്ത ഓരോരുത്തരും 1500-ൽ തുടങ്ങുന്നു. അതിഥികളെയും ബോട്ടുകളെയും 1500 ആയി കണക്കാക്കും; അവർക്ക് സ്വന്തം റേറ്റിങ് ഇല്ല.',
-    'It is an Elo rating for the team game: after every finished hand, each registered player at the table gains if their team took the chips and loses if it paid them.':
-      'ടീം കളിക്കുള്ള എലോ (Elo) റേറ്റിങ് ആണിത്: ഓരോ കളി കഴിയുമ്പോഴും മേശയിലെ രജിസ്റ്റർ ചെയ്ത ഓരോരുത്തർക്കും, സ്വന്തം ടീം മേശ നേടിയാൽ കൂടും, കൊടുത്താൽ കുറയും.',
+    'Every registered player starts at 1000. Guests and bots count as 1000 and have no rating of their own.':
+      'രജിസ്റ്റർ ചെയ്ത ഓരോരുത്തരും 1000-ൽ തുടങ്ങുന്നു. അതിഥികളെയും ബോട്ടുകളെയും 1000 ആയി കണക്കാക്കും; അവർക്ക് സ്വന്തം റേറ്റിങ് ഇല്ല.',
+    'It is an Elo rating for each player: after every finished hand, each registered player at the table gains if their team took the chips (the bid was made, or the defenders beat it) and loses if it paid them. A conceded hand is a loss for the team that conceded.':
+      'ഓരോ കളിക്കാരനുമുള്ള എലോ (Elo) റേറ്റിങ് ആണിത്: ഓരോ കളി കഴിയുമ്പോഴും മേശയിലെ രജിസ്റ്റർ ചെയ്ത ഓരോരുത്തർക്കും, സ്വന്തം ടീം മേശ നേടിയാൽ (വിളി ജയിച്ചാൽ, അല്ലെങ്കിൽ എതിരാളികളുടെ വിളി വീഴ്ത്തിയാൽ) കൂടും, കൊടുത്താൽ കുറയും. വിട്ടുകൊടുത്ത കളി, വിട്ടുകൊടുത്ത ടീമിന് തോൽവിയാണ്.',
     'How much depends on the two teams: each team counts as the average rating of its players. Beating a stronger team gains more; losing to a weaker team costs more.':
       'എത്ര എന്നത് രണ്ടു ടീമുകളെയും ആശ്രയിച്ചാണ്: ഓരോ ടീമിനെയും അതിലെ കളിക്കാരുടെ ശരാശരി റേറ്റിങ് ആയി കണക്കാക്കും. കരുത്തുള്ള ടീമിനെ തോൽപ്പിച്ചാൽ കൂടുതൽ കിട്ടും; ദുർബലമായ ടീമിനോട് തോറ്റാൽ കൂടുതൽ പോകും.',
-    'Two equal teams: the winners gain 8 points per chip of the hand, the losers lose 8 per chip.':
-      'തുല്യ ടീമുകളാണെങ്കിൽ: ആ കളിയിലെ ഓരോ മേശയ്ക്കും ജയിച്ചവർക്ക് 8 പോയിന്റ് കൂടും, തോറ്റവർക്ക് 8 കുറയും.',
-    'Chips of a hand: 28 to 39 made 1, down 2; 40: 2 or 3; 48: 3 or 4; 56: 4 or 5; doubled ×2, redoubled ×4; a conceded hand pays the normal stake. At most 5 chips count, so one hand moves a rating by 80 points at the most.':
-      'ഒരു കളിയിലെ മേശ: 28 മുതൽ 39 വരെ ജയിച്ചാൽ 1, തോറ്റാൽ 2; 40: 2 അല്ലെങ്കിൽ 3; 48: 3 അല്ലെങ്കിൽ 4; 56: 4 അല്ലെങ്കിൽ 5; ഡബിൾ ×2, റീഡബിൾ ×4; വിട്ടുകൊടുത്ത കളിക്ക് സാധാരണ നിരക്ക്. പരമാവധി 5 മേശ മാത്രം കണക്കിൽ എടുക്കും; അതിനാൽ ഒരു കളി കൊണ്ട് റേറ്റിങ് 80 പോയിന്റിൽ കൂടുതൽ മാറില്ല.',
-    'The method: change = 16 × chips × (result − expected), where result is 1 for a win and 0 for a loss, and expected = 1 / (1 + 10^((their average − your average) / 400)).':
-      'കണക്ക്: മാറ്റം = 16 × മേശ × (ഫലം − പ്രതീക്ഷ); ഫലം ജയിച്ചാൽ 1, തോറ്റാൽ 0; പ്രതീക്ഷ = 1 / (1 + 10^((അവരുടെ ശരാശരി − നിങ്ങളുടെ ശരാശരി) / 400)).',
+    'Two equal teams: in your first 30 hands the winners gain 12 points and the losers lose 12; after that 6. Bids of 40 and up count double. Doubles and redoubles add nothing.':
+      'തുല്യ ടീമുകളാണെങ്കിൽ: ആദ്യത്തെ 30 കളികളിൽ ജയിച്ചവർക്ക് 12 പോയിന്റ് കൂടും, തോറ്റവർക്ക് 12 കുറയും; അതിനുശേഷം 6. 40-ഉം അതിനു മുകളിലുമുള്ള വിളികൾക്ക് ഇരട്ടി. ഡബിളും റീഡബിളും ഒന്നും കൂട്ടില്ല.',
+    'The method: change = step × weight × (result − expected), where step is 24 for your first 30 hands and 12 after, weight is 1 for a bid under 40 and 2 from 40, result is 1 for a win and 0 for a loss, and expected = 1 / (1 + 10^((their average − your average) / 400)).':
+      'കണക്ക്: മാറ്റം = പടി × തൂക്കം × (ഫലം − പ്രതീക്ഷ); പടി ആദ്യത്തെ 30 കളികളിൽ 24, പിന്നെ 12; തൂക്കം 40-ൽ താഴെയുള്ള വിളിക്ക് 1, 40 മുതൽ 2; ഫലം ജയിച്ചാൽ 1, തോറ്റാൽ 0; പ്രതീക്ഷ = 1 / (1 + 10^((അവരുടെ ശരാശരി − നിങ്ങളുടെ ശരാശരി) / 400)).',
     'A void hand (the defenders hold no trump) changes nothing.':
       'അസാധുവായ കളി (എതിർ ടീമിന്റെ കൈയിൽ തുറുപ്പില്ല) ഒന്നും മാറ്റില്ല.',
     'No email needed. Pick a player name and a PIN of 4 to 8 digits. Use the same two on any phone or computer and your record follows you. Nobody else can sit under a registered name.':

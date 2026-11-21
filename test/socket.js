@@ -23,7 +23,17 @@ const { HUMAN_TUNED_BOTS } = require('../src/bot');
   hand('matchover', 2, true, { winner: 0 }); assert.equal(worn(), '135');            // A wins that match on its own bid: all off A, B wears it
   console.log('kunukku rules passed');
 }
-{ // records: Elo per hand (team average, guests and bots 1500), bids, matches; void hands count for nothing
+{ // the rating rule: step 24 for the first 30 hands then 12, weight 1 under 40 and 2 from 40, doubles add nothing
+  const assert = require('assert');
+  const { handDelta } = require('../src/accounts');
+  assert.equal(handDelta(0, 1000, 1000, true, 28), 12);
+  assert.equal(handDelta(0, 1000, 1000, true, 40), 24);
+  assert.equal(handDelta(29, 1000, 1000, false, 40), -24);
+  assert.equal(handDelta(30, 1000, 1000, true, 28), 6);
+  assert.equal(handDelta(30, 1000, 1000, true, undefined), 6);
+  assert.ok(handDelta(0, 900, 1100, true, 28) > 12 && handDelta(0, 1100, 900, true, 28) < 12);
+}
+{ // records: Elo per hand (team average, guests and bots 1000), bids, matches; void hands count for nothing
   const assert = require('assert');
   const { makeAccounts } = require('../src/accounts');
   const acc = makeAccounts({ reserved: ['Kuttan'] });
@@ -34,22 +44,27 @@ const { HUMAN_TUNED_BOTS } = require('../src/bot');
     assert.equal((await acc.register('Rec Two', '12')).err, 'The PIN must be 4 to 8 digits.');
     const seats = [{ pid: id }, {}, {}, {}, {}, {}];
     acc.recordHand(seats, { void: true, receiver: null });
-    acc.recordHand(seats, { receiver: 0, made: true, contract: { seat: 0 } }, 0);
+    assert.equal(acc.get(id).rating, 1000);
+    acc.recordHand(seats, { receiver: 0, made: true, contract: { seat: 0, value: 28 } }, 0);
     let a = acc.get(id);
-    assert.deepEqual([a.rating, a.hands, a.hands_won, a.bids, a.bids_made, a.matches, a.matches_won], [1508, 1, 1, 1, 1, 1, 1]);
-    acc.recordHand(seats, { receiver: 1, made: false, contract: { seat: 2 } });
+    assert.deepEqual([a.rating, a.hands, a.hands_won, a.bids, a.bids_made, a.matches, a.matches_won], [1012, 1, 1, 1, 1, 1, 1]);
+    acc.recordHand(seats, { receiver: 1, made: false, contract: { seat: 2, value: 30 } });
     a = acc.get(id);
     assert.deepEqual([a.hands, a.hands_won, a.bids], [2, 1, 1]);
-    assert.ok(a.rating < 1508 && a.rating > 1490);
-    { // the rating moves by K per chip at stake, capped at 5 chips
+    assert.ok(a.rating < 1012 && a.rating > 990);
+    { // the stake weight comes from the bid value; a redouble moves the rating no more than the plain bid
       const { id: w } = await acc.register('Rec Stake', '1234');
-      const ws = [{}, { pid: w }, {}, {}, {}, {}];
-      acc.recordHand(ws, { receiver: 1, made: true, amount: 3, contract: { seat: 1 } });
-      assert.equal(acc.get(w).rating, 1524);                           // 16 x 3 x (1 - 0.5)
-      const before = acc.get(w).rating;
-      acc.recordHand(ws, { receiver: 0, made: false, amount: 20, contract: { seat: 1 } });
-      const drop = before - acc.get(w).rating;
-      assert.ok(drop > 40 && drop <= 80);                              // redoubled 56 down: capped at 5 chips
+      const { id: v } = await acc.register('Rec Plain', '1234');
+      acc.recordHand([{}, { pid: w }, {}, {}, {}, {}], { receiver: 1, made: true, amount: 8, contract: { seat: 1, value: 28, mult: 4 } });
+      acc.recordHand([{}, { pid: v }, {}, {}, {}, {}], { receiver: 1, made: true, amount: 2, contract: { seat: 1, value: 28, mult: 1 } });
+      assert.equal(acc.get(w).rating, 1012);
+      assert.equal(acc.get(v).rating, 1012);
+      const { id: x } = await acc.register('Rec Forty', '1234');
+      acc.recordHand([{ pid: x }, {}, {}, {}, {}, {}], { receiver: 1, made: false, amount: 3, contract: { seat: 0, value: 40 } });
+      assert.equal(acc.get(x).rating, 976);                            // 40 down: weight 2
+      const { id: c } = await acc.register('Rec Concede', '1234');
+      acc.recordHand([{}, { pid: c }, {}, {}, {}, {}], { receiver: 0, made: false, conceded: 1, amount: 2, contract: { seat: 1, value: 32 } });
+      assert.equal(acc.get(c).rating, 988);                            // conceding side loses at the bid's weight
     }
     const s1 = (await acc.login('REC ONE', '1234')).session;
     assert.equal(acc.resume(s1), id);
@@ -111,7 +126,7 @@ server.listen(0, () => {
       await once(a, 'token');
       a.emit('register', { name: 'Regd', pin: '4321' });
       const [{ session, account }] = await once(a, 'login');
-      if (account.name !== 'Regd' || account.rating !== 1500) fail('bad account ' + JSON.stringify(account));
+      if (account.name !== 'Regd' || account.rating !== 1000) fail('bad account ' + JSON.stringify(account));
       const g = sock({});
       await once(g, 'token');
       g.emit('joinRoom', { code: 'HIDE6', name: 'regd' });

@@ -117,14 +117,13 @@
     $('acctBtn').classList.toggle('in', !!account);
     if (!$('account').classList.contains('hidden')) renderAccountPage();
   }
-  // the account page's "How the rating works" (src/accounts.js recordHand: ELO_K 16, ELO_MAX_CHIPS 5, BASE 1500)
+  // the account page's "How the rating works" (src/accounts.js handDelta: BASE 1000, step 24 then 12, weight 2 from 40)
   const RATING_HOW = [
-    'Every registered player starts at 1500. Guests and bots count as 1500 and have no rating of their own.',
-    'It is an Elo rating for the team game: after every finished hand, each registered player at the table gains if their team took the chips and loses if it paid them.',
+    'Every registered player starts at 1000. Guests and bots count as 1000 and have no rating of their own.',
+    'It is an Elo rating for each player: after every finished hand, each registered player at the table gains if their team took the chips (the bid was made, or the defenders beat it) and loses if it paid them. A conceded hand is a loss for the team that conceded.',
     'How much depends on the two teams: each team counts as the average rating of its players. Beating a stronger team gains more; losing to a weaker team costs more.',
-    'Two equal teams: the winners gain 8 points per chip of the hand, the losers lose 8 per chip.',
-    'Chips of a hand: 28 to 39 made 1, down 2; 40: 2 or 3; 48: 3 or 4; 56: 4 or 5; doubled ×2, redoubled ×4; a conceded hand pays the normal stake. At most 5 chips count, so one hand moves a rating by 80 points at the most.',
-    'The method: change = 16 × chips × (result − expected), where result is 1 for a win and 0 for a loss, and expected = 1 / (1 + 10^((their average − your average) / 400)).',
+    'Two equal teams: in your first 30 hands the winners gain 12 points and the losers lose 12; after that 6. Bids of 40 and up count double. Doubles and redoubles add nothing.',
+    'The method: change = step × weight × (result − expected), where step is 24 for your first 30 hands and 12 after, weight is 1 for a bid under 40 and 2 from 40, result is 1 for a win and 0 for a loss, and expected = 1 / (1 + 10^((their average − your average) / 400)).',
     'A void hand (the defenders hold no trump) changes nothing.',
   ];
   function renderAccountPage() {

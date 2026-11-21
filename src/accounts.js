@@ -8,9 +8,15 @@ const path = require('path');
 const crypto = require('crypto');
 
 const STATS = ['rating', 'hands', 'hands_won', 'bids', 'bids_made', 'matches', 'matches_won'];
-// Elo per hand, weighted by the stake: K points per chip the hand was played for (a 28 made = 1 chip,
-// a 56 down = 5, doubles included), capped at ELO_MAX_CHIPS so a redoubled 56 cannot swing a rating by hundreds.
-const ELO_K = 16, ELO_MAX_CHIPS = 5, BASE = 1500;
+// Elo per hand (docs/claude-plans/2026-11-20_player-rating-redesign.md): everyone starts at 1000, bots and guests
+// count at 1000 and never move. The side that takes the chips wins. Step 24 for a player's first 30 rated hands,
+// then 12; weight 1 for a bid under 40, 2 from 40 up; doubles add nothing.
+const BASE = 1000, STEP_NEW = 24, STEP = 12, NEW_HANDS = 30, BIG_BID = 40;
+// rating change for one hand: hands = the player's rated hands before this one, own/opp = the two sides' averages
+function handDelta(hands, own, opp, won, value) {
+  const expect = 1 / (1 + 10 ** ((opp - own) / 400));
+  return (hands < NEW_HANDS ? STEP_NEW : STEP) * (value >= BIG_BID ? 2 : 1) * ((won ? 1 : 0) - expect);
+}
 const LOCK_FAILS = 5, LOCK_MS = 15 * 60 * 1000;
 
 const nameKey = (n) => String(n || '').trim().replace(/\s+/g, ' ').toLowerCase();
@@ -173,14 +179,13 @@ function makeAccounts({ url = '', key = '', file = '', secret = '', reserved = [
     const rating = (s) => (s.pid && byId.has(s.pid) ? byId.get(s.pid).rating : BASE);
     const teamAvg = (t) => { const xs = seats.filter((s, i) => i % 2 === t).map(rating); return xs.reduce((a, b) => a + b, 0) / xs.length; };
     const avg = [teamAvg(0), teamAvg(1)];
-    const weight = Math.min(Math.max(result.amount || 1, 1), ELO_MAX_CHIPS);   // chips at stake (conceded: the normal stake)
+    const value = result.contract && result.contract.value;
     const changed = [];
     seats.forEach((s, i) => {
       const rec = s.pid && byId.get(s.pid);
       if (!rec) return;
       const t = i % 2, won = result.receiver === t;
-      const expect = 1 / (1 + 10 ** ((avg[1 - t] - avg[t]) / 400));
-      rec.rating += ELO_K * weight * ((won ? 1 : 0) - expect);
+      rec.rating += handDelta(rec.hands, avg[t], avg[1 - t], won, value);
       rec.hands++;
       if (won) rec.hands_won++;
       if (result.contract && result.contract.seat === i) { rec.bids++; if (result.made) rec.bids_made++; }
@@ -199,4 +204,4 @@ function makeAccounts({ url = '', key = '', file = '', secret = '', reserved = [
   };
 }
 
-module.exports = { makeAccounts, nameKey };
+module.exports = { makeAccounts, nameKey, handDelta, BASE };

@@ -50,7 +50,7 @@ create table public.players (
   name        text not null,
   name_key    text not null unique,      -- lower-case name, used for "held name" checks
   pin_hash    text not null,             -- scrypt
-  rating      real not null default 1500,
+  rating      real not null default 1000,  -- was 1500 before 2026-11-20; the server always sets it on register
   hands       int not null default 0,
   hands_won   int not null default 0,
   bids        int not null default 0,

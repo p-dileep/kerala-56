@@ -40,9 +40,14 @@
   const SEAT_POS_NARROW = [[50, 95], [85, 69], [85, 29], [50, 5], [15, 29], [15, 69]];
   const TRICK_POS = [[50, 72], [69, 62], [69, 36], [50, 27], [31, 36], [31, 62]];
   const SEAT_POS8 = [[50, 93], [82, 86], [95, 50], [82, 14], [50, 7], [18, 14], [5, 50], [18, 86]];
-  const SEAT_POS8_NARROW = [[50, 95], [82, 82], [86, 50], [82, 18], [50, 5], [18, 18], [14, 50], [18, 82]];
+  const SEAT_POS8_NARROW = [[50, 95], [82, 82], [86, 47], [82, 18], [50, 5], [18, 18], [14, 47], [18, 82]];   // the ends a little high, clear of the host's controls before the deal
+  // 8 players on a phone whose bid panel squeezes the table to 330px or less: three rows (three across the top, one at
+  // each end, three along the bottom) in place of the oval's five; style.css packs the seats to match
+  const SEAT_POS8_SHORT = [[50, 86], [84, 86], [92, 50], [84, 14], [50, 14], [16, 14], [8, 50], [16, 86]];
   const TRICK_POS8 = [[50, 72], [65, 66], [71, 50], [65, 34], [50, 27], [35, 34], [29, 50], [35, 66]];
+  const TRICK_POS8_NARROW = [[50, 72], [65, 66], [67, 50], [65, 34], [50, 27], [35, 34], [33, 50], [35, 66]];   // the ends' cards clear of a long name
   const narrow = () => window.matchMedia('(max-width: 700px)').matches;
+  const shortArena = () => document.querySelector('.arena').getBoundingClientRect().height <= 330;
   window.addEventListener('resize', () => room && room.game !== undefined && render());
 
   const store = {
@@ -621,8 +626,8 @@
   function teamName(t) { return esc(rawTeam(t)); }   // always used inside HTML
   const N = () => (room && room.players) || 6;
   function rel(seat) { return room.mySeat === null ? seat : (seat - room.mySeat + N()) % N(); }
-  const seatPos = () => N() === 8 ? (narrow() ? SEAT_POS8_NARROW : SEAT_POS8) : (narrow() ? SEAT_POS_NARROW : SEAT_POS);
-  const trickPos = () => (N() === 8 ? TRICK_POS8 : TRICK_POS);
+  const seatPos = () => N() === 8 ? (narrow() ? (shortArena() ? SEAT_POS8_SHORT : SEAT_POS8_NARROW) : SEAT_POS8) : (narrow() ? SEAT_POS_NARROW : SEAT_POS);
+  const trickPos = () => (N() === 8 ? (narrow() ? TRICK_POS8_NARROW : TRICK_POS8) : TRICK_POS);
   // The team's captain seat: 0 (Team A) and 3 (Team B), so the chips fly across the table. 6 players: facing each other;
   // 8 players: a diagonal (the seats straight across and corner to corner are on the same team there).
   const capSeat = (team) => team * 3;
@@ -765,6 +770,7 @@
       if (tookTrick) cls.push('won');
       // the call bubble faces the mat: below the seats across the table, beside the seats at the ends
       if (y < 15) cls.push('top'); else if (y <= 85) cls.push(x < 50 ? 'left' : 'right');
+      if (y >= 15 && y <= 85 && Math.abs(y - 50) > 10) cls.push(y < 50 ? 'upper' : 'lower');   // corner seats (8 players on a phone: their chip pile)
       let said = '';
       const a = lastBy[s.seat];
       if (tookTrick) said = `<div class="said won">${g.trick.points ? T('takes {0} pts', g.trick.points) : T('takes the trick')}</div>`;
@@ -828,12 +834,19 @@
     $('seats').querySelectorAll('.seat').forEach((el) => {
       el.style.setProperty('--nudge', '0px');
       // the seat box plus what hangs off its corners (chip pile, kunukku)
-      const boxes = [el, ...el.querySelectorAll(':scope > .kunukku, :scope > .stack')].map((e) => e.getBoundingClientRect());
+      const boxes = [el, ...el.querySelectorAll(':scope > .kunukku, :scope > .stack')].map((e) => e.getBoundingClientRect()).filter((b) => b.width);   // a hidden pile is 0x0 at the screen's corner
       const left = Math.min(...boxes.map((b) => b.left)), right = Math.max(...boxes.map((b) => b.right));
       const dx = left < pad ? pad - left : right > vw - pad ? vw - pad - right : 0;
       if (dx) el.style.setProperty('--nudge', `${Math.round(dx / zoom)}px`);
     });
   }
+  // the bid panel opening or closing changes the table's height without a window resize: move the 8 seats between
+  // the oval and the three rows when it crosses the line
+  let wasShort = null;
+  new ResizeObserver(() => {
+    const s = shortArena();
+    if (s !== wasShort) { wasShort = s; if (room && room.game !== undefined && N() === 8 && narrow()) renderSeats(room.game); }
+  }).observe(document.querySelector('.arena'));
 
   const STYLE_TEXT = named({ mixed: 'Mixed: each bot keeps its own temperament (hover a bot for it)', defensive: 'Defensive: bid low, rarely raise or go for levels', medium: 'Medium: balanced (default)', aggressive: 'Aggressive: bid up, support partner, go for 40 / 48 / 56' });
   function botStyleHtml() {

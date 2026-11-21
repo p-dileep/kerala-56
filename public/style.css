@@ -507,6 +507,10 @@ body.four .log .su-C { color: #8FD9A8 !important; }
      controls sit lower and the title and note go (the code is in the top bar) */
   #table.p8 .center.pre { top: 67%; }
   #table.p8 .center.pre .big, #table.p8 .center.pre .note { display: none; }
+  /* ...and eight seats with their Sit here / Add bot / Change / Remove buttons do not fit around the oval:
+     the buttons show when the seat is tapped (as during play), the open seat drawn over its neighbours */
+  #table.p8 .seat:not(.ingame):not(.open):not(:hover) .seat-actions { display: none; }
+  #table.p8 .seat.open { z-index: 4; }
   .levels { margin-left: 0; }
   .bid-panel { width: calc(100% - 12px); padding: 10px; gap: 8px; }
   .suits { grid-template-columns: repeat(3, 1fr); }
@@ -516,6 +520,44 @@ body.four .log .su-C { color: #8FD9A8 !important; }
   .mat.trick-on .mat-info { top: 57%; }   /* below the side seats' call bubbles, above my trick card */
   .seat .cnt { top: -9px; right: 6px; background: rgba(8,42,48,.9); color: var(--mist); border-radius: 999px; padding: 1px 6px 0; opacity: 1; font-size: .65rem; line-height: 1.3; }
   .chip.contract .stake { display: none; }
+}
+/* 8 players on a phone: each call (and the contract, and "takes n pts") sits inside its seat in place of the meta line,
+   not in a bubble beside it, where it covered the next seat or the bid in the middle of the mat.
+   On a short phone (the bid panel leaves the table 330px tall or less; app.js shortArena) the seats also stand in three
+   rows (SEAT_POS8_SHORT) and drop the meta line, the chip piles wait out the auction (the top bar has the counts),
+   and the middle shows only the standing bid (the panel's head says who holds it and whose call it is). */
+@media (max-width: 700px) {
+  #table.p8 .seat { display: flex; flex-direction: column; align-items: center; width: max-content; }   /* a seat near the right edge wrapped narrower */
+  #table.p8 .seat .said { position: static; order: 1; transform: none; margin: 2px 0 1px; padding: 1px 7px 0; font-size: .78rem; box-shadow: none; white-space: normal; max-width: 96px; }
+  #table.p8 .seat .meta { white-space: normal; max-width: 120px; }   /* Malayalam "chosen at the deal" is two lines, not one wide one */
+  #table.p8 .seat .said.high { box-shadow: 0 0 0 2px var(--kasavu); }
+  #table.p8 .seat:has(> .said) .meta { display: none; }
+  #table.p8 .center:not(.pre) .sub { max-width: 130px; margin-inline: auto; }   /* wraps between the two end seats */
+  #table.p8 .center:has(> .bidval) { top: 38%; }   /* the bid above the end seats, the short lines between them */
+  #table.p8.auction .seat .stack .tower { display: none; }   /* during the calls a captain's pile is just its count */
+  /* captain piles clear of the next seat, the cards in front of it and the bid in the middle: at a corner the pile
+     leans toward the middle row, at an end it stands below the seat (beside it, it covered the bid or the host's
+     buttons); the tower shows 15 chips at most (the badge has the count) */
+  #table.p8 .seat.upper .stack { bottom: auto; top: calc(50% - 16px); translate: 0 0; }
+  #table.p8 .seat.lower .stack { bottom: calc(50% - 16px); translate: 0 0; }
+  #table.p8 .seat .stack .tower i:nth-child(n+16) { display: none; }
+  #table.p8 .seat.left:not(.upper, .lower) .stack, #table.p8 .seat.right:not(.upper, .lower) .stack { left: 50%; right: auto; bottom: auto; top: calc(100% + 4px); translate: -50% 0; }
+  @container (max-height: 330px) {
+    #table.p8 .seat { padding: 2px 7px 1px; font-size: .8rem; line-height: 1.2; }
+    #table.p8 .seat .meta { display: none; }
+    #table.p8 .seat .said { margin: 1px 0; padding: 1px 6px 0; font-size: .72rem; }
+    #table.p8 .seat .said .sname { display: none; }   /* one line: the sign alone (the middle still names the suit) */
+    #table.p8 .seat .toks { top: -11px; }
+    #table.p8.auction .seat .stack { display: none; }
+    #table.p8.auction .center .sub { display: none; }
+    #table.p8.auction .center .bidval { font-size: 28px; }
+    #table.p8 .center:has(> .bidval) { top: 50%; }
+  }
+}
+/* ...and a bid panel full of Plus / NS buttons scrolls rather than squeeze the eight seats into a strip */
+@media (max-width: 700px) and (orientation: portrait) {
+  #table.p8 { grid-template-rows: auto minmax(130px, 1fr) minmax(0, auto) auto; }
+  #table.p8 .bid-panel { overflow-y: auto; }
 }
 /* phone held sideways: the bid panel floats over the mat instead of taking its height */
 @media (max-height: 520px) and (orientation: landscape) {

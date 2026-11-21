@@ -65,6 +65,8 @@
   let chipPain = null;          // the paying team while its chips are being taken (its seats dim)
   // the team's chips beside its captain: a vertical pile, one disc per chip (up to 30: the 8-player table holds 30 chips); the first disc is the top one
   const towerHtml = (n) => '<i></i>'.repeat(Math.max(0, Math.min(n, 30)));
+  const reviewSeen = new Set();   // review keys already shown (in the result box or a toast)
+  const reviewBoxes = new Set();  // review keys whose result box has been opened
   const shedding = new Set();   // seats whose kunukku has just come off (see kunukkuSmash)
   let smashQueued = false;      // the hand-result screens will run the smash when they are done
   // End-of-hand chain (sweep -> chips -> trophy -> smash / kayaral -> result box). While it runs the mat, log and
@@ -96,6 +98,7 @@
     show('table');
     render();
     if (shedding.size && !smashQueued) kunukkuSmash();
+    reviewArrived();
   });
   socket.on('disconnect', () => toast(T('Connection lost. Reconnecting…')));
 
@@ -210,6 +213,7 @@
     }
     const c = h.contract;
     if (step === last && c) now += `<p><b>${esc(rpName(h, c.seat))} ${colourSuits(bidText(c.value, c.suit, c.hasJack))}: ${rpOutcome(h)}</b></p>`;
+    if (step === last && c && h.review) now += `<div class="review">${reviewHTML(h.review, c, T(c.team ? 'Team B' : 'Team A'))}</div>`;
     openModal(`<h2>${T('Hand {0}', h.handNo)}</h2>${now}
       <div class="deal-list replay">${h.dealt.map((cards, i) => `
         <div class="deal-row t${i % 2} ${c && step >= A && i === c.seat ? 'bidder' : ''}">
@@ -663,12 +667,47 @@
       <span class="r r2">${c.rank}</span><span class="s1 s3">${SYM[c.suit]}</span></div>`;
   }
   let toastTimer;
-  function toast(msg) {
+  function toast(msg, ms = 2600) {
     const t = $('toast');
     t.textContent = msg;
     t.classList.add('show');
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
+    toastTimer = setTimeout(() => t.classList.remove('show'), ms);
+  }
+  // ------------------------------------------------------------ card review (worked out on the server)
+  // Best possible and played out are the bidding team's points with perfect play by everyone, all cards visible;
+  // "you gave away" is the sum of what my own cards cost against that, next to the table average for the hand.
+  const gaveText = (mine, avg) => (mine === 1 ? T('You gave away 1 point · table average {0}', avg) : T('You gave away {0} points · table average {1}', mine, avg));
+  const gradeText = (mine, avg) => T(mine < avg - 0.5 ? 'better than the table' : mine > avg + 0.5 ? 'more than the table' : 'about the table average');
+  function reviewHTML(rv, c, team) {
+    if (!rv) return '';
+    let body;
+    if (rv.pending) body = `<p class="sub">${T('Reviewing the cards…')}</p>`;
+    else if (rv.none) body = `<p class="sub">${T(rv.none === 'players' ? 'Review is not available on 8-player tables yet' : 'No review for this hand')}</p>`;
+    else {
+      body = `<p>${T('Best possible for {0}: {1} (bid {2})', team, `<b>${rv.best}</b>`, c.value)}</p>`;
+      if (rv.stopped) body += `<p>${T('Played out: {0} would have finished with {1}', team, `<b>${rv.playedOut}</b>`)}</p>`;
+      if (rv.mine != null) body += `<p class="mine">${gaveText(rv.mine, rv.avg)} <span class="grade">${gradeText(rv.mine, rv.avg)}</span></p>`;
+    }
+    return `<h3>${T('Review, with all cards visible')}</h3>${body}`;
+  }
+  // A room update may carry this hand's review: fill the result box if it is open, else (box closed already, or
+  // a new hand under way) a toast for a seated player. While the end-of-hand screens still play, wait for the box.
+  function reviewArrived() {
+    const rv = room && room.review, g = room && room.game;
+    if (!rv) return;
+    const box = $('reviewBox');
+    if (box && box.dataset.key === rv.key) {
+      box.innerHTML = reviewHTML(rv, g.result.contract, teamName(g.result.contract.team));
+      if (!rv.pending) reviewSeen.add(rv.key);
+      return;
+    }
+    if (rv.pending || rv.none || rv.mine == null || reviewSeen.has(rv.key)) return;
+    const sameHand = g && g.handNo === rv.handNo && (g.phase === 'handover' || g.phase === 'matchover');
+    if (sameHand && !reviewBoxes.has(rv.key)) return;   // its result box has not opened yet
+    reviewSeen.add(rv.key);
+    toast(rv.mine === 1 ? T('Hand {0} review: you gave away 1 point · table average {1}', rv.handNo, rv.avg)
+      : T('Hand {0} review: you gave away {1} points · table average {2}', rv.handNo, rv.mine, rv.avg), 6000);
   }
   function openModal(html, closable, kind = 'info') {
     $('modalBody').innerHTML = html;
@@ -1213,6 +1252,9 @@
     const show = () => {
       endChain();
       if (lastPhaseKey !== key) return;   // the table moved on to a new hand meanwhile
+      const rv = room.review && room.review.handNo === g.handNo ? room.review : null;
+      if (rv) { reviewBoxes.add(rv.key); if (!rv.pending) reviewSeen.add(rv.key); }
+      const reviewBox = rv ? `<div id="reviewBox" class="review" data-key="${esc(rv.key)}">${reviewHTML(rv, c, bt)}</div>` : '';
       openModal(`
       <h2>${verdict}</h2>
       <p>${T('{0} bid {1}{2}. ', esc(nameOf(c.seat)), bidText(c.value, c.suit, c.hasJack), c.mult > 1 ? ` ×${c.mult}` : '')}${flow}</p>
@@ -1223,6 +1265,7 @@
         <span>${T('{0} chips', teamName(0))}</span><span class="v">${g.tables[0]}</span>
         <span>${T('{0} chips', teamName(1))}</span><span class="v">${g.tables[1]}</span>
       </div>
+      ${reviewBox}
       ${shedLine}
       ${over ? `<p><b>${T('{0} wins the match.', teamName(g.winner))}</b></p>
         <p class="kun-line"><span class="kunukku big">${KUNUKKU}</span><span><b>${T('{0} wears the kunukku.', teamName(1 - g.winner))}</b><span class="how"><br>${T('Bid and win the first hand of the next match and the whole team takes it off. After that, each player sheds their own by bidding and making a contract.')}</span></span></p>` : room.isHost ? '' : `<p class="sub">${T('The host deals the next hand.')}</p>`}

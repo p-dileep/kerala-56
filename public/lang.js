@@ -326,7 +326,21 @@
     'Trick {0}': 'പിടി {0}',
     '(you)': '(നിങ്ങൾ)',
     'Sign in first.': 'ആദ്യം സൈൻ ഇൻ ചെയ്യൂ.',
-    'Replays are not available right now.': 'ഇപ്പോൾ റീപ്ലേ ലഭ്യമല്ല.'
+    'Replays are not available right now.': 'ഇപ്പോൾ റീപ്ലേ ലഭ്യമല്ല.',
+    // ---- card review after a hand (all cards visible)
+    'Review, with all cards visible': 'അവലോകനം, എല്ലാ ചീട്ടും കണ്ടുകൊണ്ട്',
+    'Best possible for {0}: {1} (bid {2})': '{0} നേടാമായിരുന്ന പരമാവധി: {1} (വിളി {2})',
+    'Played out: {0} would have finished with {1}': 'മുഴുവൻ കളിച്ചിരുന്നെങ്കിൽ {0} എത്തുമായിരുന്നത്: {1}',
+    'You gave away {0} points · table average {1}': 'നിങ്ങൾ വിട്ടുകൊടുത്തത് {0} പോയിന്റ് · കളിക്കാരുടെ ശരാശരി {1}',
+    'You gave away 1 point · table average {0}': 'നിങ്ങൾ വിട്ടുകൊടുത്തത് 1 പോയിന്റ് · കളിക്കാരുടെ ശരാശരി {0}',
+    'better than the table': 'ശരാശരിയെക്കാൾ മെച്ചം',
+    'about the table average': 'ഏകദേശം ശരാശരി',
+    'more than the table': 'ശരാശരിയെക്കാൾ കൂടുതൽ',
+    'Reviewing the cards…': 'ചീട്ടുകൾ പരിശോധിക്കുന്നു…',
+    'No review for this hand': 'ഈ കളിക്ക് അവലോകനം ഇല്ല',
+    'Review is not available on 8-player tables yet': '8 പേരുടെ ടേബിളിൽ അവലോകനം ഇതുവരെ ഇല്ല',
+    'Hand {0} review: you gave away {1} points · table average {2}': 'കളി {0} അവലോകനം: നിങ്ങൾ വിട്ടുകൊടുത്തത് {1} പോയിന്റ് · കളിക്കാരുടെ ശരാശരി {2}',
+    'Hand {0} review: you gave away 1 point · table average {1}': 'കളി {0} അവലോകനം: നിങ്ങൾ വിട്ടുകൊടുത്തത് 1 പോയിന്റ് · കളിക്കാരുടെ ശരാശരി {1}'
   };
 
   // The bots' names, shown in Malayalam script (only for bot seats; a player's typed name is never changed).

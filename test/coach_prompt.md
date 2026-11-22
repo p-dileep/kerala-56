@@ -40,8 +40,9 @@ Team A, odd seats Team B. Cards rank J, 9, A, 10, K, Q (8 and 7 below at 8 playe
    - "Costliest habits": 2-3 bullets, each a pattern seen in more than one hand where possible, with the chips or
      points it cost and hand ids (`#1357`).
    - "Worst hands": the 3 hands where the player's OWN calls and cards cost most, one bullet each. Rank by the
-     chips given up in judged calls with `loss >= 0.5` (summed per hand), then by `cards.given`; a hand with a
-     `flipped` card counts as costlier than one without. Never pick a hand only because the team lost chips: a hand
+     player's own chip cost: the chips given up in judged calls with `loss >= 0.5` (summed per hand), plus, when
+     one of their cards is `flipped`, the contract's losing stake (2 under 40, 3 at 40, 4 at 48, 5 at 56). Ties go
+     to the higher `cards.given`. Never pick a hand only because the team lost chips: a hand
      where the player's calls and cards cost nothing is not a worst hand. If fewer than 3 hands cost anything,
      list fewer.
    Section titles are plain lines ending with a colon.

@@ -380,8 +380,12 @@ function autoAct(room, seat) {
     const netCard = NetPlay.NAMES.includes(name) && s.kind === 'bot' && g.phase === 'playing' ? NetPlay.choose(view) : null;
     const d = netCard ? { kind: 'play', cardId: netCard } : Bot.decide(view, Bot.paramsFor(room.botStyle, name));
     if (!d) return;
-    if (d.kind === 'bid') E.applyBid(g, seat, d.action);
-    else {
+    if (d.kind === 'bid') {
+      const n = g.bidding.actions.length;
+      E.applyBid(g, seat, d.action);
+      // a call the bot made for an away human: the coach notes charge it to nobody
+      if (s.kind === 'human') g.bidding.actions.slice(n).forEach((a) => { if (a.seat === seat) a.auto = true; });
+    } else {
       E.playCard(g, seat, d.cardId);
       if (s.kind === 'human') g.played[g.played.length - 1].auto = true;   // the review charges these to nobody
     }
@@ -487,6 +491,24 @@ io.on('connection', (socket) => {
       dealt: h.dealt, auction: h.auction, contract: h.contract, played: h.played, result: h.result,
       review: personal(h.review, h.seats.findIndex((x) => x.pid === pid))
     })));
+  });
+  // The signed-in player's coach note (written on the owner's laptop, test/coach_facts.js + coach_upload.js): one
+  // row read from Supabase on request, nothing worked out here.
+  socket.on('coachNote', async () => {
+    const pid = socket.data.pid;
+    if (!pid) return fail('Sign in first.');
+    if (!SUPABASE_URL || !SUPABASE_KEY) return socket.emit('coachNote', null);
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 5000);
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/coach_notes?player_id=eq.${Number(pid)}&select=updated_at,hand_ids,note_en,note_ml`,
+        { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, signal: ctrl.signal });
+      if (!r.ok) throw new Error(`coach_notes ${r.status}`);
+      socket.emit('coachNote', (await r.json())[0] || null);
+    } catch (err) {
+      console.error('coach note error', err.message);
+      fail('Notes are not available right now.');
+    } finally { clearTimeout(t); }
   });
   socket.on('logout', () => {
     if (socket.data.room) return fail('Leave the table first.');

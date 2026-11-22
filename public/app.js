@@ -147,8 +147,9 @@
         <h2 class="acct-title">✓ ${esc(a.name)}</h2>
         <div class="acct-stats">${tile(a.rating, T('Rating'))}${tile(a.hands, T('Hands'), T('won {0}', a.hands_won))}${tile(a.bids, T('Bids'), T('made {0}', a.bids_made))}${tile(a.matches, T('Matches'), T('won {0}', a.matches_won))}</div>
         <details class="rules"><summary>${T('How the rating works')}</summary><ul>${RATING_HOW.map((x) => `<li>${T(x)}</li>`).join('')}</ul></details>
-        <div class="acct-actions"><button type="button" class="btn primary" id="replayBtn">${T('Replay my last 5 hands')}</button><button type="button" class="btn ghost" id="signOutBtn">${T('Sign out')}</button></div>`;
+        <div class="acct-actions"><button type="button" class="btn primary" id="replayBtn">${T('Replay my last 5 hands')}</button><button type="button" class="btn" id="coachBtn">${T('What went wrong')}</button><button type="button" class="btn ghost" id="signOutBtn">${T('Sign out')}</button></div>`;
       $('replayBtn').onclick = () => socket.emit('myHands');
+      $('coachBtn').onclick = () => socket.emit('coachNote');
       $('signOutBtn').onclick = () => { socket.emit('logout'); store.set('g56login', ''); leaveAccount(); };
     }
     $('acctBack').onclick = leaveAccount;
@@ -182,6 +183,27 @@
   });
   renderAccount();
   if (location.hash === '#account' && !new URLSearchParams(location.search).get('room')) openAccount();
+
+  // Coach note: a written review of my last 20 hands, made once a day on the owner's laptop (test/coach_facts.js).
+  socket.on('coachNote', (n) => showCoachNote(n));
+  function showCoachNote(n) {
+    const text = n && (document.documentElement.lang === 'ml' ? n.note_ml : n.note_en);
+    let body = `<p>${T('Your notes appear the day after you play (updated every afternoon).')}</p>`;
+    if (text) {
+      let html = '', list = false;
+      for (const raw of text.split(/\r?\n/)) {
+        const line = raw.trim();
+        if (line.startsWith('- ')) { if (!list) { html += '<ul>'; list = true; } html += `<li>${esc(line.slice(2))}</li>`; continue; }
+        if (list) { html += '</ul>'; list = false; }
+        if (!line) continue;
+        html += line.endsWith(':') ? `<h3>${esc(line)}</h3>` : `<p>${esc(line)}</p>`;
+      }
+      if (list) html += '</ul>';
+      const ids = n.hand_ids || [];
+      body = `<p class="sub">${T('Updated {0}', new Date(n.updated_at).toLocaleString())}${ids.length ? ` · ${T('Hands #{0}–#{1}', Math.min(...ids), Math.max(...ids))}` : ''}</p><div class="coach-note">${html}</div>`;
+    }
+    openModal(`<h2>${T('What went wrong')}</h2>${body}<div class="row"><button class="btn" data-close>${T('Close')}</button></div>`, true);
+  }
 
   // Replays: the signed-in player's last 5 logged hands, stepped through from the deal, call by call, card by card.
   let replays = [];

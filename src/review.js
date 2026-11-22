@@ -175,24 +175,34 @@ function makeSolver(P, bidTeam, trumpSuit, maxNodes) {
 
 // V(0..m) for a hand, or null when the work budget runs out. `hand.leader` is the opening leader when nothing
 // has been played (tests); otherwise the first card's seat.
-function values(hand, { maxNodes = 180e6 } = {}) {
-  const P = hand.players, c = hand.contract, bt = c.team, trump = c.suit === 'NT' ? null : c.suit;
-  const S = makeSolver(P, bt, c.suit, maxNodes);
-  const m = hand.played.length, pos = [];
-  const hs = hand.dealt.map((h) => h.slice());
-  let taken = 0, trick = [], leader = m ? hand.played[0].seat : hand.leader;
-  for (let k = 0; ; k++) {
-    pos.push({ hands: hs.map((h) => h.slice()), trick: trick.slice(), taken, leader });
-    if (k === m) break;
-    const p = hand.played[k];
-    hs[p.seat].splice(hs[p.seat].indexOf(p.card.id), 1);
-    trick.push({ seat: p.seat, id: p.card.id });
-    if (trick.length === P) {
-      const w = trick[E.winningIndex(trick.map((x) => ({ card: { suit: x.id.slice(-2, -1), rank: x.id.slice(0, -2) } })), trump)].seat;
-      if (E.team(w) === bt) taken += trick.reduce((s, x) => s + E.POINTS[x.id.slice(0, -2)], 0);
-      leader = w; trick = [];
-    }
+// The position after `seat` plays card `id` from position p ({ hands, trick, taken, leader }).
+function nextPos(p, seat, id, P, bt, trump) {
+  const hands = p.hands.map((h) => h.slice());
+  hands[seat].splice(hands[seat].indexOf(id), 1);
+  let trick = [...p.trick, { seat, id }], taken = p.taken, leader = p.leader;
+  if (trick.length === P) {
+    const w = trick[E.winningIndex(trick.map((x) => ({ card: { suit: x.id.slice(-2, -1), rank: x.id.slice(0, -2) } })), trump)].seat;
+    if (E.team(w) === bt) taken += trick.reduce((s, x) => s + E.POINTS[x.id.slice(0, -2)], 0);
+    leader = w; trick = [];
   }
+  return { hands, trick, taken, leader };
+}
+const toMove = (p, P) => (p.trick.length ? (p.trick[p.trick.length - 1].seat + 1) % P : p.leader);
+// Positions 0..upto of a hand (k cards of hand.played played).
+function positions(hand, upto = hand.played.length) {
+  const P = hand.players, c = hand.contract, trump = c.suit === 'NT' ? null : c.suit;
+  const pos = [{ hands: hand.dealt.map((h) => h.slice()), trick: [], taken: 0, leader: hand.played.length ? hand.played[0].seat : hand.leader }];
+  for (let k = 0; k < upto; k++) pos.push(nextPos(pos[k], hand.played[k].seat, hand.played[k].card.id, P, c.team, trump));
+  return pos;
+}
+
+// One solver for a hand, to share between values() and bestCards(): its table stays filled between calls.
+const handSolver = (hand, maxNodes = 180e6) => makeSolver(hand.players, hand.contract.team, hand.contract.suit, maxNodes);
+
+function values(hand, { maxNodes = 180e6, solver = null } = {}) {
+  const P = hand.players, c = hand.contract, bt = c.team;
+  const S = solver || makeSolver(P, bt, c.suit, maxNodes);
+  const m = hand.played.length, pos = positions(hand);
   const V = new Array(m + 1);
   let guess = null;
   try {
@@ -209,6 +219,29 @@ function values(hand, { maxNodes = 180e6 } = {}) {
   }
   V.nodes = S.nodes;
   return V;
+}
+
+// At position k: the best total the bidding team can reach (= values(hand)[k]) and the legal cards of the seat to
+// move that keep it (one id per card type). null when the work budget runs out.
+function bestCards(hand, k, { maxNodes = 180e6, solver = null, guess = null } = {}) {
+  const P = hand.players, c = hand.contract, bt = c.team, trump = c.suit === 'NT' ? null : c.suit;
+  const p = positions(hand, k)[k], seat = toMove(p, P), mine = p.hands[seat];
+  const led = p.trick.length ? p.trick[0].id.slice(-2, -1) : null;
+  const follow = led ? mine.filter((id) => id.slice(-2, -1) === led) : [];
+  const seen = new Set(), legal = (follow.length ? follow : mine).filter((id) => !seen.has(id.slice(0, -1)) && seen.add(id.slice(0, -1)));
+  const S = solver || makeSolver(P, bt, c.suit, maxNodes);
+  try {
+    const got = legal.map((id) => {
+      const q = nextPos(p, seat, id, P, bt, trump);
+      S.setPos(q.hands, q.trick);
+      return { id, v: q.taken + S.solve(toMove(q, P), guess == null ? null : guess - q.taken) };
+    });
+    const value = (E.team(seat) === bt ? Math.max : Math.min)(...got.map((x) => x.v));
+    return { value, cards: got.filter((x) => x.v === value).map((x) => x.id) };
+  } catch (e) {
+    if (e instanceof Budget) return null;
+    throw e;
+  }
 }
 
 // The review of one logged hand ({ players, dealt, contract, played }).
@@ -236,4 +269,4 @@ function personal(review, seat) {
   return out;
 }
 
-module.exports = { reviewHand, personal, values };
+module.exports = { reviewHand, personal, values, bestCards, handSolver };

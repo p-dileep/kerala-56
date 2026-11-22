@@ -5,7 +5,7 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "test": "node test/sim.js && node test/review.js && node test/review_e2e.js && node test/socket.js"
+    "test": "node test/sim.js && node test/review.js && node test/coach.js && node test/review_e2e.js && node test/socket.js"
   },
   "engines": { "node": ">=18" },
   "license": "UNLICENSED",

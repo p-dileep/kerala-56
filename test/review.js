@@ -139,6 +139,29 @@ assert.ok(full, 'a seeded deal played to the end');
   console.log('personal');
 }
 
+{ // bestCards: the best total at a position, and the cards that keep it
+  const { bestCards } = require('../src/review');
+  const type = (id) => id.slice(0, -1);
+  for (const h of [cutDeal(full, 5), cutDeal(deals[1], 4)]) {
+    const V = values(h);
+    h.played.forEach((p, k) => {
+      const b = bestCards(h, k);
+      assert.equal(b.value, V[k], `position ${k}: best ${b.value} vs V ${V[k]}`);
+      const cost = p.seat % 2 === h.contract.team ? V[k] - V[k + 1] : V[k + 1] - V[k];
+      assert.equal(b.cards.some((id) => type(id) === type(p.card.id)), cost === 0, `position ${k}: cost ${cost}, best ${b.cards}`);
+      assert.equal(new Set(b.cards.map(type)).size, b.cards.length, 'one id per card type');
+    });
+  }
+  assert.equal(bestCards(cutDeal(full, 0), 0, { maxNodes: 10 }), null);
+  { // one shared solver gives the same answers
+    const { handSolver } = require('../src/review');
+    const h = cutDeal(deals[2], 3), S = handSolver(h), V = values(h, { solver: S });
+    assert.deepEqual([...V], [...values(h)]);
+    h.played.forEach((p, k) => assert.deepEqual(bestCards(h, k, { solver: S, guess: V[k] }), bestCards(h, k)));
+  }
+  console.log('bestCards');
+}
+
 module.exports = { cutDeal, deals, full };
 if (require.main === module) {
   (async () => {

@@ -181,4 +181,4 @@ if (require.main === module) {
   }
   console.log(`took ${((Date.now() - t0) / 1000).toFixed(1)}s`);
 }
-module.exports = { loadHands, humanDecisions, evaluate, tune, STEPS, LOWER, UPPER };
+module.exports = { loadHands, humanDecisions, evaluate, tune, STEPS, LOWER, UPPER, rigHand, toAction };

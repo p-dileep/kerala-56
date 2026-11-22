@@ -340,6 +340,11 @@
     '(you)': '(നിങ്ങൾ)',
     'Sign in first.': 'ആദ്യം സൈൻ ഇൻ ചെയ്യൂ.',
     'Replays are not available right now.': 'ഇപ്പോൾ റീപ്ലേ ലഭ്യമല്ല.',
+    'What went wrong': 'എവിടെ പിഴച്ചു',
+    'Your notes appear the day after you play (updated every afternoon).': 'കളിച്ചതിന്റെ പിറ്റേന്ന് നിങ്ങളുടെ കുറിപ്പ് ഇവിടെ വരും (എല്ലാ ദിവസവും ഉച്ചകഴിഞ്ഞ് പുതുക്കും).',
+    'Updated {0}': 'പുതുക്കിയത് {0}',
+    'Hands #{0}–#{1}': 'കളികൾ #{0}–#{1}',
+    'Notes are not available right now.': 'ഇപ്പോൾ കുറിപ്പ് ലഭ്യമല്ല.',
     // ---- card review after a hand (all cards visible)
     'Review, with all cards visible': 'അവലോകനം, എല്ലാ ചീട്ടും കണ്ടുകൊണ്ട്',
     'Best possible for {0}: {1} (bid {2})': '{0} നേടാമായിരുന്ന പരമാവധി: {1} (വിളി {2})',

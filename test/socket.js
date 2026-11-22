@@ -214,7 +214,16 @@ server.listen(0, () => {
           const ok = rows.length === 3 && rows[0].handNo === 3 && rows.every((h) => h.seats[h.me].name === 'Mate' && h.dealt.length === 8 && !h.seats.some((x) => 'pid' in x));
           if (!ok) { console.error('replay rows wrong', rows.map((h) => [h.handNo, h.me])); process.exit(1); }
           console.log('replays passed');
-          console.log('socket e2e passed'); process.exit(0);
+          mate.once('coachNote', (note) => {   // no Supabase here: a signed-in player gets null; a guest is refused
+            if (note !== null) { console.error('coach note without a store should be null', note); process.exit(1); }
+            guest.once('errorMsg', (msg) => {
+              if (msg !== 'Sign in first.') { console.error('guest coach note', msg); process.exit(1); }
+              console.log('coach notes passed');
+              console.log('socket e2e passed'); process.exit(0);
+            });
+            guest.emit('coachNote');
+          });
+          mate.emit('coachNote');
         });
         mate.emit('myHands');
         return;

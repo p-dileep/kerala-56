@@ -797,4 +797,4 @@ function botView(state, seat) {
 }
 
 const estimate = estimateFor;
-module.exports = { decide, botView, estimate, chooseBid, choosePlay, track, inferFacts, dealUnseen, simPoints, DEFAULT_PARAMS, STYLES, BOT_PERSONALITY, HUMAN_TUNED, HUMAN_TUNED_BOTS, SELF_PLAY_TUNED, paramsFor };
+module.exports = { decide, botView, estimate, chooseBid, choosePlay, track, inferFacts, dealUnseen, simPoints, simRun, evAt, DEFAULT_PARAMS, STYLES, BOT_PERSONALITY, HUMAN_TUNED, HUMAN_TUNED_BOTS, SELF_PLAY_TUNED, paramsFor };

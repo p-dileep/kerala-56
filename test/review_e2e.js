@@ -26,6 +26,8 @@ server.listen(0, () => {
     const hand = lines.find((l) => l.hand_no === target && l.dealt), stored = lines.find((l) => l.review_of === hand.id);
     const mates = hand.played.filter((p) => p.seat === mateSeat);
     if (!mates.length || !mates.every((p) => p.auto) || hand.played.some((p) => p.seat !== mateSeat && p.auto)) fail('takeover cards not marked auto');
+    const mateCalls = hand.auction.filter((a) => a.seat === mateSeat);   // Mate left before the deal: every call was the bot's
+    if (!mateCalls.length || !mateCalls.every((a) => a.auto) || hand.auction.some((a) => a.seat !== mateSeat && a.auto)) fail('takeover calls not marked auto ' + JSON.stringify(hand.auction));
     if (!stored && tries < 30) return setTimeout(() => done(tries + 1), 100);   // stored just after it is shown
     if (!stored || !(Array.isArray(stored.review.given) || stored.review.none)) fail('review not stored with the hand ' + JSON.stringify(stored));
     fs.rmSync(process.env.HAND_LOG, { force: true });

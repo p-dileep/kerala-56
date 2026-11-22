@@ -39,7 +39,11 @@ Team A, odd seats Team B. Cards rank J, 9, A, 10, K, Q (8 and 7 below at 8 playe
    - "Going well": 1-2 bullets.
    - "Costliest habits": 2-3 bullets, each a pattern seen in more than one hand where possible, with the chips or
      points it cost and hand ids (`#1357`).
-   - "Worst hands": the 3 hands that cost most (chips first, then points), one bullet each.
+   - "Worst hands": the 3 hands where the player's OWN calls and cards cost most, one bullet each. Rank by the
+     chips given up in judged calls with `loss >= 0.5` (summed per hand), then by `cards.given`; a hand with a
+     `flipped` card counts as costlier than one without. Never pick a hand only because the team lost chips: a hand
+     where the player's calls and cards cost nothing is not a worst hand. If fewer than 3 hands cost anything,
+     list fewer.
    Section titles are plain lines ending with a colon.
 5. Tone: a friendly coach talking to the player directly ("you"). No player names, no other players' mistakes.
 6. `note_ml`: the same note in Malayalam, in the game's words: മേശ for chip, വിളി for bid/call, തുറുപ്പ് for trump,
